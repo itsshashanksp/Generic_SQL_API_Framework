@@ -253,6 +253,7 @@ $functionsWithoutColumn = [
     "EOMONTH",
     "DATEFROMPARTS",
     "DATETIMEFROMPARTS",
+    "TIMEFROMPARTS",
 ];
 
 if (
@@ -494,6 +495,37 @@ if (
 
             throw new Exception(
                 "DATETIMEFROMPARTS requires {$field}."
+            );
+
+        }
+
+    }
+
+    continue;
+
+}
+
+/*
+ * TIMEFROMPARTS Validation
+ */
+if (
+    strtoupper($column['function']) == "TIMEFROMPARTS"
+) {
+
+    $required = [
+        "hour",
+        "minute",
+        "second",
+        "fractions",
+        "precision"
+    ];
+
+    foreach ($required as $field) {
+
+        if (!isset($column[$field])) {
+
+            throw new Exception(
+                "TIMEFROMPARTS requires {$field}."
             );
 
         }
@@ -1004,6 +1036,7 @@ if (isset($column['function'])) {
         "ISDATE",
         "DATEFROMPARTS",
         "DATETIMEFROMPARTS",
+        "TIMEFROMPARTS",
     ];
 
     $mathFunctions = [
@@ -1937,6 +1970,48 @@ if ($function == "DATETIMEFROMPARTS") {
 
     $selectColumns[] =
         "DATETIMEFROMPARTS("
+        . implode(", ", $parts)
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * TIMEFROMPARTS()
+ */
+if ($function == "TIMEFROMPARTS") {
+
+    $parts = [];
+
+    foreach ([
+        "hour",
+        "minute",
+        "second",
+        "fractions",
+        "precision"
+    ] as $part) {
+
+        if (is_array($column[$part])) {
+
+            $parts[] =
+                $this->buildExpression(
+                    $column[$part]
+                );
+
+        } else {
+
+            $parts[] =
+                (int)$column[$part];
+
+        }
+
+    }
+
+    $selectColumns[] =
+        "TIMEFROMPARTS("
         . implode(", ", $parts)
         . ") AS ["
         . $alias
