@@ -250,7 +250,8 @@ $functionsWithoutColumn = [
     "COALESCE",
     "CONCAT",
     "DATEDIFF",
-    "EOMONTH"
+    "EOMONTH",
+    "DATEFROMPARTS",
 ];
 
 if (
@@ -426,6 +427,41 @@ if (
 
         throw new Exception(
             "ISDATE requires column."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
+ * DATEFROMPARTS Validation
+ */
+if (
+    strtoupper($column['function']) == "DATEFROMPARTS"
+) {
+
+    if (!isset($column['year'])) {
+
+        throw new Exception(
+            "DATEFROMPARTS requires year."
+        );
+
+    }
+
+    if (!isset($column['month'])) {
+
+        throw new Exception(
+            "DATEFROMPARTS requires month."
+        );
+
+    }
+
+    if (!isset($column['day'])) {
+
+        throw new Exception(
+            "DATEFROMPARTS requires day."
         );
 
     }
@@ -931,7 +967,8 @@ if (isset($column['function'])) {
         "DATEADD",
         "DATEDIFF",
         "EOMONTH",
-        "ISDATE"
+        "ISDATE",
+        "DATEFROMPARTS"
     ];
 
     $mathFunctions = [
@@ -1790,6 +1827,38 @@ if ($function == "ISDATE") {
     $selectColumns[] =
         "ISDATE("
         . $value
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * DATEFROMPARTS()
+ */
+if ($function == "DATEFROMPARTS") {
+
+    $year = is_array($column['year'])
+        ? $this->buildExpression($column['year'])
+        : (int)$column['year'];
+
+    $month = is_array($column['month'])
+        ? $this->buildExpression($column['month'])
+        : (int)$column['month'];
+
+    $day = is_array($column['day'])
+        ? $this->buildExpression($column['day'])
+        : (int)$column['day'];
+
+    $selectColumns[] =
+        "DATEFROMPARTS("
+        . $year
+        . ", "
+        . $month
+        . ", "
+        . $day
         . ") AS ["
         . $alias
         . "]";
