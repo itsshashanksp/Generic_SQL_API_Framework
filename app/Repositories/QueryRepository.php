@@ -416,6 +416,25 @@ if (
 }
 
 /*
+ * ISDATE Validation
+ */
+if (
+    strtoupper($column['function']) == "ISDATE"
+) {
+
+    if (empty($column['column'])) {
+
+        throw new Exception(
+            "ISDATE requires column."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
  * CAST / CONVERT Validation
  */
 if (
@@ -911,7 +930,8 @@ if (isset($column['function'])) {
         "GETDATE",
         "DATEADD",
         "DATEDIFF",
-        "EOMONTH"
+        "EOMONTH",
+        "ISDATE"
     ];
 
     $mathFunctions = [
@@ -1741,6 +1761,35 @@ if ($function == "EOMONTH") {
         . $start
         . ", "
         . (int)$monthOffset
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * ISDATE()
+ */
+if ($function == "ISDATE") {
+
+    $value = $resolvedColumn;
+
+    if (isset($column['style'])) {
+
+        $value =
+            "CONVERT(varchar(50), "
+            . $resolvedColumn
+            . ", "
+            . (int)$column['style']
+            . ")";
+
+    }
+
+    $selectColumns[] =
+        "ISDATE("
+        . $value
         . ") AS ["
         . $alias
         . "]";
