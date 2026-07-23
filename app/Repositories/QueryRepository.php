@@ -249,7 +249,8 @@ $functionsWithoutColumn = [
     "GETDATE",
     "COALESCE",
     "CONCAT",
-    "DATEDIFF"
+    "DATEDIFF",
+    "EOMONTH"
 ];
 
 if (
@@ -392,6 +393,25 @@ if (
     continue;
 
 }
+
+}
+
+/*
+ * EOMONTH Validation
+ */
+if (
+    strtoupper($column['function']) == "EOMONTH"
+) {
+
+    if (!isset($column['start'])) {
+
+        throw new Exception(
+            "EOMONTH requires start."
+        );
+
+    }
+
+    continue;
 
 }
 
@@ -890,7 +910,8 @@ if (isset($column['function'])) {
         "DATENAME",
         "GETDATE",
         "DATEADD",
-        "DATEDIFF"
+        "DATEDIFF",
+        "EOMONTH"
     ];
 
     $mathFunctions = [
@@ -1654,6 +1675,72 @@ if ($function == "DATEDIFF") {
         . $start
         . ", "
         . $end
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * EOMONTH()
+ */
+if ($function == "EOMONTH") {
+
+    /*
+     * START
+     */
+    if (isset($column['start']['function'])) {
+
+        $start =
+            strtoupper(
+                $column['start']['function']
+            ) . "()";
+
+    } else {
+
+        $resolved =
+            $this->resolveColumn(
+                $column['start']['column']
+            );
+
+        if (!empty($resolved['table'])) {
+
+            $start =
+                $resolved['table']
+                . "."
+                . $resolved['column'];
+
+        } else {
+
+            $start =
+                $resolved['column'];
+
+        }
+
+        if (isset($column['start']['style'])) {
+
+            $start =
+                "CONVERT(date, CAST("
+                . $start
+                . " AS varchar(8)), "
+                . (int)$column['start']['style']
+                . ")";
+
+        }
+
+    }
+
+    $monthOffset =
+        $column['month']
+        ?? 0;
+
+    $selectColumns[] =
+        "EOMONTH("
+        . $start
+        . ", "
+        . (int)$monthOffset
         . ") AS ["
         . $alias
         . "]";
