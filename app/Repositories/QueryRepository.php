@@ -478,6 +478,33 @@ if (
 
 }
 
+/*
+ * REPLACE Validation
+ */
+if (
+    strtoupper($column['function']) == "REPLACE"
+) {
+
+    if (!array_key_exists("search", $column)) {
+
+        throw new Exception(
+            "REPLACE requires search."
+        );
+
+    }
+
+    if (!array_key_exists("replace", $column)) {
+
+        throw new Exception(
+            "REPLACE requires replace."
+        );
+
+    }
+
+    continue;
+
+}
+
         /*
          * Normal Column With Alias
          */
@@ -723,7 +750,9 @@ if (isset($column['function'])) {
 
         "LEFT",
         "RIGHT",
-        "SUBSTRING"
+        "SUBSTRING",
+
+        "REPLACE"
     ];
 
     $dateFunctions = [
@@ -1225,6 +1254,40 @@ if ($function == "SUBSTRING") {
 
 }
 
+/*
+ * REPLACE()
+ */
+if ($function == "REPLACE") {
+
+    $search =
+        str_replace(
+            "'",
+            "''",
+            $column['search']
+        );
+
+    $replace =
+        str_replace(
+            "'",
+            "''",
+            $column['replace']
+        );
+
+    $selectColumns[] =
+        "REPLACE("
+        . $resolvedColumn
+        . ", '"
+        . $search
+        . "', '"
+        . $replace
+        . "') AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
     /*
      * Aggregate & String Functions
      */
@@ -1531,7 +1594,9 @@ if (!empty($request['joins'])) {
 
             "LEFT",
             "RIGHT",
-            "SUBSTRING"
+            "SUBSTRING",
+
+            "REPLACE"
        ];
 
         if (
