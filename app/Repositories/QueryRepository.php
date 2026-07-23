@@ -254,6 +254,7 @@ $functionsWithoutColumn = [
     "DATEFROMPARTS",
     "DATETIMEFROMPARTS",
     "TIMEFROMPARTS",
+    "SYSDATETIME",
 ];
 
 if (
@@ -531,6 +532,17 @@ if (
         }
 
     }
+
+    continue;
+
+}
+
+/*
+ * SYSDATETIME Validation
+ */
+if (
+    strtoupper($column['function']) == "SYSDATETIME"
+) {
 
     continue;
 
@@ -1037,6 +1049,7 @@ if (isset($column['function'])) {
         "DATEFROMPARTS",
         "DATETIMEFROMPARTS",
         "TIMEFROMPARTS",
+        "SYSDATETIME",
     ];
 
     $mathFunctions = [
@@ -2014,6 +2027,20 @@ if ($function == "TIMEFROMPARTS") {
         "TIMEFROMPARTS("
         . implode(", ", $parts)
         . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * SYSDATETIME()
+ */
+if ($function == "SYSDATETIME") {
+
+    $selectColumns[] =
+        "SYSDATETIME() AS ["
         . $alias
         . "]";
 
