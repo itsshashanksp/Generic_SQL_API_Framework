@@ -248,7 +248,8 @@ if (isset($column['function'])) {
 $functionsWithoutColumn = [
     "GETDATE",
     "COALESCE",
-    "CONCAT"
+    "CONCAT",
+    "DATEDIFF"
 ];
 
 if (
@@ -349,6 +350,41 @@ if (
 
         throw new Exception(
             "DATEADD requires number."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
+ * DATEDIFF Validation
+ */
+if (
+    strtoupper($column['function']) == "DATEDIFF"
+) {
+
+    if (!isset($column['datepart'])) {
+
+        throw new Exception(
+            "DATEDIFF requires datepart."
+        );
+
+    }
+
+    if (!isset($column['start'])) {
+
+        throw new Exception(
+            "DATEDIFF requires start."
+        );
+
+    }
+
+    if (!isset($column['end'])) {
+
+        throw new Exception(
+            "DATEDIFF requires end."
         );
 
     }
@@ -853,7 +889,8 @@ if (isset($column['function'])) {
         "DATEPART",
         "DATENAME",
         "GETDATE",
-        "DATEADD"
+        "DATEADD",
+        "DATEDIFF"
     ];
 
     $mathFunctions = [
@@ -1525,6 +1562,98 @@ if ($function == "DATEADD") {
         . (int)$column['number']
         . ", "
         . $dateExpression
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * DATEDIFF()
+ */
+if ($function == "DATEDIFF") {
+
+    $datePart = strtoupper($column['datepart']);
+
+    $allowedParts = [
+        "YEAR",
+        "QUARTER",
+        "MONTH",
+        "DAYOFYEAR",
+        "DAY",
+        "WEEK",
+        "WEEKDAY",
+        "HOUR",
+        "MINUTE",
+        "SECOND",
+        "MILLISECOND"
+    ];
+
+    if (!in_array($datePart, $allowedParts)) {
+
+        throw new Exception(
+            "Invalid DATEDIFF datepart."
+        );
+
+    }
+
+    /*
+     * START
+     */
+    if (isset($column['start']['function'])) {
+
+        $start =
+            strtoupper($column['start']['function'])
+            . "()";
+
+    } else {
+
+        $start = $column['start']['column'];
+
+        if (isset($column['start']['style'])) {
+
+            $start =
+                "CONVERT(date, CAST("
+                . $start
+                . " AS varchar(8)), "
+                . (int)$column['start']['style']
+                . ")";
+        }
+    }
+
+    /*
+     * END
+     */
+    if (isset($column['end']['function'])) {
+
+        $end =
+            strtoupper($column['end']['function'])
+            . "()";
+
+    } else {
+
+        $end = $column['end']['column'];
+
+        if (isset($column['end']['style'])) {
+
+            $end =
+                "CONVERT(date, CAST("
+                . $end
+                . " AS varchar(8)), "
+                . (int)$column['end']['style']
+                . ")";
+        }
+    }
+
+    $selectColumns[] =
+        "DATEDIFF("
+        . $datePart
+        . ", "
+        . $start
+        . ", "
+        . $end
         . ") AS ["
         . $alias
         . "]";
