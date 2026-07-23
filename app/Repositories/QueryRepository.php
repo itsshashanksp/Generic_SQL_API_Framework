@@ -252,6 +252,7 @@ $functionsWithoutColumn = [
     "DATEDIFF",
     "EOMONTH",
     "DATEFROMPARTS",
+    "DATETIMEFROMPARTS",
 ];
 
 if (
@@ -463,6 +464,39 @@ if (
         throw new Exception(
             "DATEFROMPARTS requires day."
         );
+
+    }
+
+    continue;
+
+}
+
+/*
+ * DATETIMEFROMPARTS Validation
+ */
+if (
+    strtoupper($column['function']) == "DATETIMEFROMPARTS"
+) {
+
+    $required = [
+        "year",
+        "month",
+        "day",
+        "hour",
+        "minute",
+        "second",
+        "millisecond"
+    ];
+
+    foreach ($required as $field) {
+
+        if (!isset($column[$field])) {
+
+            throw new Exception(
+                "DATETIMEFROMPARTS requires {$field}."
+            );
+
+        }
 
     }
 
@@ -968,7 +1002,8 @@ if (isset($column['function'])) {
         "DATEDIFF",
         "EOMONTH",
         "ISDATE",
-        "DATEFROMPARTS"
+        "DATEFROMPARTS",
+        "DATETIMEFROMPARTS",
     ];
 
     $mathFunctions = [
@@ -1859,6 +1894,50 @@ if ($function == "DATEFROMPARTS") {
         . $month
         . ", "
         . $day
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * DATETIMEFROMPARTS()
+ */
+if ($function == "DATETIMEFROMPARTS") {
+
+    $parts = [];
+
+    foreach ([
+        "year",
+        "month",
+        "day",
+        "hour",
+        "minute",
+        "second",
+        "millisecond"
+    ] as $part) {
+
+        if (is_array($column[$part])) {
+
+            $parts[] =
+                $this->buildExpression(
+                    $column[$part]
+                );
+
+        } else {
+
+            $parts[] =
+                (int)$column[$part];
+
+        }
+
+    }
+
+    $selectColumns[] =
+        "DATETIMEFROMPARTS("
+        . implode(", ", $parts)
         . ") AS ["
         . $alias
         . "]";
