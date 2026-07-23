@@ -255,6 +255,7 @@ $functionsWithoutColumn = [
     "DATETIMEFROMPARTS",
     "TIMEFROMPARTS",
     "SYSDATETIME",
+    "CURRENT_TIMESTAMP",
 ];
 
 if (
@@ -542,6 +543,17 @@ if (
  */
 if (
     strtoupper($column['function']) == "SYSDATETIME"
+) {
+
+    continue;
+
+}
+
+/*
+ * CURRENT_TIMESTAMP Validation
+ */
+if (
+    strtoupper($column['function']) == "CURRENT_TIMESTAMP"
 ) {
 
     continue;
@@ -1050,6 +1062,7 @@ if (isset($column['function'])) {
         "DATETIMEFROMPARTS",
         "TIMEFROMPARTS",
         "SYSDATETIME",
+        "CURRENT_TIMESTAMP",
     ];
 
     $mathFunctions = [
@@ -2041,6 +2054,20 @@ if ($function == "SYSDATETIME") {
 
     $selectColumns[] =
         "SYSDATETIME() AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * CURRENT_TIMESTAMP
+ */
+if ($function == "CURRENT_TIMESTAMP") {
+
+    $selectColumns[] =
+        "CURRENT_TIMESTAMP AS ["
         . $alias
         . "]";
 
