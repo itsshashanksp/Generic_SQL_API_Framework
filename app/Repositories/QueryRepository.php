@@ -505,6 +505,25 @@ if (
 
 }
 
+/*
+ * CHARINDEX Validation
+ */
+if (
+    strtoupper($column['function']) == "CHARINDEX"
+) {
+
+    if (!array_key_exists("search", $column)) {
+
+        throw new Exception(
+            "CHARINDEX requires search."
+        );
+
+    }
+
+    continue;
+
+}
+
         /*
          * Normal Column With Alias
          */
@@ -752,7 +771,9 @@ if (isset($column['function'])) {
         "RIGHT",
         "SUBSTRING",
 
-        "REPLACE"
+        "REPLACE",
+
+        "CHARINDEX"
     ];
 
     $dateFunctions = [
@@ -1288,6 +1309,31 @@ if ($function == "REPLACE") {
 
 }
 
+/*
+ * CHARINDEX()
+ */
+if ($function == "CHARINDEX") {
+
+    $search =
+        str_replace(
+            "'",
+            "''",
+            $column['search']
+        );
+
+    $selectColumns[] =
+        "CHARINDEX('"
+        . $search
+        . "', "
+        . $resolvedColumn
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
     /*
      * Aggregate & String Functions
      */
@@ -1596,7 +1642,9 @@ if (!empty($request['joins'])) {
             "RIGHT",
             "SUBSTRING",
 
-            "REPLACE"
+            "REPLACE",
+
+            "CHARINDEX"
        ];
 
         if (
