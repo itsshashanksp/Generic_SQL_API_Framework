@@ -161,6 +161,122 @@ private function buildExpression($expression): string
 
 }
 
+/*
+ * Build SQL Condition
+ */
+private function buildCondition(array $condition): string
+{
+
+    /*
+     * Required Fields
+     */
+    foreach ([
+        "left",
+        "operator",
+        "right"
+    ] as $field) {
+
+        if (!array_key_exists($field, $condition)) {
+
+            throw new Exception(
+                "Condition requires {$field}."
+            );
+
+        }
+
+    }
+
+    /*
+     * Allowed Operators
+     */
+    $allowedOperators = [
+
+        "=",
+        "!=",
+        "<>",
+        ">",
+        "<",
+        ">=",
+        "<=",
+        "LIKE",
+        "NOT LIKE",
+        "IN",
+        "NOT IN"
+
+    ];
+
+    $operator =
+        strtoupper($condition["operator"]);
+
+    if (
+        !in_array(
+            $operator,
+            $allowedOperators
+        )
+    ) {
+
+        throw new Exception(
+            "Invalid condition operator."
+        );
+
+    }
+
+    /*
+     * IN / NOT IN
+     */
+    if (
+        $operator == "IN"
+        || $operator == "NOT IN"
+    ) {
+
+        if (
+            !is_array($condition["right"])
+            || empty($condition["right"])
+        ) {
+
+            throw new Exception(
+                "{$operator} requires an array."
+            );
+
+        }
+
+        $values = [];
+
+        foreach ($condition["right"] as $value) {
+
+            $values[] =
+                $this->buildValue($value);
+
+        }
+
+        return
+            $this->buildExpression(
+                $condition["left"]
+            )
+            . " "
+            . $operator
+            . " ("
+            . implode(", ", $values)
+            . ")";
+
+    }
+
+    /*
+     * Normal Comparison
+     */
+    return
+        $this->buildExpression(
+            $condition["left"]
+        )
+        . " "
+        . $operator
+        . " "
+        . $this->buildExpression(
+            $condition["right"]
+        );
+
+}
+
     public function select($request)
     {
         /*
