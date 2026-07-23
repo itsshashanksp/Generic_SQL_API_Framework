@@ -524,6 +524,25 @@ if (
 
 }
 
+/*
+ * PATINDEX Validation
+ */
+if (
+    strtoupper($column['function']) == "PATINDEX"
+) {
+
+    if (!array_key_exists("pattern", $column)) {
+
+        throw new Exception(
+            "PATINDEX requires pattern."
+        );
+
+    }
+
+    continue;
+
+}
+
         /*
          * Normal Column With Alias
          */
@@ -773,7 +792,9 @@ if (isset($column['function'])) {
 
         "REPLACE",
 
-        "CHARINDEX"
+        "CHARINDEX",
+
+        "PATINDEX"
     ];
 
     $dateFunctions = [
@@ -1334,6 +1355,31 @@ if ($function == "CHARINDEX") {
 
 }
 
+/*
+ * PATINDEX()
+ */
+if ($function == "PATINDEX") {
+
+    $pattern =
+        str_replace(
+            "'",
+            "''",
+            $column['pattern']
+        );
+
+    $selectColumns[] =
+        "PATINDEX('"
+        . $pattern
+        . "', CAST("
+        . $resolvedColumn
+        . " AS NVARCHAR(MAX))) AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
     /*
      * Aggregate & String Functions
      */
@@ -1644,7 +1690,9 @@ if (!empty($request['joins'])) {
 
             "REPLACE",
 
-            "CHARINDEX"
+            "CHARINDEX",
+
+            "PATINDEX"
        ];
 
         if (
