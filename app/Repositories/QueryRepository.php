@@ -42,6 +42,57 @@ class QueryRepository
     ];
     }
 
+/*
+ * Build SQL Value
+ */
+private function buildValue($value): string
+{
+
+    /*
+     * Numeric
+     */
+    if (is_numeric($value)) {
+
+        return (string)$value;
+
+    }
+
+    /*
+     * NULL
+     */
+    if ($value === null) {
+
+        return "NULL";
+
+    }
+
+    /*
+     * Boolean
+     */
+    if (is_bool($value)) {
+
+        return $value ? "1" : "0";
+
+    }
+
+    /*
+     * Nested Expression
+     */
+    if (is_array($value)) {
+
+        return $this->buildExpression($value);
+
+    }
+
+    /*
+     * String
+     */
+    return "'"
+        . str_replace("'", "''", $value)
+        . "'";
+
+}    
+
     public function select($request)
     {
         /*
