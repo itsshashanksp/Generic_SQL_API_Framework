@@ -329,6 +329,34 @@ if (
 
     continue;
     }
+
+/*
+ * DATEADD Validation
+ */
+if (
+    strtoupper($column['function']) == "DATEADD"
+) {
+
+    if (!isset($column['datepart'])) {
+
+        throw new Exception(
+            "DATEADD requires datepart."
+        );
+
+    }
+
+    if (!isset($column['number'])) {
+
+        throw new Exception(
+            "DATEADD requires number."
+        );
+
+    }
+
+    continue;
+
+}
+
 }
 
 /*
@@ -824,7 +852,8 @@ if (isset($column['function'])) {
         "DAY",
         "DATEPART",
         "DATENAME",
-        "GETDATE"
+        "GETDATE",
+        "DATEADD"
     ];
 
     $mathFunctions = [
@@ -1440,6 +1469,65 @@ if ($function == "FORMAT") {
             . "]";
 
     }
+
+    continue;
+
+}
+
+/*
+ * DATEADD()
+ */
+if ($function == "DATEADD") {
+
+    $datePart = strtoupper($column['datepart']);
+
+    $allowedParts = [
+        "YEAR",
+        "MONTH",
+        "DAY",
+        "HOUR",
+        "MINUTE",
+        "SECOND"
+    ];
+
+    if (!in_array($datePart, $allowedParts)) {
+
+        throw new Exception(
+            "Invalid DATEADD datepart."
+        );
+
+    }
+
+    /*
+     * Legacy YYYYMMDD Support
+     */
+    if (isset($column['style'])) {
+
+        $style = (int)$column['style'];
+
+        $dateExpression =
+            "CONVERT(date, CAST("
+            . $resolvedColumn
+            . " AS varchar(8)), "
+            . $style
+            . ")";
+
+    } else {
+
+        $dateExpression = $resolvedColumn;
+
+    }
+
+    $selectColumns[] =
+        "DATEADD("
+        . $datePart
+        . ", "
+        . (int)$column['number']
+        . ", "
+        . $dateExpression
+        . ") AS ["
+        . $alias
+        . "]";
 
     continue;
 
