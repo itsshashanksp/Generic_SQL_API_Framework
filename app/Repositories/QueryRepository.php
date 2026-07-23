@@ -89,29 +89,315 @@ class QueryRepository
         if (is_array($column)) {
 
 /*
+ * CASE Expression Validation
+ */
+if (isset($column['case'])) {
+
+    $case = $column['case'];
+
+    if (
+        empty($case['when'])
+        || !is_array($case['when'])
+    ) {
+        throw new Exception(
+            "CASE requires at least one WHEN clause."
+        );
+    }
+
+    foreach ($case['when'] as $when) {
+
+        if (empty($when['condition'])) {
+            throw new Exception(
+                "CASE WHEN requires a condition."
+            );
+        }
+
+        $condition = $when['condition'];
+
+        if (empty($condition['column'])) {
+            throw new Exception(
+                "CASE condition requires column."
+            );
+        }
+
+        if (empty($condition['operator'])) {
+            throw new Exception(
+                "CASE condition requires operator."
+            );
+        }
+
+        if (!array_key_exists("value", $condition)) {
+            throw new Exception(
+                "CASE condition requires value."
+            );
+        }
+
+        if (!array_key_exists("then", $when)) {
+            throw new Exception(
+                "CASE WHEN requires THEN value."
+            );
+        }
+
+        $resolved =
+            $this->resolveColumn(
+                $condition['column']
+            );
+
+        $table =
+            $resolved['table']
+            ?? $request['table'];
+
+        if (
+            !$this->metadataRepository->columnExists(
+                $table,
+                $resolved['column']
+            )
+        ) {
+            throw new Exception(
+                "Invalid CASE column: {$condition['column']}"
+            );
+        }
+
+        $allowedOperators = [
+            "=",
+            "!=",
+            "<>",
+            ">",
+            "<",
+            ">=",
+            "<="
+        ];
+
+        if (
+            !in_array(
+                strtoupper($condition['operator']),
+                $allowedOperators
+            )
+        ) {
+            throw new Exception(
+                "Invalid CASE operator: {$condition['operator']}"
+            );
+        }
+    }
+
+    continue;
+}
+
+/*
+ * Arithmetic Expression
+ */
+if (isset($column['expression'])) {
+
+    $expression = $column['expression'];
+
+    foreach (['left','right'] as $side) {
+
+        if (is_numeric($expression[$side])) {
+
+            $$side = $expression[$side];
+
+        } else {
+
+            $resolved =
+                $this->resolveColumn(
+                    $expression[$side]
+                );
+
+            if (!empty($resolved['table'])) {
+
+                $$side =
+                    $resolved['table']
+                    . "."
+                    . $resolved['column'];
+
+            } else {
+
+                $$side =
+                    $resolved['column'];
+
+            }
+
+        }
+
+    }
+
+    $alias =
+        $column['alias']
+        ?? "Expression";
+
+    $selectColumns[] =
+        "("
+        . $left
+        . " "
+        . $expression['operator']
+        . " "
+        . $right
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
  * Aggregate Column
  */
 if (isset($column['function'])) {
 
-    /*
-     * GETDATE() does not require a column.
-     */
-    if (
-        strtoupper($column['function']) != "GETDATE"
-    ) {
+$functionsWithoutColumn = [
+    "GETDATE",
+    "COALESCE",
+    "CONCAT"
+];
 
-        if (empty($column['column'])) {
+if (
+    !in_array(
+        strtoupper($column['function']),
+        $functionsWithoutColumn
+    )
+) {
+
+    if (empty($column['column'])) {
+        throw new Exception(
+            "Function {$column['function']} requires a column."
+        );
+    }
+
+    if (strtoupper($column['column']) != "*") {
+
+        $resolved =
+            $this->resolveColumn(
+                $column['column']
+            );
+
+        $table =
+            $resolved['table']
+            ?? $request['table'];
+
+        if (
+            !$this->metadataRepository->columnExists(
+                $table,
+                $resolved['column']
+            )
+        ) {
             throw new Exception(
-                "Function {$column['function']} requires a column."
+                "Invalid column: {$column['column']}"
             );
         }
+    }
+}
 
-        if (strtoupper($column['column']) != "*") {
+/*
+ * COALESCE Validation
+ */
+if (
+    strtoupper($column['function']) == "COALESCE"
+) {
+
+    if (
+        empty($column['columns'])
+        || !is_array($column['columns'])
+    ) {
+        throw new Exception(
+            "COALESCE requires columns."
+        );
+    }
+
+    foreach ($column['columns'] as $coalesceColumn) {
+
+        $resolved =
+            $this->resolveColumn(
+                $coalesceColumn
+            );
+
+        $table =
+            $resolved['table']
+            ?? $request['table'];
+
+        if (
+            !$this->metadataRepository->columnExists(
+                $table,
+                $resolved['column']
+            )
+        ) {
+            throw new Exception(
+                "Invalid column: {$coalesceColumn}"
+            );
+        }
+    }
+
+    continue;
+    }
+}
+
+/*
+ * CAST / CONVERT Validation
+ */
+if (
+    in_array(
+        strtoupper($column['function']),
+        [
+            "CAST",
+            "CONVERT"
+        ]
+    )
+) {
+
+    if (empty($column['datatype'])) {
+        throw new Exception(
+            strtoupper($column['function'])
+            . " requires datatype."
+        );
+    }
+
+    continue;
+}
+
+/*
+ * NULLIF Validation
+ */
+if (
+    strtoupper($column['function']) == "NULLIF"
+) {
+
+    if (!array_key_exists("value", $column)) {
+        throw new Exception(
+            "NULLIF requires value."
+        );
+    }
+
+    continue;
+}
+
+/*
+ * CONCAT Validation
+ */
+if (
+    strtoupper($column['function']) == "CONCAT"
+) {
+
+    if (
+        empty($column['columns']) ||
+        !is_array($column['columns']) ||
+        count($column['columns']) < 2
+    ) {
+
+        throw new Exception(
+            "CONCAT requires at least two values."
+        );
+
+    }
+
+    foreach ($column['columns'] as $value) {
+
+        if (
+            is_string($value) &&
+            preg_match('/^[A-Za-z_][A-Za-z0-9_.]*$/', $value)
+        ) {
 
             $resolved =
-                $this->resolveColumn(
-                    $column['column']
-                );
+                $this->resolveColumn($value);
 
             $table =
                 $resolved['table']
@@ -123,12 +409,73 @@ if (isset($column['function'])) {
                     $resolved['column']
                 )
             ) {
+
                 throw new Exception(
-                    "Invalid column: {$column['column']}"
+                    "Invalid column: {$value}"
                 );
+
             }
+
         }
+
     }
+
+    continue;
+
+}
+
+/*
+ * LEFT / RIGHT Validation
+ */
+if (
+    in_array(
+        strtoupper($column['function']),
+        [
+            "LEFT",
+            "RIGHT"
+        ]
+    )
+) {
+
+    if (!isset($column['length'])) {
+
+        throw new Exception(
+            strtoupper($column['function'])
+            . " requires length."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
+ * SUBSTRING Validation
+ */
+if (
+    strtoupper($column['function'])
+    == "SUBSTRING"
+) {
+
+    if (!isset($column['start'])) {
+
+        throw new Exception(
+            "SUBSTRING requires start."
+        );
+
+    }
+
+    if (!isset($column['length'])) {
+
+        throw new Exception(
+            "SUBSTRING requires length."
+        );
+
+    }
+
+    continue;
+
 }
 
         /*
@@ -188,6 +535,162 @@ if (isset($column['function'])) {
         }
 
 /*
+ * CASE Expression
+ */
+if (isset($column['case'])) {
+
+    $case = $column['case'];
+
+    $alias =
+        $case['alias']
+        ?? "CaseValue";
+
+    $caseSql = "CASE ";
+
+    foreach ($case['when'] as $when) {
+
+        $condition =
+            $when['condition'];
+
+        $resolved =
+            $this->resolveColumn(
+                $condition['column']
+            );
+
+        if (!empty($resolved['table'])) {
+
+            $columnName =
+                $resolved['table']
+                . "."
+                . $resolved['column'];
+
+        } else {
+
+            $columnName =
+                $resolved['column'];
+
+        }
+
+        $value = $condition['value'];
+
+        if (is_string($value)) {
+            $value = "'" . $value . "'";
+        }
+
+        $then = $when['then'];
+
+        if (is_string($then)) {
+            $then = "'" . $then . "'";
+        }
+
+        $caseSql .=
+            "WHEN "
+            . $columnName
+            . " "
+            . $condition['operator']
+            . " "
+            . $value
+            . " THEN "
+            . $then
+            . " ";
+    }
+
+    if (array_key_exists("else", $case)) {
+
+        $else = $case['else'];
+
+        if (is_string($else)) {
+            $else = "'" . $else . "'";
+        }
+
+        $caseSql .=
+            "ELSE "
+            . $else
+            . " ";
+    }
+
+    $caseSql .=
+        "END AS [{$alias}]";
+
+    $selectColumns[] =
+        $caseSql;
+
+    continue;
+}        
+
+/*
+ * Arithmetic Expression Validation
+ */
+if (isset($column['expression'])) {
+
+    $expression = $column['expression'];
+
+    foreach (['left','operator','right'] as $field) {
+
+        if (!isset($expression[$field])) {
+            throw new Exception(
+                "Expression requires {$field}."
+            );
+        }
+
+    }
+
+    $allowedOperators = [
+        "+",
+        "-",
+        "*",
+        "/",
+        "%"
+    ];
+
+    if (
+        !in_array(
+            $expression['operator'],
+            $allowedOperators
+        )
+    ) {
+
+        throw new Exception(
+            "Invalid expression operator."
+        );
+
+    }
+
+    foreach (['left','right'] as $side) {
+
+        if (!is_numeric($expression[$side])) {
+
+            $resolved =
+                $this->resolveColumn(
+                    $expression[$side]
+                );
+
+            $table =
+                $resolved['table']
+                ?? $request['table'];
+
+            if (
+                !$this->metadataRepository->columnExists(
+                    $table,
+                    $resolved['column']
+                )
+            ) {
+
+                throw new Exception(
+                    "Invalid column: {$expression[$side]}"
+                );
+
+            }
+
+        }
+
+    }
+
+    continue;
+
+}
+
+/*
  * Aggregate / String / Date Function
  */
 if (isset($column['function'])) {
@@ -206,7 +709,21 @@ if (isset($column['function'])) {
         "LTRIM",
         "RTRIM",
         "TRIM",
-        "LEN"
+        "LEN",
+
+        "COALESCE",
+        "ISNULL",
+
+        "CAST",
+        "CONVERT",
+
+        "NULLIF",
+
+        "CONCAT",
+
+        "LEFT",
+        "RIGHT",
+        "SUBSTRING"
     ];
 
     $dateFunctions = [
@@ -417,6 +934,295 @@ if ($function == "POWER") {
         . "]";
 
     continue;
+}
+
+/*
+ * COALESCE()
+ */
+if ($function == "COALESCE") {
+
+    if (
+        empty($column['columns'])
+        || !is_array($column['columns'])
+    ) {
+        throw new Exception(
+            "COALESCE requires columns."
+        );
+    }
+
+    $coalesceColumns = [];
+
+    foreach ($column['columns'] as $coalesceColumn) {
+
+        $resolved =
+            $this->resolveColumn(
+                $coalesceColumn
+            );
+
+        if (!empty($resolved['table'])) {
+
+            $coalesceColumns[] =
+                $resolved['table']
+                . "."
+                . $resolved['column'];
+
+        } else {
+
+            $coalesceColumns[] =
+                $resolved['column'];
+
+        }
+    }
+
+    if (isset($column['default'])) {
+
+        $default = $column['default'];
+
+        if (is_string($default)) {
+            $default = "'" . $default . "'";
+        }
+
+        $coalesceColumns[] = $default;
+    }
+
+    $selectColumns[] =
+        "COALESCE("
+        . implode(", ", $coalesceColumns)
+        . ") AS [{$alias}]";
+
+    continue;
+}
+
+/*
+ * ISNULL()
+ */
+if ($function == "ISNULL") {
+
+    if (empty($column['column'])) {
+        throw new Exception(
+            "ISNULL requires column."
+        );
+    }
+
+    if (!array_key_exists("default", $column)) {
+        throw new Exception(
+            "ISNULL requires default."
+        );
+    }
+
+    $default = $column['default'];
+
+    if (is_string($default)) {
+        $default = "'" . $default . "'";
+    }
+
+    $selectColumns[] =
+        "ISNULL("
+        . $resolvedColumn
+        . ", "
+        . $default
+        . ") AS [{$alias}]";
+
+    continue;
+}
+/*
+ * CAST()
+ */
+if ($function == "CAST") {
+
+    if (empty($column['datatype'])) {
+        throw new Exception(
+            "CAST requires datatype."
+        );
+    }
+
+    $selectColumns[] =
+        "CAST("
+        . $resolvedColumn
+        . " AS "
+        . strtoupper($column['datatype'])
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+}
+
+/*
+ * CONVERT()
+ */
+if ($function == "CONVERT") {
+
+    if (empty($column['datatype'])) {
+        throw new Exception(
+            "CONVERT requires datatype."
+        );
+    }
+
+    $sql =
+        "CONVERT("
+        . strtoupper($column['datatype'])
+        . ", "
+        . $resolvedColumn;
+
+    if (isset($column['style'])) {
+
+        $sql .=
+            ", "
+            . (int)$column['style'];
+
+    }
+
+    $sql .=
+        ") AS ["
+        . $alias
+        . "]";
+
+    $selectColumns[] = $sql;
+
+    continue;
+}
+
+/*
+ * NULLIF()
+ */
+if ($function == "NULLIF") {
+
+    if (!array_key_exists("value", $column)) {
+        throw new Exception(
+            "NULLIF requires value."
+        );
+    }
+
+    $value = $column['value'];
+
+    if (is_string($value)) {
+        $value = "'" . $value . "'";
+    }
+
+    $selectColumns[] =
+        "NULLIF("
+        . $resolvedColumn
+        . ", "
+        . $value
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+}
+
+/*
+ * CONCAT()
+ */
+if ($function == "CONCAT") {
+
+    $parts = [];
+
+    foreach ($column['columns'] as $value) {
+
+        if (is_numeric($value)) {
+
+            $parts[] = $value;
+
+        } elseif (
+            is_string($value) &&
+            preg_match('/^[A-Za-z_][A-Za-z0-9_.]*$/', $value)
+        ) {
+
+            $resolved =
+                $this->resolveColumn($value);
+
+            if (!empty($resolved['table'])) {
+
+                $parts[] =
+                    $resolved['table']
+                    . "."
+                    . $resolved['column'];
+
+            } else {
+
+                $parts[] =
+                    $resolved['column'];
+
+            }
+
+        } else {
+
+            $parts[] =
+                "'" .
+                str_replace("'", "''", $value)
+                . "'";
+
+        }
+
+    }
+
+    $selectColumns[] =
+        "CONCAT("
+        . implode(", ", $parts)
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * LEFT()
+ */
+if ($function == "LEFT") {
+
+    $selectColumns[] =
+        "LEFT("
+        . $resolvedColumn
+        . ", "
+        . (int)$column['length']
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * RIGHT()
+ */
+if ($function == "RIGHT") {
+
+    $selectColumns[] =
+        "RIGHT("
+        . $resolvedColumn
+        . ", "
+        . (int)$column['length']
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * SUBSTRING()
+ */
+if ($function == "SUBSTRING") {
+
+    $selectColumns[] =
+        "SUBSTRING("
+        . $resolvedColumn
+        . ", "
+        . (int)$column['start']
+        . ", "
+        . (int)$column['length']
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
 }
 
     /*
@@ -721,7 +1527,11 @@ if (!empty($request['joins'])) {
             "LTRIM",
             "RTRIM",
             "TRIM",
-            "LEN"
+            "LEN",
+
+            "LEFT",
+            "RIGHT",
+            "SUBSTRING"
        ];
 
         if (

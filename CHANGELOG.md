@@ -130,6 +130,26 @@ At this stage, the project has evolved into a functional, modular query engine c
 
 ---
 
+## [0.6.0] - 2026-07-23
+
+### Added
+- CASE expression support
+- COALESCE() function
+- ISNULL() function
+- CAST() function
+- CONVERT() function
+- NULLIF() function
+- Arithmetic expressions (+, -, *, /, %)
+- CONCAT() function
+- LEFT() function
+- RIGHT() function
+- SUBSTRING() function
+
+### Improved
+- Refactored function validation using functionsWithoutColumn.
+
+---
+
 ### Notes
 
 This release represents the completion of the initial query engine foundation.
@@ -137,25 +157,6 @@ This release represents the completion of the initial query engine foundation.
 The project now provides a configurable SQL generation engine capable of powering dynamic reports without requiring developers to create separate SQL queries or APIs for each report.
 
 Development will continue with advanced SQL capabilities, reporting modules, dashboard components, export functionality, and enterprise features.
-
----
-
-## Upcoming (v0.6.0)
-
-Planned additions include:
-
-- CASE expressions
-- COALESCE / ISNULL
-- CAST / CONVERT
-- NULLIF
-- UNION
-- Common Table Expressions (CTE)
-- Window functions
-- ROW_NUMBER()
-- RANK()
-- DENSE_RANK()
-- PARTITION BY
-- Running totals
 
 ---
 
