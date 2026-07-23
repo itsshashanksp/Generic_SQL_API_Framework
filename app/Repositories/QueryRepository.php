@@ -543,6 +543,25 @@ if (
 
 }
 
+/*
+ * FORMAT Validation
+ */
+if (
+    strtoupper($column['function']) == "FORMAT"
+) {
+
+    if (!array_key_exists("format", $column)) {
+
+        throw new Exception(
+            "FORMAT requires format."
+        );
+
+    }
+
+    continue;
+
+}
+
         /*
          * Normal Column With Alias
          */
@@ -794,7 +813,9 @@ if (isset($column['function'])) {
 
         "CHARINDEX",
 
-        "PATINDEX"
+        "PATINDEX",
+
+        "FORMAT"
     ];
 
     $dateFunctions = [
@@ -1380,6 +1401,50 @@ if ($function == "PATINDEX") {
 
 }
 
+/*
+ * FORMAT()
+ */
+if ($function == "FORMAT") {
+
+    $format = str_replace(
+        "'",
+        "''",
+        $column['format']
+    );
+
+    if (isset($column['style'])) {
+
+        $style = (int)$column['style'];
+
+        $selectColumns[] =
+            "FORMAT("
+            . "CONVERT(date, CAST("
+            . $resolvedColumn
+            . " AS varchar(8)), "
+            . $style
+            . "), '"
+            . $format
+            . "') AS ["
+            . $alias
+            . "]";
+
+    } else {
+
+        $selectColumns[] =
+            "FORMAT("
+            . $resolvedColumn
+            . ", '"
+            . $format
+            . "') AS ["
+            . $alias
+            . "]";
+
+    }
+
+    continue;
+
+}
+
     /*
      * Aggregate & String Functions
      */
@@ -1692,7 +1757,9 @@ if (!empty($request['joins'])) {
 
             "CHARINDEX",
 
-            "PATINDEX"
+            "PATINDEX",
+
+            "FORMAT"
        ];
 
         if (
