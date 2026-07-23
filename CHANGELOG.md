@@ -1,199 +1,57 @@
-# Changelog
+## [0.7.0] - 2026-07-23
 
-All notable changes to this project will be documented in this file.
-
-The format of this changelog is inspired by **Keep a Changelog**, and the project follows **Semantic Versioning** principles for future releases.
-
----
-
-## [0.5.0] - Initial Public Commit
-
-This marks the first public commit of the Generic Dashboard project.
-
-At this stage, the project has evolved into a functional, modular query engine capable of dynamically generating SQL Server queries using structured JSON requests. The foundation has been designed with extensibility, maintainability, and enterprise integration in mind.
+This release significantly expands the SQL Server function library supported by the Generic Dashboard Query Engine, bringing it closer to feature parity with native SQL Server queries while maintaining JSON-driven dynamic query generation.
 
 ### Added
-
-#### Core Framework
-
-- Project architecture
-- Configuration management
-- Database connection engine
-- Repository-based query engine
-- Metadata repository
-- Response engine
-- Exception handling framework
-- Modular project structure
-
-#### Dynamic Query Builder
-
-- Dynamic SELECT statement generation
-- Table validation
-- Column validation
-- Dynamic SQL generation
-- Alias resolution
-- Pagination support
-- DISTINCT
-- TOP clause
-
-#### WHERE Clause Support
-
-- Equality operators
-- Comparison operators
-- AND / OR conditions
-- LIKE
-- NOT LIKE
-- IN
-- NOT IN
-- BETWEEN
-- NOT BETWEEN
-- IS NULL
-- IS NOT NULL
-
-#### Grouping & Sorting
-
-- GROUP BY
-- HAVING
-- ORDER BY
-- Multiple sorting support
-
-#### JOIN Support
-
-- INNER JOIN
-- LEFT JOIN
-- RIGHT JOIN
-- Table aliases
-- Column aliases
-
-#### Aggregate Functions
-
-- COUNT()
-- SUM()
-- AVG()
-- MIN()
-- MAX()
-
-#### String Functions
-
-- UPPER()
-- LOWER()
-- LTRIM()
-- RTRIM()
-- TRIM()
-- LEN()
 
 #### Date Functions
 
-- YEAR()
-- MONTH()
-- DAY()
-- DATEPART()
-- DATENAME()
-- GETDATE()
+- DATEADD()
+- DATEDIFF()
+- EOMONTH()
+- ISDATE()
+- DATEFROMPARTS()
+- DATETIMEFROMPARTS()
 
-#### Mathematical Functions
+#### String Functions
 
-- ABS()
-- ROUND()
-- CEILING()
-- FLOOR()
-- POWER()
-- SQRT()
-- EXP()
-- LOG()
+- REPLACE()
+- CHARINDEX()
+- PATINDEX()
+- FORMAT()
 
-#### Validation
+#### Query Engine
 
-- Table validation
-- Column validation
-- SQL function validation
-- Operator validation
-- Alias validation
-- Input validation
+- Support for functions without direct column dependencies
+- Dynamic parameter validation for date construction functions
+- Automatic handling of SQL date expressions
+- Enhanced expression builder for multi-parameter SQL functions
 
-#### Error Handling
+### Improved
 
-- Standardized JSON responses
-- SQL execution error handling
-- Validation error reporting
-- Exception handling
-
----
+- Refactored SQL function validation pipeline
+- Improved date function processing
+- Improved dynamic SQL generation for multi-argument functions
+- Improved expression parsing for nested function calls
+- Enhanced alias handling across generated expressions
+- Better validation messages for invalid function parameters
+- Improved maintainability of QueryRepository function handlers
 
 ### Fixed
 
-- Improved alias resolution across dynamic queries.
-- Resolved validation issues when using SQL functions.
-- Corrected SQL generation for GETDATE().
-- Improved mathematical function handling.
-- Enhanced query builder stability for complex SELECT statements.
-
----
-
-## [0.6.0] - 2026-07-23
-
-### Added
-- CASE expression support
-- COALESCE() function
-- ISNULL() function
-- CAST() function
-- CONVERT() function
-- NULLIF() function
-- Arithmetic expressions (+, -, *, /, %)
-- CONCAT() function
-- LEFT() function
-- RIGHT() function
-- SUBSTRING() function
-
-### Improved
-- Refactored function validation using functionsWithoutColumn.
+- Fixed DATEDIFF() validation logic
+- Fixed DATEDIFF() SQL generation
+- Fixed date conversion handling for SQL Server
+- Fixed function resolution for functions without column arguments
+- Fixed edge cases in dynamic SQL builder for date expressions
+- Improved SQL generation stability for complex function combinations
 
 ---
 
 ### Notes
 
-This release represents the completion of the initial query engine foundation.
+This release focuses on expanding SQL Server compatibility by introducing advanced date and string functions frequently used in enterprise reporting systems.
 
-The project now provides a configurable SQL generation engine capable of powering dynamic reports without requiring developers to create separate SQL queries or APIs for each report.
+The query engine now supports complex date calculations, date construction, string searching, formatting, and replacement while continuing to generate fully dynamic SQL from structured JSON requests.
 
-Development will continue with advanced SQL capabilities, reporting modules, dashboard components, export functionality, and enterprise features.
-
----
-
-## Future Releases
-
-### v0.7.0
-
-Reporting Engine
-
-- Stored procedures
-- Saved reports
-- Dynamic report templates
-- Pivot reports
-- Parameterized reports
-
-### v0.8.0
-
-Dashboard Engine
-
-- Dashboard APIs
-- KPI widgets
-- Charts
-- Dashboard filters
-- Dashboard builder
-
-### v0.9.0
-
-Enterprise Features
-
-- Excel export
-- PDF export
-- CSV export
-- Authentication
-- Role-based access control
-- Audit logs
-- Performance optimization
-
-### v1.0.0
-
-Production-ready Generic Dashboard Platform.
+Development will continue with advanced SQL capabilities, reporting features, stored procedures, window functions, JSON support, and dashboard components.
