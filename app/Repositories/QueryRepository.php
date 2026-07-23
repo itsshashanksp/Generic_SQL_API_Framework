@@ -91,7 +91,75 @@ private function buildValue($value): string
         . str_replace("'", "''", $value)
         . "'";
 
-}    
+}
+
+/*
+ * Build SQL Expression
+ */
+private function buildExpression($expression): string
+{
+
+    /*
+     * Primitive Value
+     */
+    if (
+        is_numeric($expression)
+        || is_string($expression)
+        || is_bool($expression)
+        || $expression === null
+    ) {
+
+        return $this->buildValue($expression);
+
+    }
+
+    /*
+     * Column
+     */
+    if (isset($expression["column"])) {
+
+        $resolved =
+            $this->resolveColumn(
+                $expression["column"]
+            );
+
+        if (!empty($resolved["table"])) {
+
+            return
+                $resolved["table"]
+                . "."
+                . $resolved["column"];
+
+        }
+
+        return $resolved["column"];
+
+    }
+
+    /*
+     * Arithmetic Expression
+     */
+    if (isset($expression["expression"])) {
+
+        return "("
+            . $this->buildExpression(
+                $expression["expression"]["left"]
+            )
+            . " "
+            . $expression["expression"]["operator"]
+            . " "
+            . $this->buildExpression(
+                $expression["expression"]["right"]
+            )
+            . ")";
+
+    }
+
+    throw new Exception(
+        "Unsupported expression."
+    );
+
+}
 
     public function select($request)
     {
