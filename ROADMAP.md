@@ -1,41 +1,149 @@
-## Future Releases
+# Roadmap
 
-### v0.8.0
+## Current Version
 
-Advanced SQL Features
+✅ v0.8.0
 
-- Window Functions (ROW_NUMBER, RANK, DENSE_RANK)
-- LEAD() / LAG()
+---
+
+# Completed
+
+## Core Engine
+- SQL Builder
+- Metadata Validation
+- Prepared Statements
+- Dynamic Query Engine
+
+## Query Features
+- SELECT
+- WHERE
+- GROUP BY
+- HAVING
+- ORDER BY
+- DISTINCT
+- TOP
+- Pagination
+- JOIN
+
+## SQL Functions
+
+### Aggregate
+- COUNT
+- SUM
+- AVG
+- MIN
+- MAX
+
+### String
+- UPPER
+- LOWER
+- LTRIM
+- RTRIM
+- TRIM
+- LEN
+- LEFT
+- RIGHT
+- SUBSTRING
+- REPLACE
+- CHARINDEX
+- PATINDEX
+- FORMAT
+- CONCAT
+- COALESCE
+- ISNULL
+- NULLIF
+- CAST
+- CONVERT
+
+### Date
+- YEAR
+- MONTH
+- DAY
+- DATEPART
+- DATENAME
+- GETDATE
+- DATEADD
+- DATEDIFF
+- EOMONTH
+- ISDATE
+- DATEFROMPARTS
+- DATETIMEFROMPARTS
+- TIMEFROMPARTS
+- SYSDATETIME
+- CURRENT_TIMESTAMP
+
+### Math
+- ABS
+- ROUND
+- CEILING
+- FLOOR
+- POWER
+- SQRT
+- EXP
+- LOG
+
+### Conditional
+- CASE
+- IIF
+- CHOOSE
+
+### Window
+- ROW_NUMBER
+- RANK
+
+---
+
+# v0.9.0 (Planned)
+
+## Additional Window Functions
+- DENSE_RANK()
+- NTILE()
+- LAG()
+- LEAD()
+- FIRST_VALUE()
+- LAST_VALUE()
+
+## Aggregate Enhancements
 - STRING_AGG()
-- JSON_VALUE()
-- JSON_QUERY()
-- OPENJSON()
-- IIF()
-- CHOOSE()
-- CTE Support
+- GROUPING()
 
-### v0.9.0
+## Advanced SQL Support
+- UNION
+- UNION ALL
+- EXISTS
+- NOT EXISTS
+- ANY
+- ALL
 
-Reporting Engine
+## JSON Support
+- FOR JSON
+- OPENJSON
 
-- Stored procedures
-- Saved reports
-- Dynamic report templates
-- Parameterized reports
-- Pivot reports
-- Dashboard APIs
+---
 
-### v1.0.0
+# v1.0.0 (Stable)
 
-Production-ready Generic Dashboard Platform
+## Data Modification
+- INSERT
+- UPDATE
+- DELETE
+- MERGE
 
-- Excel export
-- PDF export
-- CSV export
-- Authentication
-- Role-based access control
-- Audit logs
-- Dashboard builder
-- Performance optimization
-- Production documentation
-- Enterprise deployment support
+## Transactions
+- BEGIN TRANSACTION
+- COMMIT
+- ROLLBACK
+
+## Stored Procedures
+- EXEC
+- OUTPUT Parameters
+
+## Security
+- Role-based permissions
+- Function restrictions
+- SQL audit logging
+
+## Performance
+- Query caching
+- Execution statistics
+- SQL profiling
