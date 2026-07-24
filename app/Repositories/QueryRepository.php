@@ -493,6 +493,7 @@ $functionsWithoutColumn = [
     "CURRENT_TIMESTAMP",
     "IIF",
     "CHOOSE",
+    "ROW_NUMBER",
 ];
 
 if (
@@ -536,6 +537,7 @@ if (
  * COALESCE Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "COALESCE"
 ) {
 
@@ -578,6 +580,7 @@ if (
  * DATEADD Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "DATEADD"
 ) {
 
@@ -605,6 +608,7 @@ if (
  * DATEDIFF Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "DATEDIFF"
 ) {
 
@@ -642,6 +646,7 @@ if (
  * EOMONTH Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "EOMONTH"
 ) {
 
@@ -661,6 +666,7 @@ if (
  * ISDATE Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "ISDATE"
 ) {
 
@@ -680,6 +686,7 @@ if (
  * DATEFROMPARTS Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "DATEFROMPARTS"
 ) {
 
@@ -715,6 +722,7 @@ if (
  * DATETIMEFROMPARTS Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "DATETIMEFROMPARTS"
 ) {
 
@@ -748,6 +756,7 @@ if (
  * TIMEFROMPARTS Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "TIMEFROMPARTS"
 ) {
 
@@ -779,6 +788,7 @@ if (
  * SYSDATETIME Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "SYSDATETIME"
 ) {
 
@@ -790,6 +800,7 @@ if (
  * CURRENT_TIMESTAMP Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "CURRENT_TIMESTAMP"
 ) {
 
@@ -801,6 +812,7 @@ if (
  * IIF Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "IIF"
 ) {
 
@@ -823,6 +835,7 @@ if (
  * CHOOSE Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "CHOOSE"
 ) {
 
@@ -858,9 +871,33 @@ if (
 }
 
 /*
+ * ROW_NUMBER Validation
+ */
+if (
+    isset($column['function']) &&
+    strtoupper($column['function']) == "ROW_NUMBER"
+) {
+
+    if (
+        empty($column['orderBy'])
+        || !is_array($column['orderBy'])
+    ) {
+
+        throw new Exception(
+            "ROW_NUMBER requires orderBy."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
  * CAST / CONVERT Validation
  */
 if (
+    isset($column['function']) &&
     in_array(
         strtoupper($column['function']),
         [
@@ -884,6 +921,7 @@ if (
  * NULLIF Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "NULLIF"
 ) {
 
@@ -900,6 +938,7 @@ if (
  * CONCAT Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "CONCAT"
 ) {
 
@@ -954,6 +993,7 @@ if (
  * LEFT / RIGHT Validation
  */
 if (
+    isset($column['function']) &&
     in_array(
         strtoupper($column['function']),
         [
@@ -980,6 +1020,7 @@ if (
  * SUBSTRING Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function'])
     == "SUBSTRING"
 ) {
@@ -1008,6 +1049,7 @@ if (
  * REPLACE Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "REPLACE"
 ) {
 
@@ -1035,6 +1077,7 @@ if (
  * CHARINDEX Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "CHARINDEX"
 ) {
 
@@ -1054,6 +1097,7 @@ if (
  * PATINDEX Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "PATINDEX"
 ) {
 
@@ -1073,6 +1117,7 @@ if (
  * FORMAT Validation
  */
 if (
+    isset($column['function']) &&
     strtoupper($column['function']) == "FORMAT"
 ) {
 
@@ -1373,7 +1418,11 @@ if (isset($column['function'])) {
         "POWER",
         "SQRT",
         "EXP",
-        "LOG"
+        "LOG",
+    ];
+
+    $windowFunctions = [
+        "ROW_NUMBER"
     ];
 
     $function =
@@ -1387,6 +1436,8 @@ if (isset($column['function'])) {
         !in_array($function,$dateFunctions)
         &&
         !in_array($function, $mathFunctions)
+        &&
+        !in_array($function, $windowFunctions)
     ) {
         throw new Exception(
             "Invalid SQL function: {$column['function']}"
@@ -2414,6 +2465,48 @@ if ($function == "CHOOSE") {
         . (int)$column["index"]
         . ", "
         . implode(", ", $values)
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * ROW_NUMBER()
+ */
+if ($function == "ROW_NUMBER") {
+
+    $orders = [];
+
+    foreach ($column["orderBy"] as $order) {
+
+        $resolved =
+            $this->resolveColumn(
+                $order["column"]
+            );
+
+        $columnName =
+            !empty($resolved["table"])
+            ? $resolved["table"] . "." . $resolved["column"]
+            : $resolved["column"];
+
+        $direction =
+            strtoupper(
+                $order["direction"] ?? "ASC"
+            );
+
+        $orders[] =
+            $columnName
+            . " "
+            . $direction;
+
+    }
+
+    $selectColumns[] =
+        "ROW_NUMBER() OVER (ORDER BY "
+        . implode(", ", $orders)
         . ") AS ["
         . $alias
         . "]";
