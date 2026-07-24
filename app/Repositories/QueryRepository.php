@@ -495,6 +495,7 @@ $functionsWithoutColumn = [
     "CHOOSE",
     "ROW_NUMBER",
     "RANK",
+    "DENSE_RANK",
 ];
 
 if (
@@ -909,6 +910,29 @@ if (
 
         throw new Exception(
             "RANK requires orderBy."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
+ * DENSE_RANK Validation
+ */
+if (
+    isset($column['function']) &&
+    strtoupper($column['function']) == "DENSE_RANK"
+) {
+
+    if (
+        empty($column['orderBy']) ||
+        !is_array($column['orderBy'])
+    ) {
+
+        throw new Exception(
+            "DENSE_RANK requires orderBy."
         );
 
     }
@@ -1448,6 +1472,7 @@ if (isset($column['function'])) {
     $windowFunctions = [
         "ROW_NUMBER",
         "RANK",
+        "DENSE_RANK",
     ];
 
     $function =
@@ -2573,6 +2598,48 @@ if ($function == "RANK") {
 
     $selectColumns[] =
         "RANK() OVER (ORDER BY "
+        . implode(", ", $orders)
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * DENSE_RANK()
+ */
+if ($function == "DENSE_RANK") {
+
+    $orders = [];
+
+    foreach ($column["orderBy"] as $order) {
+
+        $resolved =
+            $this->resolveColumn(
+                $order["column"]
+            );
+
+        $columnName =
+            !empty($resolved["table"])
+            ? $resolved["table"] . "." . $resolved["column"]
+            : $resolved["column"];
+
+        $direction =
+            strtoupper(
+                $order["direction"] ?? "ASC"
+            );
+
+        $orders[] =
+            $columnName
+            . " "
+            . $direction;
+
+    }
+
+    $selectColumns[] =
+        "DENSE_RANK() OVER (ORDER BY "
         . implode(", ", $orders)
         . ") AS ["
         . $alias
