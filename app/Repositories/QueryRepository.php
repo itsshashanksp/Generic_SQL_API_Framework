@@ -496,6 +496,7 @@ $functionsWithoutColumn = [
     "ROW_NUMBER",
     "RANK",
     "DENSE_RANK",
+    "NTILE",
 ];
 
 if (
@@ -933,6 +934,48 @@ if (
 
         throw new Exception(
             "DENSE_RANK requires orderBy."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
+ * NTILE Validation
+ */
+if (
+    isset($column['function']) &&
+    strtoupper($column['function']) == "NTILE"
+) {
+
+    if (!isset($column['buckets'])) {
+
+        throw new Exception(
+            "NTILE requires buckets."
+        );
+
+    }
+
+    if (
+        !is_numeric($column['buckets'])
+        || $column['buckets'] <= 0
+    ) {
+
+        throw new Exception(
+            "NTILE buckets must be greater than zero."
+        );
+
+    }
+
+    if (
+        empty($column['orderBy'])
+        || !is_array($column['orderBy'])
+    ) {
+
+        throw new Exception(
+            "NTILE requires orderBy."
         );
 
     }
@@ -1473,6 +1516,7 @@ if (isset($column['function'])) {
         "ROW_NUMBER",
         "RANK",
         "DENSE_RANK",
+        "NTILE",
     ];
 
     $function =
@@ -2640,6 +2684,50 @@ if ($function == "DENSE_RANK") {
 
     $selectColumns[] =
         "DENSE_RANK() OVER (ORDER BY "
+        . implode(", ", $orders)
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * NTILE()
+ */
+if ($function == "NTILE") {
+
+    $orders = [];
+
+    foreach ($column["orderBy"] as $order) {
+
+        $resolved =
+            $this->resolveColumn(
+                $order["column"]
+            );
+
+        $columnName =
+            !empty($resolved["table"])
+            ? $resolved["table"] . "." . $resolved["column"]
+            : $resolved["column"];
+
+        $direction =
+            strtoupper(
+                $order["direction"] ?? "ASC"
+            );
+
+        $orders[] =
+            $columnName
+            . " "
+            . $direction;
+
+    }
+
+    $selectColumns[] =
+        "NTILE("
+        . (int)$column["buckets"]
+        . ") OVER (ORDER BY "
         . implode(", ", $orders)
         . ") AS ["
         . $alias
