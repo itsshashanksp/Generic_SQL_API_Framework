@@ -491,6 +491,7 @@ $functionsWithoutColumn = [
     "TIMEFROMPARTS",
     "SYSDATETIME",
     "CURRENT_TIMESTAMP",
+    "IIF",
 ];
 
 if (
@@ -793,6 +794,28 @@ if (
 
     continue;
 
+}
+
+/*
+ * IIF Validation
+ */
+if (
+    strtoupper($column['function']) == "IIF"
+) {
+
+    foreach (["condition", "true", "false"] as $field) {
+
+        if (!isset($column[$field])) {
+
+            throw new Exception(
+                "IIF requires {$field}."
+            );
+
+        }
+
+    }
+
+    continue;
 }
 
 /*
@@ -1298,6 +1321,7 @@ if (isset($column['function'])) {
         "TIMEFROMPARTS",
         "SYSDATETIME",
         "CURRENT_TIMESTAMP",
+        "IIF",
     ];
 
     $mathFunctions = [
@@ -2303,6 +2327,26 @@ if ($function == "CURRENT_TIMESTAMP") {
 
     $selectColumns[] =
         "CURRENT_TIMESTAMP AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * IIF()
+ */
+if ($function == "IIF") {
+
+    $selectColumns[] =
+        "IIF("
+        . $this->buildCondition($column["condition"])
+        . ", "
+        . $this->buildExpression($column["true"])
+        . ", "
+        . $this->buildExpression($column["false"])
+        . ") AS ["
         . $alias
         . "]";
 
