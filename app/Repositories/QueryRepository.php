@@ -985,6 +985,51 @@ if (
 }
 
 /*
+ * LAG Validation
+ */
+if (
+    isset($column['function']) &&
+    strtoupper($column['function']) == "LAG"
+) {
+
+    if (empty($column['column'])) {
+
+        throw new Exception(
+            "LAG requires column."
+        );
+
+    }
+
+    if (
+        empty($column['orderBy']) ||
+        !is_array($column['orderBy'])
+    ) {
+
+        throw new Exception(
+            "LAG requires orderBy."
+        );
+
+    }
+
+    if (
+        isset($column['offset']) &&
+        (
+            !is_numeric($column['offset']) ||
+            $column['offset'] < 1
+        )
+    ) {
+
+        throw new Exception(
+            "LAG offset must be greater than zero."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
  * CAST / CONVERT Validation
  */
 if (
@@ -1517,6 +1562,7 @@ if (isset($column['function'])) {
         "RANK",
         "DENSE_RANK",
         "NTILE",
+        "LAG",
     ];
 
     $function =
@@ -2732,6 +2778,72 @@ if ($function == "NTILE") {
         . ") AS ["
         . $alias
         . "]";
+
+    continue;
+
+}
+
+/*
+ * LAG()
+ */
+if ($function == "LAG") {
+
+    $orders = [];
+
+    foreach ($column["orderBy"] as $order) {
+
+        $resolved =
+            $this->resolveColumn(
+                $order["column"]
+            );
+
+        $columnName =
+            !empty($resolved["table"])
+            ? $resolved["table"] . "." . $resolved["column"]
+            : $resolved["column"];
+
+        $direction =
+            strtoupper(
+                $order["direction"] ?? "ASC"
+            );
+
+        $orders[] =
+            $columnName
+            . " "
+            . $direction;
+
+    }
+
+    $offset =
+        (int)($column["offset"] ?? 1);
+
+    $sql =
+        "LAG("
+        . $resolvedColumn
+        . ", "
+        . $offset;
+
+    if (array_key_exists("default", $column)) {
+
+        $default =
+            $this->buildValue(
+                $column["default"]
+            );
+
+        $sql .=
+            ", "
+            . $default;
+
+    }
+
+    $sql .=
+        ") OVER (ORDER BY "
+        . implode(", ", $orders)
+        . ") AS ["
+        . $alias
+        . "]";
+
+    $selectColumns[] = $sql;
 
     continue;
 
