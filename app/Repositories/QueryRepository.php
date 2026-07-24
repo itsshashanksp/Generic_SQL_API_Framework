@@ -492,6 +492,7 @@ $functionsWithoutColumn = [
     "SYSDATETIME",
     "CURRENT_TIMESTAMP",
     "IIF",
+    "CHOOSE",
 ];
 
 if (
@@ -816,6 +817,44 @@ if (
     }
 
     continue;
+}
+
+/*
+ * CHOOSE Validation
+ */
+if (
+    strtoupper($column['function']) == "CHOOSE"
+) {
+
+    if (!isset($column['index'])) {
+
+        throw new Exception(
+            "CHOOSE requires index."
+        );
+
+    }
+
+    if (
+        empty($column['values'])
+        || !is_array($column['values'])
+    ) {
+
+        throw new Exception(
+            "CHOOSE requires values."
+        );
+
+    }
+
+    if (count($column['values']) < 2) {
+
+        throw new Exception(
+            "CHOOSE requires at least two values."
+        );
+
+    }
+
+    continue;
+
 }
 
 /*
@@ -1302,7 +1341,9 @@ if (isset($column['function'])) {
 
         "PATINDEX",
 
-        "FORMAT"
+        "FORMAT",
+
+        "CHOOSE",
     ];
 
     $dateFunctions = [
@@ -2346,6 +2387,33 @@ if ($function == "IIF") {
         . $this->buildExpression($column["true"])
         . ", "
         . $this->buildExpression($column["false"])
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * CHOOSE()
+ */
+if ($function == "CHOOSE") {
+
+    $values = [];
+
+    foreach ($column["values"] as $value) {
+
+        $values[] =
+            $this->buildExpression($value);
+
+    }
+
+    $selectColumns[] =
+        "CHOOSE("
+        . (int)$column["index"]
+        . ", "
+        . implode(", ", $values)
         . ") AS ["
         . $alias
         . "]";
