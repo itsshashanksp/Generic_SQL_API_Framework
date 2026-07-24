@@ -1106,6 +1106,37 @@ if (
 }
 
 /*
+ * LAST_VALUE Validation
+ */
+if (
+    isset($column['function']) &&
+    strtoupper($column['function']) == "LAST_VALUE"
+) {
+
+    if (empty($column['column'])) {
+
+        throw new Exception(
+            "LAST_VALUE requires column."
+        );
+
+    }
+
+    if (
+        empty($column['orderBy']) ||
+        !is_array($column['orderBy'])
+    ) {
+
+        throw new Exception(
+            "LAST_VALUE requires orderBy."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
  * CAST / CONVERT Validation
  */
 if (
@@ -1641,6 +1672,7 @@ if (isset($column['function'])) {
         "LAG",
         "LEAD",
         "FIRST_VALUE",
+        "LAST_VALUE"
     ];
 
     $function =
@@ -3029,6 +3061,52 @@ if ($function == "FIRST_VALUE") {
         . $resolvedColumn
         . ") OVER (ORDER BY "
         . implode(", ", $orders)
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * LAST_VALUE()
+ */
+if ($function == "LAST_VALUE") {
+
+    $orders = [];
+
+    foreach ($column["orderBy"] as $order) {
+
+        $resolved =
+            $this->resolveColumn(
+                $order["column"]
+            );
+
+        $columnName =
+            !empty($resolved["table"])
+            ? $resolved["table"] . "." . $resolved["column"]
+            : $resolved["column"];
+
+        $direction =
+            strtoupper(
+                $order["direction"] ?? "ASC"
+            );
+
+        $orders[] =
+            $columnName
+            . " "
+            . $direction;
+
+    }
+
+    $selectColumns[] =
+        "LAST_VALUE("
+        . $resolvedColumn
+        . ") OVER (ORDER BY "
+        . implode(", ", $orders)
+        . " ROWS BETWEEN UNBOUNDED PRECEDING "
+        . "AND UNBOUNDED FOLLOWING"
         . ") AS ["
         . $alias
         . "]";
