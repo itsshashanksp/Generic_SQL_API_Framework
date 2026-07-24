@@ -1160,6 +1160,17 @@ if (
 
     }
 
+    if (
+        isset($column['orderBy']) &&
+        !is_array($column['orderBy'])
+    ) {
+
+        throw new Exception(
+            "STRING_AGG orderBy must be an array."
+        );
+
+    }
+
     continue;
 
 }
@@ -3156,14 +3167,54 @@ if ($function == "STRING_AGG") {
             $column["separator"]
         );
 
-    $selectColumns[] =
+    $sql =
         "STRING_AGG("
         . $resolvedColumn
         . ", '"
         . $separator
-        . "') AS ["
+        . "')";
+
+    if (!empty($column["orderBy"])) {
+
+        $orders = [];
+
+        foreach ($column["orderBy"] as $order) {
+
+            $resolved =
+                $this->resolveColumn(
+                    $order["column"]
+                );
+
+            $columnName =
+                !empty($resolved["table"])
+                ? $resolved["table"] . "." . $resolved["column"]
+                : $resolved["column"];
+
+            $direction =
+                strtoupper(
+                    $order["direction"] ?? "ASC"
+                );
+
+            $orders[] =
+                $columnName
+                . " "
+                . $direction;
+
+        }
+
+        $sql .=
+            " WITHIN GROUP (ORDER BY "
+            . implode(", ", $orders)
+            . ")";
+
+    }
+
+    $sql .=
+        " AS ["
         . $alias
         . "]";
+
+    $selectColumns[] = $sql;
 
     continue;
 
