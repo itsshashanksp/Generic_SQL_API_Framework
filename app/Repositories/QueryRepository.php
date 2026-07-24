@@ -1137,6 +1137,34 @@ if (
 }
 
 /*
+ * STRING_AGG Validation
+ */
+if (
+    isset($column['function']) &&
+    strtoupper($column['function']) == "STRING_AGG"
+) {
+
+    if (empty($column['column'])) {
+
+        throw new Exception(
+            "STRING_AGG requires column."
+        );
+
+    }
+
+    if (!isset($column['separator'])) {
+
+        throw new Exception(
+            "STRING_AGG requires separator."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
  * CAST / CONVERT Validation
  */
 if (
@@ -1598,7 +1626,8 @@ if (isset($column['function'])) {
         "SUM",
         "AVG",
         "MIN",
-        "MAX"
+        "MAX",
+        "STRING_AGG",
     ];
 
     $stringFunctions = [
@@ -3115,6 +3144,31 @@ if ($function == "LAST_VALUE") {
 
 }
 
+/*
+ * STRING_AGG()
+ */
+if ($function == "STRING_AGG") {
+
+    $separator =
+        str_replace(
+            "'",
+            "''",
+            $column["separator"]
+        );
+
+    $selectColumns[] =
+        "STRING_AGG("
+        . $resolvedColumn
+        . ", '"
+        . $separator
+        . "') AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
     /*
      * Aggregate & String Functions
      */
@@ -3408,7 +3462,8 @@ if (!empty($request['joins'])) {
              "SUM",
              "AVG",
              "MIN",
-             "MAX"
+             "MAX",
+             "STRING_AGG",
         ];
 
         $stringFunctions = [
