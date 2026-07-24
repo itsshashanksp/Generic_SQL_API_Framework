@@ -494,6 +494,7 @@ $functionsWithoutColumn = [
     "IIF",
     "CHOOSE",
     "ROW_NUMBER",
+    "RANK",
 ];
 
 if (
@@ -885,6 +886,29 @@ if (
 
         throw new Exception(
             "ROW_NUMBER requires orderBy."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
+ * RANK Validation
+ */
+if (
+    isset($column['function']) &&
+    strtoupper($column['function']) == "RANK"
+) {
+
+    if (
+        empty($column['orderBy']) ||
+        !is_array($column['orderBy'])
+    ) {
+
+        throw new Exception(
+            "RANK requires orderBy."
         );
 
     }
@@ -1422,7 +1446,8 @@ if (isset($column['function'])) {
     ];
 
     $windowFunctions = [
-        "ROW_NUMBER"
+        "ROW_NUMBER",
+        "RANK",
     ];
 
     $function =
@@ -2506,6 +2531,48 @@ if ($function == "ROW_NUMBER") {
 
     $selectColumns[] =
         "ROW_NUMBER() OVER (ORDER BY "
+        . implode(", ", $orders)
+        . ") AS ["
+        . $alias
+        . "]";
+
+    continue;
+
+}
+
+/*
+ * RANK()
+ */
+if ($function == "RANK") {
+
+    $orders = [];
+
+    foreach ($column["orderBy"] as $order) {
+
+        $resolved =
+            $this->resolveColumn(
+                $order["column"]
+            );
+
+        $columnName =
+            !empty($resolved["table"])
+            ? $resolved["table"] . "." . $resolved["column"]
+            : $resolved["column"];
+
+        $direction =
+            strtoupper(
+                $order["direction"] ?? "ASC"
+            );
+
+        $orders[] =
+            $columnName
+            . " "
+            . $direction;
+
+    }
+
+    $selectColumns[] =
+        "RANK() OVER (ORDER BY "
         . implode(", ", $orders)
         . ") AS ["
         . $alias
