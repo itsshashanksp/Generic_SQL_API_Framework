@@ -1075,6 +1075,37 @@ if (
 }
 
 /*
+ * FIRST_VALUE Validation
+ */
+if (
+    isset($column['function']) &&
+    strtoupper($column['function']) == "FIRST_VALUE"
+) {
+
+    if (empty($column['column'])) {
+
+        throw new Exception(
+            "FIRST_VALUE requires column."
+        );
+
+    }
+
+    if (
+        empty($column['orderBy']) ||
+        !is_array($column['orderBy'])
+    ) {
+
+        throw new Exception(
+            "FIRST_VALUE requires orderBy."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
  * CAST / CONVERT Validation
  */
 if (
@@ -1609,6 +1640,7 @@ if (isset($column['function'])) {
         "NTILE",
         "LAG",
         "LEAD",
+        "FIRST_VALUE",
     ];
 
     $function =
@@ -2956,6 +2988,50 @@ if ($function == "LEAD") {
         . "]";
 
     $selectColumns[] = $sql;
+
+    continue;
+
+}
+
+/*
+ * FIRST_VALUE()
+ */
+if ($function == "FIRST_VALUE") {
+
+    $orders = [];
+
+    foreach ($column["orderBy"] as $order) {
+
+        $resolved =
+            $this->resolveColumn(
+                $order["column"]
+            );
+
+        $columnName =
+            !empty($resolved["table"])
+            ? $resolved["table"] . "." . $resolved["column"]
+            : $resolved["column"];
+
+        $direction =
+            strtoupper(
+                $order["direction"] ?? "ASC"
+            );
+
+        $orders[] =
+            $columnName
+            . " "
+            . $direction;
+
+    }
+
+    $selectColumns[] =
+        "FIRST_VALUE("
+        . $resolvedColumn
+        . ") OVER (ORDER BY "
+        . implode(", ", $orders)
+        . ") AS ["
+        . $alias
+        . "]";
 
     continue;
 
