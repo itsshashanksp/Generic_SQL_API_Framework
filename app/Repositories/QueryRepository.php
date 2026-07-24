@@ -1030,6 +1030,51 @@ if (
 }
 
 /*
+ * LEAD Validation
+ */
+if (
+    isset($column['function']) &&
+    strtoupper($column['function']) == "LEAD"
+) {
+
+    if (empty($column['column'])) {
+
+        throw new Exception(
+            "LEAD requires column."
+        );
+
+    }
+
+    if (
+        empty($column['orderBy']) ||
+        !is_array($column['orderBy'])
+    ) {
+
+        throw new Exception(
+            "LEAD requires orderBy."
+        );
+
+    }
+
+    if (
+        isset($column['offset']) &&
+        (
+            !is_numeric($column['offset']) ||
+            $column['offset'] < 1
+        )
+    ) {
+
+        throw new Exception(
+            "LEAD offset must be greater than zero."
+        );
+
+    }
+
+    continue;
+
+}
+
+/*
  * CAST / CONVERT Validation
  */
 if (
@@ -1563,6 +1608,7 @@ if (isset($column['function'])) {
         "DENSE_RANK",
         "NTILE",
         "LAG",
+        "LEAD",
     ];
 
     $function =
@@ -2819,6 +2865,72 @@ if ($function == "LAG") {
 
     $sql =
         "LAG("
+        . $resolvedColumn
+        . ", "
+        . $offset;
+
+    if (array_key_exists("default", $column)) {
+
+        $default =
+            $this->buildValue(
+                $column["default"]
+            );
+
+        $sql .=
+            ", "
+            . $default;
+
+    }
+
+    $sql .=
+        ") OVER (ORDER BY "
+        . implode(", ", $orders)
+        . ") AS ["
+        . $alias
+        . "]";
+
+    $selectColumns[] = $sql;
+
+    continue;
+
+}
+
+/*
+ * LEAD()
+ */
+if ($function == "LEAD") {
+
+    $orders = [];
+
+    foreach ($column["orderBy"] as $order) {
+
+        $resolved =
+            $this->resolveColumn(
+                $order["column"]
+            );
+
+        $columnName =
+            !empty($resolved["table"])
+            ? $resolved["table"] . "." . $resolved["column"]
+            : $resolved["column"];
+
+        $direction =
+            strtoupper(
+                $order["direction"] ?? "ASC"
+            );
+
+        $orders[] =
+            $columnName
+            . " "
+            . $direction;
+
+    }
+
+    $offset =
+        (int)($column["offset"] ?? 1);
+
+    $sql =
+        "LEAD("
         . $resolvedColumn
         . ", "
         . $offset;
