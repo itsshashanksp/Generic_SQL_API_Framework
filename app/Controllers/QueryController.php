@@ -13,6 +13,11 @@ class QueryController extends BaseController
         $this->queryService = new QueryService();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Select Controller
+    |--------------------------------------------------------------------------
+    */
     public function select($request)
     {
         Validator::required($request, [
@@ -24,5 +29,22 @@ class QueryController extends BaseController
             $this->queryService->select($request),
             "Data Loaded Successfully"
         );
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Union Controller
+    |--------------------------------------------------------------------------
+    */
+    public function union($request)
+    {
+        Validator::required($request, [
+            'queries'
+        ]);
+
+        $this->success(
+            $this->queryService->union($request),
+            "Data Loaded Successfully"
+      );
     }
 }

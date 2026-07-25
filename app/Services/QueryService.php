@@ -11,7 +11,22 @@ class QueryService
         $this->queryRepository = new QueryRepository();
     }
 
+    /*
+    |--------------------------------------------------------------------------
+    | Select Service
+    |--------------------------------------------------------------------------
+    */
     public function select($request)
+    {
+        return $this->queryRepository->select($request);
+    }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Union Service
+    |--------------------------------------------------------------------------
+    */
+    public function union($request)
     {
         return $this->queryRepository->select($request);
     }

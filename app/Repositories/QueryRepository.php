@@ -2,12 +2,14 @@
 
 require_once __DIR__ . '/../../core/QueryEngine.php';
 require_once __DIR__ . '/MetadataRepository.php';
+require_once __DIR__ . '/UnionBuilder.php';
 
 class QueryRepository
 {
     private QueryEngine $queryEngine;
     private MetadataRepository $metadataRepository;
-
+    private UnionBuilder $unionBuilder;
+    
     // Table & Alias Map
     private array $tableMap = [];
 
@@ -15,6 +17,7 @@ class QueryRepository
     {
         $this->queryEngine = new QueryEngine();
         $this->metadataRepository = new MetadataRepository();
+        $this->unionBuilder = new UnionBuilder($this);
     }
     
     private function resolveColumn(string $column): array
@@ -277,7 +280,26 @@ private function buildCondition(array $condition): string
 
 }
 
-    public function select($request)
+public function select($request)
+{
+    if (isset($request['queries'])) {
+        return $this->unionBuilder->build($request);
+    }
+
+    $query = $this->buildSelect($request);
+
+    return $this->queryEngine->executePrepared(
+        $query['sql'],
+        $query['params']
+    );
+}
+
+    /*
+    |--------------------------------------------------------------------------
+    | Select Query Builder
+    |--------------------------------------------------------------------------
+    */
+    public function buildSelect($request, bool $isUnion = false)
     {
         /*
          * Validate Table
@@ -3608,6 +3630,8 @@ if (!empty($request['joins'])) {
      /*
      * ORDER BY
      */
+    if (!$isUnion) {
+
     if (!empty($request['sort'])) {
 
         $allowedDirections = [
@@ -3687,6 +3711,8 @@ if (!empty($request['joins'])) {
 
     }
 
+    }
+
         /*
          * Pagination
          */
@@ -3705,9 +3731,9 @@ if (!empty($request['joins'])) {
             ";
         }
 
-        return $this->queryEngine->executePrepared(
-            $sql,
-            $params
-        );
+        return [
+            'sql' => $sql,
+            'params' => $params
+        ];
     }
 }
