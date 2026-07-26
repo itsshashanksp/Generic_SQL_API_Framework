@@ -2,7 +2,7 @@
 
 require_once __DIR__ . '/QueryRepository.php';
 
-class UnionBuilder
+class SetOperationBuilder
 {
     private QueryRepository $queryRepository;
     private QueryEngine $queryEngine;
@@ -20,10 +20,15 @@ public function __construct(QueryRepository $queryRepository)
             throw new Exception("At least one query is required.");
         }
 
-        $unionType = strtoupper($request['type'] ?? 'UNION');
+        $setOperation = strtoupper($request['type'] ?? 'UNION');
 
-        if (!in_array($unionType, ['UNION', 'UNION ALL'])) {
-            throw new Exception("Invalid UNION type.");
+        if (!in_array($setOperation, [
+            'UNION', 
+            'UNION ALL',
+            'INTERSECT',
+            'EXCEPT'
+            ])) {
+            throw new Exception("Invalid SET operation type.");
         }
 
         $sqlParts = [];
@@ -42,7 +47,7 @@ public function __construct(QueryRepository $queryRepository)
         }
 
         $sql = implode(
-            " {$unionType} ",
+            " {$setOperation} ",
             $sqlParts
         );
 

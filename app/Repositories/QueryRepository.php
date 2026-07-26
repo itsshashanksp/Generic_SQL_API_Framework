@@ -2,13 +2,13 @@
 
 require_once __DIR__ . '/../../core/QueryEngine.php';
 require_once __DIR__ . '/MetadataRepository.php';
-require_once __DIR__ . '/UnionBuilder.php';
+require_once __DIR__ . '/SetOperationBuilder.php';
 
 class QueryRepository
 {
     private QueryEngine $queryEngine;
     private MetadataRepository $metadataRepository;
-    private UnionBuilder $unionBuilder;
+    private SetOperationBuilder $SetOperationBuilder;
     
     // Table & Alias Map
     private array $tableMap = [];
@@ -17,7 +17,7 @@ class QueryRepository
     {
         $this->queryEngine = new QueryEngine();
         $this->metadataRepository = new MetadataRepository();
-        $this->unionBuilder = new UnionBuilder($this);
+        $this->SetOperationBuilder = new SetOperationBuilder($this);
     }
     
     private function resolveColumn(string $column): array
@@ -283,7 +283,7 @@ private function buildCondition(array $condition): string
 public function select($request)
 {
     if (isset($request['queries'])) {
-        return $this->unionBuilder->build($request);
+        return $this->SetOperationBuilder->build($request);
     }
 
     $query = $this->buildSelect($request);
