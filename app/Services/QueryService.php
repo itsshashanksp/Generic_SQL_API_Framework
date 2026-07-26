@@ -50,4 +50,14 @@ class QueryService
     {
         return $this->queryRepository->function($request);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Table Function Service
+    |--------------------------------------------------------------------------
+    */
+    public function tableFunction($request)
+    {
+        return $this->queryRepository->tableFunction($request);
+    }
 }

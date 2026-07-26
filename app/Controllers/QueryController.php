@@ -81,4 +81,21 @@ class QueryController extends BaseController
             "Function Executed Successfully"
         );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Table Function Controller
+    |--------------------------------------------------------------------------
+    */
+    public function tableFunction($request)
+    {
+        Validator::required($request, [
+            "function"
+        ]);
+
+        $this->success(
+            $this->queryService->tableFunction($request),
+            "Table Function Executed Successfully"
+        );
+    }
 }

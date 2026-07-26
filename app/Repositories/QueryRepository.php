@@ -323,6 +323,19 @@ public function function(array $request)
     );
 }
 
+/*
+ * Execute Table Function
+ */
+public function tableFunction(array $request)
+{
+    $query = $this->buildTableFunction($request);
+
+    return $this->queryEngine->executePreparedQuery(
+        $query["sql"],
+        $query["params"]
+    );
+}
+
     /*
     |--------------------------------------------------------------------------
     | Select Query Builder
@@ -4017,4 +4030,38 @@ if (
         ];
     }
 
+    /*
+     * Execute Table-Valued Function
+     */
+    public function buildTableFunction(array $request)
+    {
+        if (empty($request["function"])) {
+            throw new Exception("Function name is required.");
+        }
+
+        $params = $request["params"] ?? [];
+
+        $placeholders = "";
+
+        if (count($params) > 0) {
+            $placeholders = implode(
+                ", ",
+                array_fill(0, count($params), "?")
+            );
+        }
+
+        $sql = "SELECT * FROM {$request['function']}(";
+
+        if ($placeholders !== "") {
+            $sql .= $placeholders;
+        }
+
+        $sql .= ")";
+
+        return [
+            "sql" => $sql,
+            "params" => $params
+        ];
+    }
+    
 }
