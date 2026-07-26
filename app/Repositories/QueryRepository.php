@@ -3422,6 +3422,29 @@ if (!empty($request['joins'])) {
                     || strtoupper($filter['operator']) == "NOT IN"
                 ) {
 
+            /*
+             * Subquery
+             */
+            if (isset($filter['subquery'])) {
+
+                $subQuery =
+                    $this->buildSelect(
+                        $filter['subquery'],
+                        true
+                    );
+
+                $conditions[] =
+                    "{$filter['column']} {$filter['operator']} ({$subQuery['sql']})";
+
+                $params = array_merge(
+                    $params,
+                    $subQuery['params']
+                );
+
+                continue;
+
+            }
+
                 if (
                     !is_array($filter['value']) ||
                     empty($filter['value'])
