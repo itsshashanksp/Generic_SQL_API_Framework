@@ -3358,6 +3358,16 @@ if (!empty($request['joins'])) {
 
             foreach ($request['filters'] as $filter) {
 
+                /*
+                * EXISTS / NOT EXISTS has no column
+                */
+                if (
+                    strtoupper($filter['operator']) == "EXISTS"
+                    || strtoupper($filter['operator']) == "NOT EXISTS"
+                   ) {
+                    continue;
+                }
+
                 $resolved = $this->resolveColumn($filter['column']);
                 $table = $resolved['table'] ?? $request['table'];
 
@@ -3392,7 +3402,9 @@ if (!empty($request['joins'])) {
                     "BETWEEN",
                     "NOT BETWEEN",
                     "IS NULL",
-                    "IS NOT NULL"
+                    "IS NOT NULL",
+                    "EXISTS",
+                    "NOT EXISTS",
                 ];
 
                 if (
@@ -3416,6 +3428,42 @@ if (!empty($request['joins'])) {
 
                     continue;
                 }
+
+/*
+* EXISTS / NOT EXISTS
+*/
+
+if (
+    strtoupper($filter['operator']) == "EXISTS"
+    ||
+    strtoupper($filter['operator']) == "NOT EXISTS"
+)
+{
+
+    if (!isset($filter['subquery']))
+    {
+        throw new Exception(
+            "{$filter['operator']} requires a subquery."
+        );
+    }
+
+    $subQuery =
+        $this->buildSelect(
+            $filter['subquery'],
+            true
+        );
+
+    $conditions[] =
+        "{$filter['operator']} ({$subQuery['sql']})";
+
+    $params = array_merge(
+        $params,
+        $subQuery['params']
+    );
+
+    continue;
+
+}
 
                 if (
                     strtoupper($filter['operator']) == "IN"
