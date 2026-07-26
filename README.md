@@ -93,25 +93,6 @@ JSON Response
 
 ---
 
-## Project Structure
-
-```
-api/
-app/
-config/
-connection/
-core/
-docs/
-logs/
-
-README.md
-CHANGELOG.md
-LICENSE
-index.php
-```
-
----
-
 ## Example Request
 
 ```json
@@ -195,14 +176,12 @@ index.php
 - Authorization
 - API Keys
 
-### Dashboard
-
-- Dashboard Builder
-- Charts
-- Report Designer
-
 ---
 
 ## License
 
 This project is licensed under the MIT License.
+
+You are free to use, modify, distribute, and include this framework in personal or commercial projects, provided that the original copyright notice and license are included.
+
+See the [LICENSE](LICENSE) file for full details.
