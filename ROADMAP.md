@@ -2,7 +2,7 @@
 
 ## Current Version
 
-✅ v0.8.0
+✅ v0.9.0
 
 ---
 
@@ -24,6 +24,9 @@
 - TOP
 - Pagination
 - JOIN
+- UNION
+- UNION ALL
+- Subquery
 
 ## SQL Functions
 
@@ -33,6 +36,7 @@
 - AVG
 - MIN
 - MAX
+- STRING_AGG
 
 ### String
 - UPPER
@@ -90,60 +94,33 @@
 ### Window
 - ROW_NUMBER
 - RANK
+- DENSE_RANK
+- NTILE
+- LAG
+- LEAD
+- FIRST_VALUE
+- LAST_VALUE
 
 ---
 
-# v0.9.0 (Planned)
-
-## Additional Window Functions
-- DENSE_RANK()
-- NTILE()
-- LAG()
-- LEAD()
-- FIRST_VALUE()
-- LAST_VALUE()
-
-## Aggregate Enhancements
-- STRING_AGG()
-- GROUPING()
+# v1.0.0 (In Progress)
 
 ## Advanced SQL Support
-- UNION
-- UNION ALL
 - EXISTS
 - NOT EXISTS
-- ANY
-- ALL
+- CTE
+- Recursive CTE
+- CROSS APPLY
+- OUTER APPLY
 
-## JSON Support
-- FOR JSON
-- OPENJSON
+## Database Objects
+- Stored Procedure Execution
+- Table-Valued Function Support
 
----
+## Metadata
+- Metadata API
 
-# v1.0.0 (Stable)
-
-## Data Modification
-- INSERT
-- UPDATE
-- DELETE
-- MERGE
-
-## Transactions
-- BEGIN TRANSACTION
-- COMMIT
-- ROLLBACK
-
-## Stored Procedures
-- EXEC
-- OUTPUT Parameters
-
-## Security
-- Role-based permissions
-- Function restrictions
-- SQL audit logging
-
-## Performance
-- Query caching
-- Execution statistics
-- SQL profiling
+## Release
+- Documentation
+- Testing
+- v1.0.0 Stable Release
