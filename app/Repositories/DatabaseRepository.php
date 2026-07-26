@@ -3,7 +3,7 @@
 require_once __DIR__ . '/../../config/constants.php';
 require_once __DIR__ . '/../../core/QueryEngine.php';
 
-class MetadataRepository
+class DatabaseRepository
 {
     private QueryEngine $queryEngine;
 
