@@ -1,10 +1,10 @@
 # Generic SQL API Framework
 
-Generic SQL API Framework is a PHP-based backend framework for building dynamic SQL Server APIs.
+Generic SQL API Framework is a lightweight, JSON-driven PHP framework for building dynamic Microsoft SQL Server APIs.
 
-The framework accepts JSON requests, validates them, generates SQL queries dynamically, executes them using parameterized statements, and returns standardized JSON responses.
+Instead of writing a separate API for every report or module, the framework accepts structured JSON requests, validates them, generates SQL dynamically, executes parameterized queries, and returns standardized JSON responses.
 
-It is designed to reduce repetitive API development by providing a reusable query engine that can be integrated into reporting systems, dashboards, ERP applications, POS software, mobile applications, and other business systems.
+It is designed for reporting systems, dashboards, ERP applications, POS software, inventory systems, CRM solutions, and other business applications.
 
 ---
 
@@ -12,72 +12,67 @@ It is designed to reduce repetitive API development by providing a reusable quer
 
 ### Query Engine
 
-- Dynamic SELECT queries
-- JSON-driven request processing
-- Prepared statement support
-- Standardized JSON responses
+* Dynamic SQL query generation
+* JSON-driven request processing
+* Prepared statements
+* Standardized JSON responses
+
+### Supported Query Features
+
+* SELECT
+* WHERE
+* GROUP BY
+* HAVING
+* ORDER BY
+* Pagination
+* INNER JOIN
+* LEFT JOIN
+* RIGHT JOIN
 
 ### Validation
 
-- Table validation
-- Column validation
-- SQL function validation
-- JOIN validation
-- Operator validation
-- Alias validation
+* Table validation
+* Column validation
+* SQL function validation
+* JOIN validation
+* Operator validation
+* Alias validation
 
-### Query Support
+### SQL Functions
 
-- SELECT
-- WHERE
-- GROUP BY
-- HAVING
-- ORDER BY
-- Pagination
-- INNER JOIN
-- LEFT JOIN
-- RIGHT JOIN
-- Aggregate functions
-- String functions
-- Date functions
-- Mathematical functions
+* Aggregate Functions
+* String Functions
+* Date Functions
+* Mathematical Functions
 
 ### Monitoring
 
-- Query execution statistics
-- Execution time
-- Rows returned
-- Centralized logging
-- Exception logging
+* Query execution statistics
+* Execution time
+* Rows returned
+* Centralized logging
+* Exception logging
 
 ---
 
 ## Architecture
 
-```
+```text
 Client
    │
-   ▼
-JSON Request
+HTTP/HTTPS
    │
    ▼
-Controller
+Generic SQL API Framework
    │
-   ▼
 Validation Engine
    │
-   ▼
 SQL Builder
    │
-   ▼
 Query Engine
    │
-   ├── Logger
-   │
-   ▼
 Microsoft SQL Server
    │
-   ▼
 JSON Response
 ```
 
@@ -85,96 +80,70 @@ JSON Response
 
 ## Technology Stack
 
-- PHP 8+
-- Microsoft SQL Server
-- ODBC Driver
-- Repository Pattern
-- JSON-based API Design
-
----
-
-## Example Request
-
-```json
-{
-    "controller": "Query",
-    "action": "select",
-    "table": "CustomerTable",
-    "columns": [
-        "Cust_Name",
-        {
-            "function": "SUM",
-            "column": "Op_Bal",
-            "alias": "TotalBalance"
-        }
-    ],
-    "groupBy": [
-        "Cust_Name"
-    ]
-}
-```
-
----
-
-## Example Response
-
-```json
-{
-    "success": true,
-    "message": "Data Loaded Successfully",
-    "executionTime": 18.42,
-    "rowsReturned": 5,
-    "data": [
-        {
-            "Cust_Name": "ABC Traders",
-            "TotalBalance": 250000
-        }
-    ]
-}
-```
+* PHP 8+
+* Microsoft SQL Server
+* Microsoft ODBC Driver
+* JSON-based API Design
+* Repository Pattern
 
 ---
 
 ## Current Status
 
-### Completed
+**Version:** v1.0
 
-- Query Engine
-- Validation Engine
-- SQL Builder
-- Metadata Engine
-- JOIN Engine
-- Query Statistics
-- Centralized Logging
+### Currently Supported
+
+* Dynamic SELECT queries
+* SQL function support
+* JOIN support
+* Query validation
+* Pagination
+* Logging
+* Query statistics
+* Metadata engine
+
+### Planned
+
+* INSERT
+* UPDATE
+* DELETE
+* UPSERT
+* Stored Procedures
+* Transactions
+* Multi-database support
+* Authentication & Authorization
+* Export (Excel, PDF, CSV)
 
 ---
 
-## Planned Features
+## Documentation
 
-### CRUD
+Complete documentation is available in the **`docs/`** directory.
 
-- INSERT
-- UPDATE
-- DELETE
-- UPSERT
+| Document                    | Description                             |
+| --------------------------- | --------------------------------------- |
+| `Introduction.md`           | Framework overview and goals            |
+| `Architecture.md`           | Internal architecture and request flow  |
+| `API.md`                    | HTTP API reference                      |
+| `JSON-Request-Reference.md` | Complete JSON request specification     |
+| `Query-Examples.md`         | Practical request and response examples |
+| `Database-Configuration.md` | Database configuration guide            |
+| `Hosting.md`                | Deployment and hosting instructions     |
+| `Roadmap.md`                | Planned features and future releases    |
+| `CHANGELOG.md`              | Version history                         |
+| `CONTRIBUTING.md`           | Contribution guidelines                 |
 
-### Database
+---
 
-- Stored Procedures
-- Transactions
-- Bulk Operations
+## Getting Started
 
-### Export
+1. Clone the repository.
+2. Configure your database connection in `database.json`.
+3. Deploy the project to your PHP web server.
+4. Send JSON requests to the API endpoint.
 
-- Excel
-- PDF
-- CSV
-
-### Security
-
-- Authentication
-- Authorization
-- API Keys
+Refer to the documentation in the `docs/` folder for detailed setup and usage instructions.
 
 ---
 
@@ -182,6 +151,4 @@ JSON Response
 
 This project is licensed under the MIT License.
 
-You are free to use, modify, distribute, and include this framework in personal or commercial projects, provided that the original copyright notice and license are included.
-
-See the [LICENSE](LICENSE) file for full details.
+See the `LICENSE` file for more information.
