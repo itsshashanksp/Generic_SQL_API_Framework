@@ -1,255 +1,133 @@
-# Generic Dashboard
+# Generic SQL API Framework
 
-A configurable SQL Server reporting and dashboard platform built with PHP.
+Generic SQL API Framework is a PHP-based backend framework for building dynamic SQL Server APIs.
 
-Generic Dashboard is designed to eliminate the need for writing custom reports for every client requirement. Instead of creating individual SQL queries and dedicated APIs for each report, the system accepts a structured JSON request, validates it, dynamically generates SQL queries, executes them securely, and returns standardized JSON responses.
+The framework accepts JSON requests, validates them, generates SQL queries dynamically, executes them using parameterized statements, and returns standardized JSON responses.
 
-The goal is to provide a reusable reporting engine that can power dashboards, MIS reports, ERP systems, POS software, inventory management, accounting systems, and other business applications.
-
----
-
-# Why this project?
-
-Most business applications contain hundreds of reports.
-
-Traditional applications usually require developers to:
-
-- Write a new SQL query
-- Create a new API endpoint
-- Validate parameters
-- Maintain duplicate code
-- Modify reports whenever business requirements change
-
-This approach becomes difficult to maintain as the application grows.
-
-Generic Dashboard solves this problem by introducing a single configurable query engine capable of generating reports dynamically through JSON requests.
-
-Instead of creating hundreds of APIs, one engine can generate thousands of different reports.
+It is designed to reduce repetitive API development by providing a reusable query engine that can be integrated into reporting systems, dashboards, ERP applications, POS software, mobile applications, and other business systems.
 
 ---
 
-# Project Objectives
+## Features
 
-The primary objectives of this project are:
+### Query Engine
 
-- Build a reusable reporting engine
-- Reduce development time
-- Eliminate duplicate SQL code
-- Standardize report generation
-- Support configurable dashboards
-- Provide enterprise-ready reporting APIs
-- Simplify maintenance of large business applications
+- Dynamic SELECT queries
+- JSON-driven request processing
+- Prepared statement support
+- Standardized JSON responses
+
+### Validation
+
+- Table validation
+- Column validation
+- SQL function validation
+- JOIN validation
+- Operator validation
+- Alias validation
+
+### Query Support
+
+- SELECT
+- WHERE
+- GROUP BY
+- HAVING
+- ORDER BY
+- Pagination
+- INNER JOIN
+- LEFT JOIN
+- RIGHT JOIN
+- Aggregate functions
+- String functions
+- Date functions
+- Mathematical functions
+
+### Monitoring
+
+- Query execution statistics
+- Execution time
+- Rows returned
+- Centralized logging
+- Exception logging
 
 ---
 
-# Target Use Cases
-
-Generic Dashboard can be integrated into:
-
-- ERP Systems
-- POS Software
-- Accounting Applications
-- Inventory Management Systems
-- CRM Platforms
-- Courier & Logistics Software
-- Healthcare Applications
-- Educational Management Systems
-- Manufacturing Systems
-- Business Intelligence Dashboards
-
----
-
-# Architecture
-
-The application follows a modular architecture.
+## Architecture
 
 ```
 Client
    │
    ▼
-
 JSON Request
-
    │
    ▼
-
 Controller
-
    │
    ▼
-
-Query Repository
-
-   │
-   ▼
-
 Validation Engine
-
    │
    ▼
-
 SQL Builder
-
    │
    ▼
-
 Query Engine
-
+   │
+   ├── Logger
    │
    ▼
-
-SQL Server
-
+Microsoft SQL Server
    │
    ▼
-
 JSON Response
 ```
 
-Each layer has a dedicated responsibility, making the project modular, maintainable, and extensible.
-
 ---
 
-# Core Features
-
-## Dynamic Query Builder
-
-Supports dynamic SQL generation using JSON without requiring developers to write SQL for every report.
-
----
-
-## Validation Engine
-
-The engine validates:
-
-- Tables
-- Columns
-- SQL Functions
-- Operators
-- JOINs
-- Aliases
-
-before executing any query.
-
----
-
-## Query Features
-
-Current supported features include:
-
-### SELECT
-
-- Dynamic Columns
-- Column Aliases
-- DISTINCT
-- TOP
-
-### WHERE
-
-- AND
-- OR
-- LIKE
-- NOT LIKE
-- IN
-- NOT IN
-- BETWEEN
-- NOT BETWEEN
-- IS NULL
-- IS NOT NULL
-
-### GROUPING
-
-- GROUP BY
-- HAVING
-
-### SORTING
-
-- ORDER BY
-- Pagination
-
-### JOIN
-
-- INNER JOIN
-- LEFT JOIN
-- RIGHT JOIN
-- Table Aliases
-- Column Aliases
-
----
-
-# Supported SQL Functions
-
-## Aggregate Functions
-
-- COUNT
-- SUM
-- AVG
-- MIN
-- MAX
-
-## String Functions
-
-- UPPER
-- LOWER
-- LTRIM
-- RTRIM
-- TRIM
-- LEN
-
-## Date Functions
-
-- YEAR
-- MONTH
-- DAY
-- DATEPART
-- DATENAME
-- GETDATE
-
-## Mathematical Functions
-
-- ABS
-- ROUND
-- CEILING
-- FLOOR
-- POWER
-- SQRT
-- EXP
-- LOG
-
----
-
-# Technology Stack
-
-Backend
+## Technology Stack
 
 - PHP 8+
-- ODBC Driver
 - Microsoft SQL Server
-
-Architecture
-
+- ODBC Driver
 - Repository Pattern
-- Modular Design
-- JSON Driven Query Builder
+- JSON-based API Design
 
 ---
 
-# Example Request
+## Project Structure
+
+```
+api/
+app/
+config/
+connection/
+core/
+docs/
+logs/
+
+README.md
+CHANGELOG.md
+LICENSE
+index.php
+```
+
+---
+
+## Example Request
 
 ```json
 {
-    "controller":"Query",
-    "action":"select",
-    "table":"CustomerTable",
-    "columns":[
+    "controller": "Query",
+    "action": "select",
+    "table": "CustomerTable",
+    "columns": [
         "Cust_Name",
         {
-            "function":"SUM",
-            "column":"Op_Bal",
-            "alias":"TotalBalance"
+            "function": "SUM",
+            "column": "Op_Bal",
+            "alias": "TotalBalance"
         }
     ],
-    "groupBy":[
+    "groupBy": [
         "Cust_Name"
     ]
 }
@@ -257,16 +135,18 @@ Architecture
 
 ---
 
-# Example Response
+## Example Response
 
 ```json
 {
     "success": true,
     "message": "Data Loaded Successfully",
+    "executionTime": 18.42,
+    "rowsReturned": 5,
     "data": [
         {
             "Cust_Name": "ABC Traders",
-            "TotalBalance": 254000
+            "TotalBalance": 250000
         }
     ]
 }
@@ -274,61 +154,55 @@ Architecture
 
 ---
 
-# Current Progress
+## Current Status
 
-Current Milestone
-
-**Phase 1 Completed**
+### Completed
 
 - Query Engine
 - Validation Engine
-- Dynamic SQL Builder
-- SQL Function Support
-- Join Engine
+- SQL Builder
 - Metadata Engine
-
-Overall Progress
-
-**53 / 100 Planned Features**
+- JOIN Engine
+- Query Statistics
+- Centralized Logging
 
 ---
 
-# Future Development
+## Planned Features
 
-The next phase of development will include:
+### CRUD
 
-- CASE Expressions
-- COALESCE / ISNULL
-- CAST / CONVERT
-- UNION
-- Common Table Expressions (CTE)
-- Window Functions
-- Stored Procedure Support
+- INSERT
+- UPDATE
+- DELETE
+- UPSERT
+
+### Database
+
+- Stored Procedures
+- Transactions
+- Bulk Operations
+
+### Export
+
+- Excel
+- PDF
+- CSV
+
+### Security
+
+- Authentication
+- Authorization
+- API Keys
+
+### Dashboard
+
 - Dashboard Builder
-- Chart Engine
-- Report Templates
-- Export Engine (Excel, PDF, CSV)
-- User Management
-- Role-Based Permissions
-- Audit Logs
-- Performance Optimization
+- Charts
+- Report Designer
 
 ---
 
-# Project Status
+## License
 
-**Active Development**
-
-Current Version:
-
-**Phase 1 – Query Engine**
-
-Next Milestone:
-
-**Advanced SQL Engine**
-
----
-
-# License
-
-MIT License
+This project is licensed under the MIT License.
