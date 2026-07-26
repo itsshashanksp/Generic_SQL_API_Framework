@@ -280,6 +280,9 @@ private function buildCondition(array $condition): string
 
 }
 
+/*
+ * Execute Prepared SQL
+ */
 public function select($request)
 {
     if (isset($request['queries'])) {
@@ -294,9 +297,25 @@ public function select($request)
     );
 }
 
+/*
+ * Execute Procedure
+ */
 public function procedure(array $request)
 {
     $query = $this->buildProcedure($request);
+
+    return $this->queryEngine->executePreparedQuery(
+        $query["sql"],
+        $query["params"]
+    );
+}
+
+/*
+ * Execute Function
+ */ 
+public function function(array $request)
+{
+    $query = $this->buildFunction($request);
 
     return $this->queryEngine->executePreparedQuery(
         $query["sql"],
@@ -3932,6 +3951,9 @@ if (
         ];
     }
 
+    /*
+     * Build Procedure Query
+     */
     public function buildProcedure(array $request)
     {
         if (empty($request["procedure"])) {
@@ -3960,5 +3982,39 @@ if (
             "params" => $params
         ];
     }
-    
+
+    /*
+     * Execute Function
+     */
+    public function buildFunction(array $request)
+    {
+        if (empty($request["function"])) {
+            throw new Exception("Function name is required.");
+        }
+
+        $params = $request["params"] ?? [];
+
+        $placeholders = "";
+
+        if (count($params) > 0) {
+            $placeholders = implode(
+                ", ",
+                array_fill(0, count($params), "?")
+            );
+        }
+
+        $sql = "SELECT {$request['function']}(";
+
+        if ($placeholders !== "") {
+            $sql .= $placeholders;
+        }
+
+        $sql .= ") AS Result";
+
+        return [
+            "sql" => $sql,
+            "params" => $params
+        ];
+    }
+
 }

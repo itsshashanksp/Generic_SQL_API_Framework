@@ -40,4 +40,14 @@ class QueryService
     {
         return $this->queryRepository->procedure($request);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Function Service
+    |--------------------------------------------------------------------------
+    */
+    public function function($request)
+    {
+        return $this->queryRepository->function($request);
+    }
 }
