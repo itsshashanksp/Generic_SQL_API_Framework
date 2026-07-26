@@ -47,4 +47,21 @@ class QueryController extends BaseController
             "Data Loaded Successfully"
       );
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Procedure Controller
+    |--------------------------------------------------------------------------
+    */
+    public function procedure($request)
+    {
+        Validator::required($request, [
+            "procedure"
+        ]);
+
+        $this->success(
+            $this->queryService->procedure($request),
+            "Procedure Executed Successfully"
+        );
+    }
 }

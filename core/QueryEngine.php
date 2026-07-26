@@ -75,26 +75,30 @@ class QueryEngine
     /**
     * Execute Prepared SQL With Result
     */
-    public function executePreparedQuery($sql, array $params = [])
-    {
-       $statement = odbc_prepare($this->connection, $sql);
+public function executePreparedQuery($sql, array $params = [])
+{
+    $statement = odbc_prepare($this->connection, $sql);
 
-       if (!$statement) {
-         throw new Exception(odbc_errormsg($this->connection));
+    if (!$statement) {
+        throw new Exception(odbc_errormsg($this->connection));
     }
 
-       if (!odbc_execute($statement, $params)) {
-         throw new Exception(odbc_errormsg($this->connection));
+    if (!@odbc_execute($statement, $params)) {
+        throw new Exception(odbc_errormsg($this->connection));
     }
 
     $rows = [];
 
-    while ($row = odbc_fetch_array($statement)) {
-        $rows[] = $row;
-    }
+    do {
+
+        while ($row = odbc_fetch_array($statement)) {
+            $rows[] = $row;
+        }
+
+    } while (@odbc_next_result($statement));
 
     return $rows;
-    }
+}
 
     /**
      * Execute SQL File

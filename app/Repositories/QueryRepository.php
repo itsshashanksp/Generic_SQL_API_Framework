@@ -294,6 +294,16 @@ public function select($request)
     );
 }
 
+public function procedure(array $request)
+{
+    $query = $this->buildProcedure($request);
+
+    return $this->queryEngine->executePreparedQuery(
+        $query["sql"],
+        $query["params"]
+    );
+}
+
     /*
     |--------------------------------------------------------------------------
     | Select Query Builder
@@ -3921,4 +3931,34 @@ if (
             'params' => $params
         ];
     }
+
+    public function buildProcedure(array $request)
+    {
+        if (empty($request["procedure"])) {
+            throw new Exception("Procedure name is required.");
+        }
+
+        $params = $request["params"] ?? [];
+
+        $placeholders = "";
+
+        if (count($params) > 0) {
+            $placeholders = implode(
+                ", ",
+                array_fill(0, count($params), "?")
+            );
+        }
+
+        $sql = "EXEC {$request['procedure']}";
+
+        if ($placeholders !== "") {
+            $sql .= " " . $placeholders;
+        }
+
+        return [
+            "sql" => $sql,
+            "params" => $params
+        ];
+    }
+    
 }

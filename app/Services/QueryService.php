@@ -30,4 +30,14 @@ class QueryService
     {
         return $this->queryRepository->select($request);
     }
+
+    /*
+    |--------------------------------------------------------------------------
+    | Procedure Service
+    |--------------------------------------------------------------------------
+    */
+    public function procedure($request)
+    {
+        return $this->queryRepository->procedure($request);
+    }
 }
