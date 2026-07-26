@@ -301,14 +301,53 @@ public function select($request)
     */
     public function buildSelect($request, bool $isUnion = false)
     {
+
+    $params = [];
+/*
+ * CTE Request
+ */
+$cteSql = "";
+
+if (isset($request['cte'])) {
+
+    $cte = $request['cte'];
+
+    if (
+        empty($cte['name'])
+        || empty($cte['query'])
+    ) {
+        throw new Exception(
+            "CTE requires name and query."
+        );
+    }
+
+    $subQuery = $this->buildSelect(
+        $cte['query'],
+        true
+    );
+
+    $cteSql =
+        "WITH {$cte['name']} AS ({$subQuery['sql']}) ";
+
+    $params = array_merge(
+        $params,
+        $subQuery['params']
+    );
+}
+
         /*
          * Validate Table
          */
-        if (
-            !$this->metadataRepository->tableExists(
-                $request['table']
-            )
-        ) {
+          $isCTE =
+              isset($request['cte']) &&
+              $request['table'] === $request['cte']['name'];
+
+          if (
+              !$isCTE &&
+              !$this->metadataRepository->tableExists(
+                  $request['table']
+              )
+          ) {
             throw new Exception("Invalid table name.");
         }
 
@@ -1445,6 +1484,13 @@ if (
             $resolved = $this->resolveColumn($column['column']);
 
             $table = $resolved['table'] ?? $request['table'];
+
+            $isCTEColumn = isset($request['cte']) &&
+            $table === $request['cte']['name'];
+
+            if ($isCTEColumn) {
+                continue;
+            }
 
             if (
                 !$this->metadataRepository->columnExists(
@@ -3801,6 +3847,8 @@ if (
                 FETCH NEXT {$request['pageSize']} ROWS ONLY
             ";
         }
+        
+        $sql = $cteSql . $sql;
 
         return [
             'sql' => $sql,

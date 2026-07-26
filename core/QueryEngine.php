@@ -57,7 +57,9 @@ class QueryEngine
          throw new Exception(odbc_errormsg($this->connection));
    }
 
-    if (!odbc_execute($statement, $params)) {
+    $result = @odbc_execute($statement, $params);
+
+    if ($result === false) {
         throw new Exception(odbc_errormsg($this->connection));
     }
 
