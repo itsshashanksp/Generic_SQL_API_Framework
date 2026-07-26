@@ -76,7 +76,7 @@ class MetadataRepository
            [$table]
         );
 
-    return $result[0]['Total'] > 0;
+    return (($result["data"][0]["Total"] ?? 0) > 0);
     }
 
     /**
@@ -103,7 +103,7 @@ class MetadataRepository
         ]
     );
 
-    return $result[0]['Total'] > 0;
+    return (($result["data"][0]["Total"] ?? 0) > 0);
     }
 
     /**

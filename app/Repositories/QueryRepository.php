@@ -1616,6 +1616,11 @@ if (
 
     } else {
 
+        // Allow SELECT *
+        if ($column === "*") {
+            continue;
+        }
+
         $resolved = $this->resolveColumn($column);
 
         $table = $resolved['table'] ?? $request['table'];
@@ -1630,8 +1635,8 @@ if (
                 "Invalid column: {$column}"
             );
         }
-    }
         }
+    }
 
     /*
      * Build SELECT Columns

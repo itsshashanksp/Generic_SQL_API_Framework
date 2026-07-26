@@ -11,11 +11,25 @@ class Response
 
         header("Content-Type: application/json");
 
-        echo json_encode([
+        $response = [
             "success" => true,
-            "message" => $message,
-            "data" => $data
-        ], JSON_PRETTY_PRINT);
+            "message" => $message
+        ];
+
+        if (
+            is_array($data) &&
+            isset($data["executionTime"]) &&
+            isset($data["rowsReturned"]) &&
+            isset($data["data"])
+        ) {
+            $response["executionTime"] = $data["executionTime"];
+            $response["rowsReturned"]  = $data["rowsReturned"];
+            $response["data"]          = $data["data"];
+        } else {
+            $response["data"] = $data;
+        }
+
+        echo json_encode($response, JSON_PRETTY_PRINT);
 
         exit;
     }

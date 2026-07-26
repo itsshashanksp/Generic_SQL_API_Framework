@@ -28,10 +28,24 @@ class QueryEngine
     }
 
     /**
+     * Build Query Result
+     */
+    private function buildResult(array $rows, float $startTime): array
+    {
+        return [
+            "executionTime" => round((microtime(true) - $startTime) * 1000, 2),
+            "rowsReturned"  => count($rows),
+            "data"          => $rows
+        ];
+    }
+
+    /**
      * Execute SQL
      */
     public function execute($sql)
     {
+        $startTime = microtime(true);
+
         $result = odbc_exec($this->connection, $sql);
 
         if (!$result) {
@@ -44,61 +58,66 @@ class QueryEngine
             $rows[] = $row;
         }
 
-        return $rows;
+        return $this->buildResult($rows, $startTime);
     }
+
     /**
-    *Execute Prepared SQL
-    */
+     * Execute Prepared SQL
+     */
     public function executePrepared($sql, array $params = [])
     {
-       $statement = odbc_prepare($this->connection, $sql);
+        $startTime = microtime(true);
 
-       if (!$statement) {
-         throw new Exception(odbc_errormsg($this->connection));
-   }
+        $statement = odbc_prepare($this->connection, $sql);
 
-    $result = @odbc_execute($statement, $params);
+        if (!$statement) {
+            throw new Exception(odbc_errormsg($this->connection));
+        }
 
-    if ($result === false) {
-        throw new Exception(odbc_errormsg($this->connection));
-    }
+        $result = @odbc_execute($statement, $params);
 
-    $rows = [];
+        if ($result === false) {
+            throw new Exception(odbc_errormsg($this->connection));
+        }
 
-    while ($row = odbc_fetch_array($statement)) {
-        $rows[] = $row;
-    }
-
-    return $rows;
-    }
-
-    /**
-    * Execute Prepared SQL With Result
-    */
-public function executePreparedQuery($sql, array $params = [])
-{
-    $statement = odbc_prepare($this->connection, $sql);
-
-    if (!$statement) {
-        throw new Exception(odbc_errormsg($this->connection));
-    }
-
-    if (!@odbc_execute($statement, $params)) {
-        throw new Exception(odbc_errormsg($this->connection));
-    }
-
-    $rows = [];
-
-    do {
+        $rows = [];
 
         while ($row = odbc_fetch_array($statement)) {
             $rows[] = $row;
         }
 
-    } while (@odbc_next_result($statement));
+        return $this->buildResult($rows, $startTime);
+    }
 
-    return $rows;
-}
+        /**
+     * Execute Prepared SQL With Result
+     */
+    public function executePreparedQuery($sql, array $params = [])
+    {
+        $startTime = microtime(true);
+
+        $statement = odbc_prepare($this->connection, $sql);
+
+        if (!$statement) {
+            throw new Exception(odbc_errormsg($this->connection));
+        }
+
+        if (!@odbc_execute($statement, $params)) {
+            throw new Exception(odbc_errormsg($this->connection));
+        }
+
+        $rows = [];
+
+        do {
+
+            while ($row = odbc_fetch_array($statement)) {
+                $rows[] = $row;
+            }
+
+        } while (@odbc_next_result($statement));
+
+        return $this->buildResult($rows, $startTime);
+    }
 
     /**
      * Execute SQL File
@@ -117,4 +136,4 @@ public function executePreparedQuery($sql, array $params = [])
     {
         $this->db->close();
     }
-}
+}    
