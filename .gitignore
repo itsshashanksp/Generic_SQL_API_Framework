@@ -1,2 +1,24 @@
-connection/
+# Dependencies
+/vendor/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
 logs/
+
+# Generated Files
+exports/
+uploads/
+storage/
+
+# Environment
+.env
+
+# OS Files
+.DS_Store
+Thumbs.db
+
+# DB Config
+database/config/database.json

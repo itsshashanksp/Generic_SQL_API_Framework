@@ -1,39 +1,24 @@
 <?php
 
+require_once __DIR__ . "/../database/factory/DriverFactory.php";
+
 class Database
 {
-    private $connection;
+    private $driver;
 
     public function __construct()
     {
-        require_once __DIR__ . '/../config/constants.php';
-
-        $config = require __DIR__ . '/../config/database.php';
-
-        $connectionString = trim(file_get_contents($config['connection_file']));
-        $username         = trim(file_get_contents($config['username_file']));
-        $password         = trim(file_get_contents($config['password_file']));
-
-        $this->connection = odbc_connect(
-            $connectionString,
-            $username,
-            $password
-        );
-
-        if (!$this->connection) {
-            die("Database Connection Failed : " . odbc_errormsg());
-        }
+        $this->driver = DriverFactory::create();
+        $this->driver->connect();
     }
 
     public function getConnection()
     {
-        return $this->connection;
+        return $this->driver->getConnection();
     }
 
     public function close()
     {
-        if ($this->connection) {
-            odbc_close($this->connection);
-        }
+        $this->driver->disconnect();
     }
 }
