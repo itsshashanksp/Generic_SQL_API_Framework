@@ -1,18 +1,21 @@
 <?php
 
 require_once __DIR__ . '/Database.php';
+require_once __DIR__ . '/Logger.php';
 
 class QueryEngine
 {
     private $db;
 
     private $connection;
+    private Logger $logger;
 
     public function __construct()
     {
         $this->db = new Database();
 
         $this->connection = $this->db->getConnection();
+        $this->logger = new Logger();
     }
 
     /**
@@ -39,34 +42,107 @@ class QueryEngine
         ];
     }
 
-    /**
-     * Execute SQL
-     */
-    public function execute($sql)
-    {
-        $startTime = microtime(true);
+    /*
+    * Log Query Success
+    */
+        private function logSuccess(
+        string $sql,
+        array $params,
+        array $result
+    ): void {
 
-        $result = odbc_exec($this->connection, $sql);
+        $message =
+            "========================================\n";
 
-        if (!$result) {
+        $message .=
+            "Date : "
+            . date("Y-m-d H:i:s")
+            . "\n";
+
+        $message .=
+            "Status : SUCCESS\n";
+
+        $message .=
+            "Execution Time : "
+            . $result["executionTime"]
+            . " ms\n";
+
+        $message .=
+            "Rows Returned : "
+            . $result["rowsReturned"]
+            . "\n\n";
+
+        $message .=
+            "SQL:\n"
+            . $sql
+            . "\n\n";
+
+        $message .=
+            "Parameters:\n"
+            . json_encode(
+                $params,
+                JSON_PRETTY_PRINT
+            )
+            . "\n";
+
+        $message .=
+            "========================================\n\n";
+
+        $this->logger->write($message);
+    }
+
+/**
+ * Execute SQL
+ */
+public function execute($sql)
+{
+    $startTime = microtime(true);
+
+    try {
+
+        $query = odbc_exec($this->connection, $sql);
+
+        if (!$query) {
             throw new Exception(odbc_errormsg($this->connection));
         }
 
         $rows = [];
 
-        while ($row = odbc_fetch_array($result)) {
+        while ($row = odbc_fetch_array($query)) {
             $rows[] = $row;
         }
 
-        return $this->buildResult($rows, $startTime);
-    }
+        $result = $this->buildResult($rows, $startTime);
 
-    /**
-     * Execute Prepared SQL
-     */
-    public function executePrepared($sql, array $params = [])
-    {
-        $startTime = microtime(true);
+        $this->logSuccess(
+            $sql,
+            [],
+            $result
+        );
+
+        return $result;
+
+    } catch (Exception $e) {
+
+        $this->logger->error(
+            $sql,
+            [],
+            $e->getMessage(),
+            (microtime(true) - $startTime) * 1000
+        );
+
+        throw $e;
+    }
+}
+
+/**
+ * Execute Prepared SQL
+ */
+public function executePrepared($sql, array $params = [])
+{
+    $startTime = microtime(true);
+
+    try {
 
         $statement = odbc_prepare($this->connection, $sql);
 
@@ -74,9 +150,9 @@ class QueryEngine
             throw new Exception(odbc_errormsg($this->connection));
         }
 
-        $result = @odbc_execute($statement, $params);
+        $executed = @odbc_execute($statement, $params);
 
-        if ($result === false) {
+        if ($executed === false) {
             throw new Exception(odbc_errormsg($this->connection));
         }
 
@@ -86,15 +162,37 @@ class QueryEngine
             $rows[] = $row;
         }
 
-        return $this->buildResult($rows, $startTime);
-    }
+        $result = $this->buildResult($rows, $startTime);
 
-        /**
-     * Execute Prepared SQL With Result
-     */
-    public function executePreparedQuery($sql, array $params = [])
-    {
-        $startTime = microtime(true);
+        $this->logSuccess(
+            $sql,
+            $params,
+            $result
+        );
+
+        return $result;
+
+    } catch (Exception $e) {
+
+        $this->logger->error(
+            $sql,
+            $params,
+            $e->getMessage(),
+            (microtime(true) - $startTime) * 1000
+        );
+
+        throw $e;
+    }
+}
+
+/**
+ * Execute Prepared SQL With Result
+ */
+public function executePreparedQuery($sql, array $params = [])
+{
+    $startTime = microtime(true);
+
+    try {
 
         $statement = odbc_prepare($this->connection, $sql);
 
@@ -116,8 +214,28 @@ class QueryEngine
 
         } while (@odbc_next_result($statement));
 
-        return $this->buildResult($rows, $startTime);
+        $result = $this->buildResult($rows, $startTime);
+
+        $this->logSuccess(
+            $sql,
+            $params,
+            $result
+        );
+
+        return $result;
+
+    } catch (Exception $e) {
+
+        $this->logger->error(
+            $sql,
+            $params,
+            $e->getMessage(),
+            (microtime(true) - $startTime) * 1000
+        );
+
+        throw $e;
     }
+}
 
     /**
      * Execute SQL File
@@ -136,4 +254,4 @@ class QueryEngine
     {
         $this->db->close();
     }
-}    
+}     

@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . '/Response.php';
+require_once __DIR__ . '/Logger.php';
 
 class ExceptionHandler
 {
@@ -8,19 +9,13 @@ class ExceptionHandler
     {
         set_exception_handler(function (Throwable $exception) {
 
-            $logFile = __DIR__ . '/../logs/error.log';
+            $logger = new Logger();
 
-            $message = sprintf(
-                "[%s] %s\n%s\n\n",
-                date('Y-m-d H:i:s'),
-                $exception->getMessage(),
+            $logger->error(
+                "Unhandled Exception",
+                [],
+                $exception->getMessage() . PHP_EOL .
                 $exception->getTraceAsString()
-            );
-
-            file_put_contents(
-                $logFile,
-                $message,
-                FILE_APPEND
             );
 
             Response::error(
