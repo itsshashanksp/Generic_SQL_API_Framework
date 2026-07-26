@@ -303,10 +303,63 @@ public function select($request)
     {
 
     $params = [];
+
+/*
+*Recursive CTE
+*/
+$cteSql = "";
+
+if (isset($request["recursiveCte"])) {
+
+    $cte = $request["recursiveCte"];
+
+    foreach ([
+        "name",
+        "anchor",
+        "recursive"
+    ] as $field) {
+
+        if (empty($cte[$field])) {
+
+            throw new Exception(
+                "Recursive CTE requires {$field}."
+            );
+
+        }
+
+    }
+
+    $anchor =
+        $this->buildSelect(
+            $cte["anchor"],
+            true
+        );
+
+    $recursive =
+        $this->buildSelect(
+            $cte["recursive"],
+            true
+        );
+
+    $cteSql =
+        "WITH "
+        . $cte["name"]
+        . " AS ("
+        . $anchor["sql"]
+        . " UNION ALL "
+        . $recursive["sql"]
+        . ") ";
+
+    $params = array_merge(
+        $params,
+        $anchor["params"],
+        $recursive["params"]
+    );
+}
+
 /*
  * CTE Request
  */
-$cteSql = "";
 
 if (isset($request['cte'])) {
 
@@ -338,18 +391,25 @@ if (isset($request['cte'])) {
         /*
          * Validate Table
          */
-          $isCTE =
-              isset($request['cte']) &&
-              $request['table'] === $request['cte']['name'];
+         $isCTE =
+         (
+             isset($request['cte']) &&
+             $request['table'] === $request['cte']['name']
+         )
+         ||
+         (
+             isset($request['recursiveCte']) &&
+             $request['table'] === $request['recursiveCte']['name']
+         );
 
-          if (
-              !$isCTE &&
-              !$this->metadataRepository->tableExists(
-                  $request['table']
-              )
-          ) {
-            throw new Exception("Invalid table name.");
-        }
+         if (
+             !$isCTE &&
+             !$this->metadataRepository->tableExists(
+                 $request['table']
+            )
+         ) {
+             throw new Exception("Invalid table name.");
+         }
 
         /*
         * Register Base Table
@@ -1485,12 +1545,20 @@ if (
 
             $table = $resolved['table'] ?? $request['table'];
 
-            $isCTEColumn = isset($request['cte']) &&
-            $table === $request['cte']['name'];
+            $isCTEColumn =
+            (
+                isset($request['cte']) &&
+                $table === $request['cte']['name']
+            )
+            ||
+            (
+              isset($request['recursiveCte']) &&
+                $table === $request['recursiveCte']['name']
+            );
 
             if ($isCTEColumn) {
                 continue;
-            }
+}
 
             if (
                 !$this->metadataRepository->columnExists(
@@ -3350,8 +3418,6 @@ if ($function == "STRING_AGG") {
     FROM
         {$request['table']}{$baseAlias}
     ";
-
-        $params = [];
 
 /*
  * JOIN
