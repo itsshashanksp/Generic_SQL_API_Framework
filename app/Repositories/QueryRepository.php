@@ -3513,9 +3513,9 @@ if (!empty($request['joins'])) {
         /*
          * WHERE
          */
-        if (!empty($request['filters'])) {
+        if (!empty($request['where'])) {
 
-            foreach ($request['filters'] as $filter) {
+            foreach ($request['where'] as $filter) {
 
                 /*
                 * EXISTS / NOT EXISTS has no column
@@ -3544,7 +3544,7 @@ if (!empty($request['joins'])) {
 
             $conditions = [];
 
-            foreach ($request['filters'] as $filter) {
+            foreach ($request['where'] as $filter) {
 
                 $allowedOperators = [
                     "=",
