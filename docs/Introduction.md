@@ -102,6 +102,26 @@ Future releases will introduce additional database providers, CRUD operations, t
 
 ---
 
+# Getting Started
+
+After configuring the database, you can immediately begin sending JSON requests to the Generic SQL API Framework from any frontend application.
+
+Before connecting your frontend, make sure the frontend URL is added to the CORS allowlist in `api/index.php`.
+
+For example:
+
+```php
+$allowed_origins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "https://your-frontend.com"
+];
+```
+
+For detailed deployment instructions, including CORS configuration, web server setup, and production recommendations, refer to **Hosting.md**.
+
+----
+
 # Conclusion
 
 The Generic SQL API Framework provides a reusable foundation for building secure, configurable, and maintainable SQL APIs. By separating database access, validation, query generation, and configuration into dedicated components, the framework enables developers to rapidly build data-driven applications while maintaining a clean and scalable architecture.

@@ -170,6 +170,104 @@ No framework-specific SDK is required.
 
 ---
 
+# CORS Configuration
+
+## Overview
+
+The Generic SQL API Framework uses a configurable Cross-Origin Resource Sharing (CORS) allowlist to restrict API access to trusted frontend applications.
+
+The allowlist is configured in:
+
+```text
+api/index.php
+```
+
+---
+
+## Default Configuration
+
+```php
+$allowed_origins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "https://myfrontend.com"
+];
+```
+
+---
+
+## Adding Your Frontend
+
+If your frontend runs at:
+
+```text
+http://localhost:5174
+```
+
+Simply add it to the allowlist.
+
+```php
+$allowed_origins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:3000",
+    "http://localhost:5174"
+];
+```
+
+For production deployments:
+
+```php
+$allowed_origins = [
+    "https://app.company.com",
+    "https://portal.company.com"
+];
+```
+
+---
+
+## Supported Request Methods
+
+The framework automatically handles:
+
+- GET
+- POST
+- OPTIONS (Preflight Requests)
+
+---
+
+## Allowed Headers
+
+The framework allows the following request headers:
+
+- Content-Type
+- Authorization
+
+---
+
+## After Updating
+
+After modifying the allowlist:
+
+1. Save `api/index.php`.
+2. Restart Apache, IIS, or PHP if required.
+3. Refresh your frontend application.
+
+---
+
+## Security Recommendation
+
+Only add trusted frontend domains to the allowlist.
+
+Avoid using:
+
+```php
+header("Access-Control-Allow-Origin: *");
+```
+
+in production environments, as it allows requests from any origin.
+
+----
+
 # Communication Flow
 
 ```text
