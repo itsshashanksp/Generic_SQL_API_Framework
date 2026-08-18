@@ -24,6 +24,9 @@ class Response
         ) {
             $response["executionTime"] = $data["executionTime"];
             $response["rowsReturned"]  = $data["rowsReturned"];
+            if (isset($data["totalRows"])) {
+                $response["totalRows"] = $data["totalRows"];
+            }
             $response["data"]          = $data["data"];
         } else {
             $response["data"] = $data;

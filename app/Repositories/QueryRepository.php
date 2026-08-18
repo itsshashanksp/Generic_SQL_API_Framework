@@ -291,10 +291,16 @@ public function select($request)
 
     $query = $this->buildSelect($request);
 
-    return $this->queryEngine->executePrepared(
+    $result = $this->queryEngine->executePrepared(
         $query['sql'],
         $query['params']
     );
+
+    if ($query['totalRows'] !== null) {
+        $result['totalRows'] = $query['totalRows'];
+    }
+
+    return $result;
 }
 
 /*
@@ -345,6 +351,7 @@ public function tableFunction(array $request)
     {
 
     $params = [];
+    $totalRows = null;
 
 /*
 *Recursive CTE
@@ -3943,6 +3950,51 @@ if (
 
     }
 
+/*
+ * Total Rows
+ *
+ * Calculate total matching rows before pagination.
+ */
+$countSql = null;
+
+if (
+    isset($request['page']) &&
+    isset($request['pageSize'])
+) {
+    $countBaseSql = $sql;
+
+    /*
+     * Remove ORDER BY from count query.
+     */
+    $countBaseSql = preg_replace(
+        '/\s+ORDER BY\s+.*$/is',
+        '',
+        $countBaseSql
+    );
+
+    $countSql =
+        "SELECT COUNT(*) AS TotalRows
+         FROM (
+             {$countBaseSql}
+         ) AS CountQuery";
+
+    $countResult =
+        $this->queryEngine->executePrepared(
+            $countSql,
+            $params
+        );
+
+    if (
+        !empty($countResult['data']) &&
+        isset($countResult['data'][0]['TotalRows'])
+    ) {
+        $totalRows =
+            (int)$countResult['data'][0]['TotalRows'];
+    } else {
+        $totalRows = 0;
+    }
+}
+
         /*
          * Pagination
          */
@@ -3965,7 +4017,8 @@ if (
 
         return [
             'sql' => $sql,
-            'params' => $params
+            'params' => $params,
+            'totalRows' => $totalRows
         ];
     }
 
