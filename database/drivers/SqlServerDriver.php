@@ -17,6 +17,7 @@ class SqlServerDriver implements DatabaseDriverInterface
     $database,
     $username,
     $password,
+    $authentication,
     $encrypt,
     $trust
 ) {
@@ -57,12 +58,25 @@ class SqlServerDriver implements DatabaseDriverInterface
             . "Encrypt={$encrypt};"
             . "TrustServerCertificate={$trust};";
 
+    if (
+        strtolower(trim($authentication)) === "windows"
+    ) {
+        $dsn .= "Trusted_Connection=yes;";
+
+        $connection = @odbc_connect(
+            $dsn,
+            "",
+            "",
+            SQL_CUR_USE_ODBC
+        );
+    } else {        
         $connection = @odbc_connect(
             $dsn,
             $username,
             $password,
             SQL_CUR_USE_ODBC
         );
+    }
 
         if ($connection) {
 
@@ -128,6 +142,13 @@ class SqlServerDriver implements DatabaseDriverInterface
 
         $password =
             $config["password"] ?? "";
+        
+        $authentication =
+        strtolower(
+            trim(
+                $config["authentication"] ?? "sql"
+            )
+        );
 
         if (empty($server)) {
             throw new Exception(
@@ -177,6 +198,7 @@ class SqlServerDriver implements DatabaseDriverInterface
                     $database,
                     $username,
                     $password,
+                    $authentication,
                     $encrypt,
                     $trust
                 );
@@ -210,6 +232,19 @@ class SqlServerDriver implements DatabaseDriverInterface
         /*
          * Establish connection.
          */
+        if ($authentication === "windows") {
+
+        $dsn .= "Trusted_Connection=yes;";
+
+        $this->connection =
+            @odbc_connect(
+                $dsn,
+                "",
+                "",
+                SQL_CUR_USE_ODBC
+            );
+
+    } else {
         $this->connection =
             @odbc_connect(
                 $dsn,
@@ -217,6 +252,7 @@ class SqlServerDriver implements DatabaseDriverInterface
                 $password,
                 SQL_CUR_USE_ODBC
             );
+    }
 
         if (!$this->connection) {
 
