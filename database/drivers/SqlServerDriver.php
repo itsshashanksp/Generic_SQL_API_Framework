@@ -6,137 +6,318 @@ class SqlServerDriver implements DatabaseDriverInterface
 {
     private $connection = null;
 
-    private function detectDriver($server, $database, $username, $password, $encrypt, $trust)
-    {
-        $drivers = [
-            "ODBC Driver 18 for SQL Server",
-            "ODBC Driver 17 for SQL Server",
-            "ODBC Driver 13 for SQL Server",
-            "SQL Server Native Client 11.0",
-            "SQL Native Client",
-            "SQL Server"
-        ];
+    /**
+     * Detect a compatible SQL Server ODBC driver.
+     *
+     * Drivers are tested from newest to oldest.
+     */
+    private function detectDriver(
+    $server,
+    $port,
+    $database,
+    $username,
+    $password,
+    $encrypt,
+    $trust
+) {
+    $drivers = [
+        "ODBC Driver 19 for SQL Server",
+        "ODBC Driver 18 for SQL Server",
+        "ODBC Driver 17 for SQL Server",
+        "ODBC Driver 13.1 for SQL Server",
+        "ODBC Driver 13 for SQL Server",
+        "ODBC Driver 11 for SQL Server",
+        "ODBC Driver 10 for SQL Server",
 
-        foreach ($drivers as $driver) {
+        "SQL Server Native Client 11.0",
+        "SQL Server Native Client 10.0",
+        "SQL Server Native Client 9.0",
 
-            $dsn = "Driver={$driver};"
-                 . "Server={$server};"
-                 . "Database={$database};"
-                 . "Encrypt={$encrypt};"
-                 . "TrustServerCertificate={$trust};";
+        "SQL Native Client",
+        "SQL Server"
+    ];
 
-            $connection = @odbc_connect($dsn, $username, $password);
+    /*
+     * Build server address.
+     */
+    $serverAddress = $server;
 
-            if ($connection) {
-                odbc_close($connection);
-                return $driver;
-            }
-        }
-
-        throw new Exception("No compatible SQL Server ODBC driver found.");
+    if (!empty($port)) {
+        $serverAddress .= "," . $port;
     }
 
+    $errors = [];
+
+    foreach ($drivers as $driver) {
+
+        $dsn =
+            "Driver={" . $driver . "};"
+            . "Server={$serverAddress};"
+            . "Database={$database};"
+            . "Encrypt={$encrypt};"
+            . "TrustServerCertificate={$trust};";
+
+        $connection = @odbc_connect(
+            $dsn,
+            $username,
+            $password,
+            SQL_CUR_USE_ODBC
+        );
+
+        if ($connection) {
+
+            odbc_close($connection);
+
+            return $driver;
+        }
+
+        $error = odbc_errormsg();
+
+        $errors[] =
+            $driver . ": " . $error;
+    }
+
+    throw new Exception(
+        "No compatible SQL Server ODBC driver could establish a connection."
+        . "\n\nServer: " . $serverAddress
+        . "\nDatabase: " . $database
+        . "\n\nDriver errors:\n"
+        . implode("\n", $errors)
+    );
+}
+
+    /**
+     * Connect to SQL Server.
+     */
     public function connect()
     {
-        $configPath = __DIR__ . '/../config/database.json';
+        $configPath =
+            __DIR__ . '/../config/database.json';
 
         if (!file_exists($configPath)) {
-            throw new Exception("database.json not found.");
+            throw new Exception(
+                "database.json not found."
+            );
         }
 
-        $config = json_decode(file_get_contents($configPath), true);
+        $config = json_decode(
+            file_get_contents($configPath),
+            true
+        );
 
-        if (!$config) {
-            throw new Exception("Invalid database.json");
+        if (!is_array($config)) {
+            throw new Exception(
+                "Invalid database.json"
+            );
         }
 
-        $server   = $config["server"];
-        $database = $config["database"];
-        $username = $config["username"];
-        $password = $config["password"];
+        /*
+         * Database configuration.
+         */
+        $server =
+            $config["server"] ?? null;
 
-        // Read options from JSON
-        $encrypt = !empty($config["options"]["encrypt"]) ? "yes" : "no";
-        $trust   = !empty($config["options"]["trustServerCertificate"]) ? "yes" : "no";
+        $port =
+            $config["port"] ?? null;
 
-        // Detect driver automatically
-        if (strtolower($config["driver"]) === "auto") {
+        $database =
+            $config["database"] ?? null;
 
-            $driver = $this->detectDriver(
-                $server,
-                $database,
-                $username,
-                $password,
-                $encrypt,
-                $trust
-          );
+        $username =
+            $config["username"] ?? "";
+
+        $password =
+            $config["password"] ?? "";
+
+        if (empty($server)) {
+            throw new Exception(
+                "Database server is not configured."
+            );
+        }
+
+        if (empty($database)) {
+            throw new Exception(
+                "Database name is not configured."
+            );
+        }
+
+        /*
+         * Read connection options.
+         */
+        $encrypt =
+            !empty(
+                $config["options"]["encrypt"]
+            )
+                ? "yes"
+                : "no";
+
+        $trust =
+            !empty(
+                $config["options"]["trustServerCertificate"]
+            )
+                ? "yes"
+                : "no";
+
+        /*
+         * Driver selection.
+         */
+        $configuredDriver =
+            $config["driver"] ?? "auto";
+
+        if (
+            strtolower(
+                trim($configuredDriver)
+            ) === "auto"
+        ) {
+
+            $driver =
+                $this->detectDriver(
+                    $server,
+                    $port,
+                    $database,
+                    $username,
+                    $password,
+                    $encrypt,
+                    $trust
+                );
 
         } else {
 
-            $driver = $config["driver"];
-
+            $driver =
+                trim($configuredDriver);
         }
 
-        // Build DSN
-        $dsn = "Driver={$driver};"
-             . "Server={$server};"
-             . "Database={$database};"
-             . "Encrypt={$encrypt};"
-             . "TrustServerCertificate={$trust};";
+        /*
+         * Build server address.
+         */
+        $serverAddress =
+            $server;
 
-        $this->connection = odbc_connect(
-            $dsn,
-            $username,
-            $password
-        );
+        if (!empty($port)) {
+            $serverAddress .= "," . $port;
+        }
+
+        /*
+         * Build ODBC connection string.
+         */
+        $dsn =
+            "Driver={" . $driver . "};"
+            . "Server={$serverAddress};"
+            . "Database={$database};"
+            . "Encrypt={$encrypt};"
+            . "TrustServerCertificate={$trust};";
+
+        /*
+         * Establish connection.
+         */
+        $this->connection =
+            @odbc_connect(
+                $dsn,
+                $username,
+                $password,
+                SQL_CUR_USE_ODBC
+            );
 
         if (!$this->connection) {
-            throw new Exception(odbc_errormsg());
+
+            throw new Exception(
+                "SQL Server connection failed using "
+                . "ODBC driver '{$driver}': "
+                . odbc_errormsg()
+            );
         }
 
         return $this->connection;
     }
 
+    /**
+     * Disconnect from SQL Server.
+     */
     public function disconnect()
     {
         if ($this->connection) {
-            odbc_close($this->connection);
+
+            odbc_close(
+                $this->connection
+            );
+
             $this->connection = null;
         }
     }
 
+    /**
+     * Execute SQL query.
+     */
     public function query($sql)
     {
-        return odbc_exec($this->connection, $sql);
+        return odbc_exec(
+            $this->connection,
+            $sql
+        );
     }
 
+    /**
+     * Execute SQL.
+     */
     public function execute($sql)
     {
         return $this->query($sql);
     }
 
+    /**
+     * Fetch a row.
+     */
     public function fetch($result)
     {
-        return odbc_fetch_array($result);
+        return odbc_fetch_array(
+            $result
+        );
     }
 
+    /**
+     * Begin transaction.
+     */
     public function beginTransaction()
     {
-        odbc_autocommit($this->connection, false);
+        odbc_autocommit(
+            $this->connection,
+            false
+        );
     }
 
+    /**
+     * Commit transaction.
+     */
     public function commit()
     {
-        odbc_commit($this->connection);
-        odbc_autocommit($this->connection, true);
+        odbc_commit(
+            $this->connection
+        );
+
+        odbc_autocommit(
+            $this->connection,
+            true
+        );
     }
 
+    /**
+     * Rollback transaction.
+     */
     public function rollback()
     {
-        odbc_rollback($this->connection);
-        odbc_autocommit($this->connection, true);
+        odbc_rollback(
+            $this->connection
+        );
+
+        odbc_autocommit(
+            $this->connection,
+            true
+        );
     }
 
+    /**
+     * Get active connection.
+     */
     public function getConnection()
     {
         return $this->connection;
