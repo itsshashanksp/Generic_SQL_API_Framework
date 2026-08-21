@@ -7,49 +7,66 @@ class SqlServerDriver implements DatabaseDriverInterface
     private $connection = null;
 
     /**
-     * Detect a compatible SQL Server ODBC driver.
+     * SQL Server ODBC drivers.
      *
      * Drivers are tested from newest to oldest.
      */
-    private function detectDriver(
-    $server,
-    $port,
-    $database,
-    $username,
-    $password,
-    $authentication,
-    $encrypt,
-    $trust
-) {
-    $drivers = [
-        "ODBC Driver 19 for SQL Server",
-        "ODBC Driver 18 for SQL Server",
-        "ODBC Driver 17 for SQL Server",
-        "ODBC Driver 13.1 for SQL Server",
-        "ODBC Driver 13 for SQL Server",
-        "ODBC Driver 11 for SQL Server",
-        "ODBC Driver 10 for SQL Server",
+    private function getSupportedDrivers(): array
+    {
+        return [
+            // Modern Microsoft ODBC Drivers
+            "ODBC Driver 19 for SQL Server",
+            "ODBC Driver 18 for SQL Server",
+            "ODBC Driver 17 for SQL Server",
+            "ODBC Driver 13.1 for SQL Server",
+            "ODBC Driver 13 for SQL Server",
+            "ODBC Driver 11 for SQL Server",
+            "ODBC Driver 10 for SQL Server",
 
-        "SQL Server Native Client 11.0",
-        "SQL Server Native Client 10.0",
-        "SQL Server Native Client 9.0",
+            // SQL Server Native Client
+            "SQL Server Native Client 11.0",
+            "SQL Server Native Client 10.0",
+            "SQL Server Native Client 9.0",
 
-        "SQL Native Client",
-        "SQL Server"
-    ];
+            // Legacy SQL Native Client
+            "SQL Native Client",
 
-    /*
-     * Build server address.
-     */
-    $serverAddress = $server;
-
-    if (!empty($port)) {
-        $serverAddress .= "," . $port;
+            // Legacy SQL Server ODBC driver
+            "SQL Server"
+        ];
     }
 
-    $errors = [];
+    /**
+     * Build SQL Server address.
+     */
+    private function buildServerAddress(
+        string $server,
+        $port
+    ): string {
 
-    foreach ($drivers as $driver) {
+        $serverAddress = $server;
+
+        if (
+            !empty($port)
+            && strpos($server, ",") === false
+        ) {
+            $serverAddress .= "," . $port;
+        }
+
+        return $serverAddress;
+    }
+
+    /**
+     * Build ODBC connection string.
+     */
+    private function buildDsn(
+        string $driver,
+        string $serverAddress,
+        string $database,
+        string $authentication,
+        string $encrypt,
+        string $trust
+    ): string {
 
         $dsn =
             "Driver={" . $driver . "};"
@@ -58,19 +75,45 @@ class SqlServerDriver implements DatabaseDriverInterface
             . "Encrypt={$encrypt};"
             . "TrustServerCertificate={$trust};";
 
-    if (
-        strtolower(trim($authentication)) === "windows"
-    ) {
-        $dsn .= "Trusted_Connection=yes;";
+        /*
+         * Windows Authentication
+         */
+        if ($authentication === "windows") {
 
-        $connection = @odbc_connect(
-            $dsn,
-            "",
-            "",
-            SQL_CUR_USE_ODBC
-        );
-    } else {        
-        $connection = @odbc_connect(
+            $dsn .=
+                "Trusted_Connection=yes;";
+        }
+
+        return $dsn;
+    }
+
+    /**
+     * Connect using authentication mode.
+     */
+    private function openConnection(
+        string $dsn,
+        string $authentication,
+        string $username,
+        string $password
+    ) {
+
+        /*
+         * Windows Authentication
+         */
+        if ($authentication === "windows") {
+
+            return @odbc_connect(
+                $dsn,
+                "",
+                "",
+                SQL_CUR_USE_ODBC
+            );
+        }
+
+        /*
+         * SQL Server Authentication
+         */
+        return @odbc_connect(
             $dsn,
             $username,
             $password,
@@ -78,27 +121,90 @@ class SqlServerDriver implements DatabaseDriverInterface
         );
     }
 
-        if ($connection) {
+    /**
+     * Automatically detect a working SQL Server driver.
+     *
+     * IMPORTANT:
+     * The successful connection is kept open.
+     */
+    private function detectDriver(
+        string $server,
+        $port,
+        string $database,
+        string $username,
+        string $password,
+        string $authentication,
+        string $encrypt,
+        string $trust
+    ): array {
 
-            odbc_close($connection);
+        $drivers =
+            $this->getSupportedDrivers();
 
-            return $driver;
+        $serverAddress =
+            $this->buildServerAddress(
+                $server,
+                $port
+            );
+
+        $errors = [];
+
+        foreach ($drivers as $driver) {
+
+            $dsn =
+                $this->buildDsn(
+                    $driver,
+                    $serverAddress,
+                    $database,
+                    $authentication,
+                    $encrypt,
+                    $trust
+                );
+
+            $connection =
+                $this->openConnection(
+                    $dsn,
+                    $authentication,
+                    $username,
+                    $password
+                );
+
+            /*
+             * Driver + database connection succeeded.
+             *
+             * DO NOT CLOSE THIS CONNECTION.
+             */
+            if ($connection) {
+
+                return [
+                    "driver" => $driver,
+                    "connection" => $connection
+                ];
+            }
+
+            $error =
+                odbc_errormsg();
+
+            $errors[] =
+                $driver . ": " . $error;
         }
 
-        $error = odbc_errormsg();
-
-        $errors[] =
-            $driver . ": " . $error;
+        throw new Exception(
+            "No compatible SQL Server ODBC driver "
+            . "could establish a connection."
+            . "\n\nServer: "
+            . $serverAddress
+            . "\nDatabase: "
+            . $database
+            . "\nAuthentication: "
+            . $authentication
+            . "\n\nDriver errors:\n"
+            . implode(
+                "\n",
+                $errors
+            )
+        );
     }
-
-    throw new Exception(
-        "No compatible SQL Server ODBC driver could establish a connection."
-        . "\n\nServer: " . $serverAddress
-        . "\nDatabase: " . $database
-        . "\n\nDriver errors:\n"
-        . implode("\n", $errors)
-    );
-}
 
     /**
      * Connect to SQL Server.
@@ -109,17 +215,20 @@ class SqlServerDriver implements DatabaseDriverInterface
             __DIR__ . '/../config/database.json';
 
         if (!file_exists($configPath)) {
+
             throw new Exception(
                 "database.json not found."
             );
         }
 
-        $config = json_decode(
-            file_get_contents($configPath),
-            true
-        );
+        $config =
+            json_decode(
+                file_get_contents($configPath),
+                true
+            );
 
         if (!is_array($config)) {
+
             throw new Exception(
                 "Invalid database.json"
             );
@@ -142,28 +251,53 @@ class SqlServerDriver implements DatabaseDriverInterface
 
         $password =
             $config["password"] ?? "";
-        
+
         $authentication =
-        strtolower(
-            trim(
-                $config["authentication"] ?? "sql"
+            strtolower(
+                trim(
+                    $config["authentication"]
+                    ?? "sql"
+                )
+            );
+
+        /*
+         * Validate authentication mode.
+         */
+        $allowedAuthenticationModes = [
+            "sql",
+            "windows"
+        ];
+
+        if (
+            !in_array(
+                $authentication,
+                $allowedAuthenticationModes,
+                true
             )
-        );
+        ) {
+
+            throw new Exception(
+                "Unsupported authentication type: "
+                . $authentication
+            );
+        }
 
         if (empty($server)) {
+
             throw new Exception(
                 "Database server is not configured."
             );
         }
 
         if (empty($database)) {
+
             throw new Exception(
                 "Database name is not configured."
             );
         }
 
         /*
-         * Read connection options.
+         * Connection options.
          */
         $encrypt =
             !empty(
@@ -174,24 +308,31 @@ class SqlServerDriver implements DatabaseDriverInterface
 
         $trust =
             !empty(
-                $config["options"]["trustServerCertificate"]
+                $config["options"]
+                    ["trustServerCertificate"]
             )
                 ? "yes"
                 : "no";
 
         /*
-         * Driver selection.
+         * Driver configuration.
          */
         $configuredDriver =
-            $config["driver"] ?? "auto";
+            trim(
+                $config["driver"]
+                ?? "auto"
+            );
 
+        /*
+         * AUTO DRIVER
+         */
         if (
             strtolower(
-                trim($configuredDriver)
+                $configuredDriver
             ) === "auto"
         ) {
 
-            $driver =
+            $detected =
                 $this->detectDriver(
                     $server,
                     $port,
@@ -203,56 +344,44 @@ class SqlServerDriver implements DatabaseDriverInterface
                     $trust
                 );
 
-        } else {
+            /*
+             * Keep the successful connection.
+             */
+            $this->connection =
+                $detected["connection"];
 
-            $driver =
-                trim($configuredDriver);
+            return $this->connection;
         }
 
         /*
-         * Build server address.
+         * MANUAL DRIVER
          */
+        $driver =
+            $configuredDriver;
+
         $serverAddress =
-            $server;
+            $this->buildServerAddress(
+                $server,
+                $port
+            );
 
-        if (!empty($port)) {
-            $serverAddress .= "," . $port;
-        }
-
-        /*
-         * Build ODBC connection string.
-         */
         $dsn =
-            "Driver={" . $driver . "};"
-            . "Server={$serverAddress};"
-            . "Database={$database};"
-            . "Encrypt={$encrypt};"
-            . "TrustServerCertificate={$trust};";
-
-        /*
-         * Establish connection.
-         */
-        if ($authentication === "windows") {
-
-        $dsn .= "Trusted_Connection=yes;";
-
-        $this->connection =
-            @odbc_connect(
-                $dsn,
-                "",
-                "",
-                SQL_CUR_USE_ODBC
+            $this->buildDsn(
+                $driver,
+                $serverAddress,
+                $database,
+                $authentication,
+                $encrypt,
+                $trust
             );
 
-    } else {
         $this->connection =
-            @odbc_connect(
+            $this->openConnection(
                 $dsn,
+                $authentication,
                 $username,
-                $password,
-                SQL_CUR_USE_ODBC
+                $password
             );
-    }
 
         if (!$this->connection) {
 
@@ -273,7 +402,7 @@ class SqlServerDriver implements DatabaseDriverInterface
     {
         if ($this->connection) {
 
-            odbc_close(
+            @odbc_close(
                 $this->connection
             );
 
@@ -286,6 +415,13 @@ class SqlServerDriver implements DatabaseDriverInterface
      */
     public function query($sql)
     {
+        if (!$this->connection) {
+
+            throw new Exception(
+                "Database connection is not available."
+            );
+        }
+
         return odbc_exec(
             $this->connection,
             $sql
@@ -352,7 +488,7 @@ class SqlServerDriver implements DatabaseDriverInterface
     }
 
     /**
-     * Get active connection.
+     * Get active database connection.
      */
     public function getConnection()
     {
