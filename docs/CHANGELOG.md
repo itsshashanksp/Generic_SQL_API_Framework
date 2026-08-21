@@ -2,7 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
-The format follows the principles of Keep a Changelog and Semantic Versioning.
+---
+
+# [Unreleased]
+
+## Added
+
+### Windows Portable PHP Runtime
+
+- Added prebuilt Windows PHP runtime under runtime/windows/php/.
+- Added start-windows.bat.
+- Added PHP runtime validation.
+- Added PHP configuration validation.
+- Added automatic OPcache directory creation.
+- Added automatic log directory creation.
+- Added PHP ODBC extension validation.
+- Added database connection startup validation.
+- Added API directory validation.
+- Added automatic HTTP port detection.
+- Added automatic fallback from port 8000 through 8100.
+- Added database connection failure guidance.
+
+### SQL Server Driver Improvements
+
+- Added automatic SQL Server ODBC driver detection.
+- Added support for multiple Microsoft ODBC Driver generations.
+- Added support for older SQL Server ODBC driver names where installed.
+- Added SQL Server Native Client compatibility detection.
+- Added SQL Server named-instance support.
+- Added explicit SQL Server port handling.
+- Added SQL Authentication support.
+- Added Windows Authentication support.
+- Added encryption configuration.
+- Added Trust Server Certificate configuration.
+
+### Query Compatibility
+
+- Added SQL Server capability-aware pagination.
+- Added ROW_NUMBER() pagination fallback for older SQL Server compatibility levels where OFFSET/FETCH is unavailable.
+- Kept the frontend pagination request format independent of SQL Server pagination syntax.
+
+### Deployment
+
+- Windows users can run the framework without manually installing PHP when using the bundled runtime.
+- Existing Apache, IIS, Nginx, XAMPP, WAMP, Docker, and PHP deployments remain supported.
 
 ---
 
@@ -10,36 +53,31 @@ The format follows the principles of Keep a Changelog and Semantic Versioning.
 
 ## Added
 
-### Query Engine
+### Framework Core
 
-- Dynamic SELECT query execution
-- SQL execution using ODBC
-- Prepared statement support
-- SQL file execution support
-- Standardized JSON responses
+- Dynamic SQL Query Engine
+- Validation Engine
+- SQL Builder
+- Metadata Engine
+- Repository Pattern
+- Centralized Logging
+- Query Execution Statistics
+- Standardized JSON Responses
+- Global Exception Handling
 
-### Validation Engine
+### SQL Support
 
-- Table validation
-- Column validation
-- SQL function validation
-- JOIN validation
-- Operator validation
-- Alias validation
-- Request validation before query execution
+- SELECT
+- WHERE
+- GROUP BY
+- HAVING
+- ORDER BY
+- Pagination
+- INNER JOIN
+- LEFT JOIN
+- RIGHT JOIN
 
-### SQL Builder
-
-- Dynamic SQL generation from JSON requests
-- Dynamic column selection
-- WHERE clause generation
-- GROUP BY support
-- HAVING support
-- ORDER BY support
-- Pagination support
-- JOIN query generation
-
-### SQL Function Support
+### SQL Functions
 
 #### Aggregate Functions
 
@@ -124,20 +162,3 @@ The format follows the principles of Keep a Changelog and Semantic Versioning.
 - Exception handling
 - Centralized logging
 - Input validation
-
----
-
-## Documentation
-
-- Project README
-- CHANGELOG
-- Framework documentation structure
-- Architecture overview
-
----
-
-## Initial Release Notes
-
-Version 1.0.0 provides the foundation of the Generic SQL API Framework, including a dynamic query engine, validation system, centralized logging, metadata validation, execution statistics, and a modular architecture designed for future expansion.
-
-Future releases will introduce INSERT, UPDATE, DELETE, transactions, stored procedure support, authentication, export modules, and dashboard integration.

@@ -2,301 +2,328 @@
 
 ## Overview
 
-The Generic SQL API Framework follows a modular, layered architecture designed to separate responsibilities, improve maintainability, and simplify future enhancements.
+Generic SQL API Framework uses a modular architecture designed to separate request validation, SQL generation, database access, configuration, and response handling.
 
-Each component has a dedicated responsibility and communicates only with adjacent layers. This minimizes dependencies, improves code organization, and allows new features to be introduced without affecting existing components.
-
-The framework processes every request through a well-defined pipeline, from receiving a client request to returning a standardized JSON response.
+The architecture allows the framework to remain generic while database-specific behavior is isolated inside provider/driver components.
 
 ---
 
 # High-Level Architecture
 
-```text
-                        Client
-                           │
-                           ▼
-                    HTTP Request
-                           │
-                           ▼
-                     API Controller
-                           │
-                           ▼
-                 Validation Engine
-                           │
-                           ▼
-                    SQL Builder
-                           │
-                           ▼
-                   Query Engine
-                           │
-                           ▼
-                  Database Engine
-                           │
-                           ▼
-                   Driver Factory
-                           │
-                           ▼
-                 SQL Server Driver
-                           │
-                           ▼
-                Microsoft SQL Server
-                           │
-                           ▼
-                    Query Results
-                           │
-                           ▼
-                  JSON Response
-                           │
-                           ▼
-                         Client
-```
+Frontend / Client
+       |
+       v
+api/index.php
+       |
+       v
+Request / Controller Layer
+       |
+       v
+Validation Engine
+       |
+       v
+SQL Builder
+       |
+       v
+Repository / Database Layer
+       |
+       v
+Database Driver
+       |
+       v
+Microsoft SQL Server
 
 ---
 
-# Request Lifecycle
+# Request Flow
 
-Every request follows the same execution pipeline.
+A typical request follows:
 
-1. Client sends an HTTP request containing a JSON payload.
-2. API Controller receives and parses the request.
-3. Validation Engine validates all request components.
-4. SQL Builder converts JSON into a parameterized SQL statement.
-5. Query Engine prepares the query for execution.
-6. Database Engine loads the configured database provider.
-7. Driver Factory initializes the appropriate database driver.
-8. SQL Server Driver executes the SQL statement.
-9. Microsoft SQL Server returns the result set.
-10. Query Engine formats the result.
-11. API Controller returns a standardized JSON response.
-
----
-
-# Core Components
-
-## API Controller
-
-Responsibilities:
-
-- Receive HTTP requests
-- Parse JSON payloads
-- Route requests
-- Coordinate framework components
-- Return standardized JSON responses
-- Handle exceptions
-
----
-
-## Validation Engine
-
-Responsibilities:
-
-- Validate request structure
-- Validate tables
-- Validate columns
-- Validate SQL functions
-- Validate operators
-- Validate JOIN clauses
-- Validate aliases
-
-Invalid requests are rejected before reaching the database.
+JSON Request
+     |
+     v
+Request Validation
+     |
+     v
+Controller
+     |
+     v
+SQL Builder
+     |
+     v
+Repository
+     |
+     v
+Database Driver
+     |
+     v
+SQL Server
+     |
+     v
+Result
+     |
+     v
+Standard JSON Response
 
 ---
 
-## SQL Builder
+# Configuration Layer
 
-Responsibilities:
+Database configuration is loaded from:
 
-- Build SELECT statements
-- Build WHERE clauses
-- Build GROUP BY clauses
-- Build HAVING clauses
-- Build ORDER BY clauses
-- Build JOIN clauses
-- Build Pagination
-- Generate parameterized SQL
+database/config/database.json
 
-The SQL Builder only generates SQL and never communicates directly with the database.
+The configuration determines:
 
----
+- Provider
+- ODBC driver
+- Server
+- Database
+- Authentication
+- Username
+- Password
+- Port
+- Encryption
+- Certificate trust behavior
 
-## Query Engine
-
-Responsibilities:
-
-- Receive generated SQL
-- Bind parameters
-- Execute prepared statements
-- Measure execution time
-- Count returned rows
-- Return structured query results
+This keeps environment-specific connection information outside the core query engine.
 
 ---
 
-## Database Engine
+# Database Driver Architecture
 
-Responsibilities:
+The framework uses a database driver interface.
 
-- Load database configuration
-- Read provider information
-- Manage database connections
-- Delegate operations to drivers
-- Provide a common interface for all providers
+The SQL Server implementation is responsible for SQL Server-specific connection behavior.
 
-The rest of the framework communicates only with the Database Engine.
+The driver handles:
 
----
+- ODBC connection creation
+- Driver detection
+- Authentication mode
+- Server/instance handling
+- Port handling
+- Encryption options
+- Trust Server Certificate
+- Query execution
+- Transactions
+- Result fetching
 
-## Driver Factory
-
-Responsibilities:
-
-- Read configured provider
-- Load the correct database driver
-- Create driver instances
-
-Example:
-
-```text
-Provider
-│
-├── sqlserver
-├── mysql
-├── postgresql
-├── sqlite
-└── oracle
-```
-
-Current Version:
-
-- SQL Server
-
-Future Versions:
-
-- MySQL
-- PostgreSQL
-- SQLite
-- Oracle
+This allows additional database drivers to be introduced without redesigning the rest of the framework.
 
 ---
 
-## SQL Server Driver
+# ODBC Driver Detection
 
-Responsibilities:
+When:
 
-- Detect ODBC Driver
-- Establish SQL Server connection
-- Execute parameterized queries
-- Return results
-- Handle SQL Server errors
+"driver": "auto"
 
-All SQL Server-specific logic is isolated inside this driver.
+is configured, the SQL Server driver tests compatible installed ODBC driver names.
 
----
+Detection is performed from newer to older supported driver generations.
 
-## Metadata Engine
+The framework can therefore work across environments with different installed SQL Server ODBC driver versions.
 
-Responsibilities:
-
-- Retrieve available databases
-- Retrieve tables
-- Retrieve columns
-- Retrieve schema information
-
-Status:
-
-Planned for future releases.
+This avoids making the API dependent on a single hard-coded ODBC driver version.
 
 ---
 
-## Logging System
+# Authentication
 
-Responsibilities:
+The SQL Server driver supports:
 
-- Record executed queries
-- Store execution time
-- Record returned rows
-- Capture exceptions
-- Log database errors
+SQL Authentication
+Windows Authentication
 
-Logging assists with debugging, auditing, and performance monitoring.
+The connection logic selects the authentication method from:
 
----
+"authentication": "sql"
 
-# Layered Architecture
+or:
 
-```text
-Presentation Layer
-        │
-        ▼
-Controller Layer
-        │
-        ▼
-Validation Layer
-        │
-        ▼
-Query Generation Layer
-        │
-        ▼
-Execution Layer
-        │
-        ▼
-Database Layer
-        │
-        ▼
-Driver Layer
-        │
-        ▼
-Database Server
-```
-
-Each layer has a single responsibility and communicates only with neighboring layers.
+"authentication": "windows"
 
 ---
 
-# Design Principles
+# Server and Port Handling
 
-## Separation of Concerns
+The database configuration supports both:
 
-Each module performs one specific responsibility.
+localhost
 
-## Modularity
+and named instances such as:
 
-Components can be developed and maintained independently.
+localhost\SQLEXPRESS
 
-## Reusability
+An explicit port can also be supplied:
 
-Core framework components can be reused across multiple projects.
+"port": 1433
 
-## Extensibility
-
-New database providers can be added without changing business logic.
-
-## Maintainability
-
-A clear architecture simplifies debugging and future enhancements.
-
-## Security
-
-All database operations use validated requests and parameterized queries.
+The driver constructs the SQL Server connection target from the configured server and port.
 
 ---
 
-# Advantages
+# Query Compatibility Layer
 
-- Modular architecture
-- Layered design
-- Reusable components
-- Database abstraction
-- Provider-based architecture
-- Improved maintainability
-- Better scalability
-- Easier testing
-- Frontend independence
-- Secure query execution
+Pagination is handled by the database layer instead of the frontend.
+
+The framework can detect SQL Server capability and select a compatible pagination implementation.
+
+SQL Server capability
+        |
+        +---- Modern capability
+        |        |
+        |        v
+        |    Modern pagination
+        |
+        +---- Older compatibility
+                 |
+                 v
+             ROW_NUMBER()
+
+This prevents the frontend from needing database-version-specific SQL logic.
+
+The frontend continues to send:
+
+{
+    "pagination": {
+        "page": 1,
+        "pageSize": 25
+    }
+}
 
 ---
 
-# Summary
+# Validation Engine
 
-The Generic SQL API Framework is built on a modular, provider-based architecture that separates request handling, validation, SQL generation, query execution, and database communication into independent components. This design improves maintainability, scalability, security, and provides a strong foundation for supporting multiple database providers in future releases.
+The Validation Engine validates incoming request data before SQL generation.
+
+It validates:
+
+- Controller
+- Action
+- Table
+- Columns
+- SQL functions
+- Operators
+- JOIN definitions
+- Aliases
+- Pagination input
+
+Invalid requests are rejected before SQL generation.
+
+---
+
+# SQL Builder
+
+The SQL Builder converts validated JSON requests into SQL statements.
+
+It supports:
+
+- SELECT
+- WHERE
+- JOIN
+- GROUP BY
+- HAVING
+- ORDER BY
+- Pagination
+- SQL functions
+
+Database-specific pagination behavior remains in the database/query compatibility layer.
+
+---
+
+# Repository Layer
+
+The Repository Pattern separates database operations from controllers and request processing.
+
+Repositories communicate with the configured database driver instead of directly coupling application logic to ODBC.
+
+---
+
+# Logging
+
+The framework provides centralized logging for:
+
+- Successful queries
+- Failed queries
+- Exceptions
+- Execution time
+- Rows returned
+- Query parameters
+
+The Windows launcher also configures the PHP error log under the project logs/ directory.
+
+---
+
+# Windows Runtime Architecture
+
+Windows can use the bundled PHP runtime:
+
+start-windows.bat
+        |
+        v
+runtime/windows/php/php.exe
+        |
+        v
+PHP ODBC
+        |
+        v
+SQL Server ODBC Driver
+        |
+        v
+SQL Server
+
+The launcher performs environment checks before starting the API.
+
+It also creates the required OPcache and logging directories automatically.
+
+---
+
+# Port Selection
+
+The Windows startup script begins with:
+
+8000
+
+If the port is occupied, it searches sequentially up to:
+
+8100
+
+The selected port is then passed to PHP's built-in server.
+
+---
+
+# Security Architecture
+
+Security is enforced through:
+
+- Request validation
+- Parameterized SQL execution
+- Centralized database access
+- CORS configuration
+- Exception handling
+- Controlled database configuration
+- Avoidance of direct SQL exposure to frontend clients
+
+Production deployments should also use HTTPS and protect database credentials.
+
+---
+
+# Extensibility
+
+The architecture is designed for future expansion.
+
+Potential future components include:
+
+- Additional database providers
+- CRUD operations
+- Stored procedures
+- Authentication
+- Authorization
+- Export systems
+- Dashboard services
+- API documentation
+- Caching
+- Monitoring

@@ -12,11 +12,11 @@ The framework is intended to reduce repetitive backend development while promoti
 
 # Purpose
 
-Modern business applications often require multiple APIs that perform similar database operations. Developing these APIs individually leads to duplicated code, inconsistent implementations, and increased maintenance effort.
+Modern business applications often require multiple APIs that perform similar database operations. Developing these APIs individually leads to duplicated code, inconsistent implementations, and increased maintenance overhead.
 
-The Generic SQL API Framework addresses this problem by providing a generic query engine capable of generating SQL dynamically from structured JSON requests.
+The Generic SQL API Framework addresses this by providing a generic query engine capable of generating SQL dynamically from structured JSON requests.
 
-This allows developers to focus on application logic rather than repeatedly implementing database operations.
+This allows developers to focus on application logic rather than repeatedly implementing backend query operations.
 
 ---
 
@@ -24,24 +24,22 @@ This allows developers to focus on application logic rather than repeatedly impl
 
 The primary goals of the framework are:
 
-* Simplify SQL API development.
-* Reduce repetitive backend code.
-* Provide a configurable database engine.
-* Support reusable SQL query generation.
-* Improve maintainability through modular architecture.
-* Standardize API request and response formats.
-* Ensure secure database access using parameterized queries.
-* Enable integration with any frontend technology.
+- Simplify SQL API development.
+- Reduce repetitive backend code.
+- Provide a configurable database engine.
+- Provide reusable SQL query generation.
+- Improve maintainability through modular architecture.
+- Standardize API request and response formats.
+- Ensure secure database access using parameterized queries.
+- Enable integration with any frontend technology.
 
 ---
 
 # Design Philosophy
 
-The framework is designed around several core principles.
-
 ## Modularity
 
-Each component has a single responsibility. Validation, query generation, database access, logging, and configuration are separated into independent modules, making the framework easier to maintain and extend.
+Each component has a single responsibility. Validation, query generation, database access, logging, and configuration are separated into independent modules.
 
 ## Reusability
 
@@ -49,7 +47,7 @@ The same framework can be used across multiple projects without modifying its co
 
 ## Security
 
-All database interactions use parameterized statements to reduce the risk of SQL injection. Requests are validated before query generation, and database access is centralized through the Database Engine.
+Database interactions use parameterized statements to reduce SQL injection risk. Requests are validated before query generation, and database access is centralized through the Database Engine.
 
 ## Flexibility
 
@@ -57,71 +55,123 @@ The framework accepts structured JSON requests instead of hardcoded SQL statemen
 
 ## Scalability
 
-The architecture supports future expansion through provider-based database drivers, making it possible to add support for additional database systems without changing the core framework.
+The architecture uses provider-based database drivers, allowing additional database systems to be introduced without changing the core framework.
+
+---
+
+# Database Connectivity
+
+The current database implementation is designed for Microsoft SQL Server through ODBC.
+
+The SQL Server driver supports:
+
+- Automatic ODBC driver detection
+- Newer and older supported ODBC driver generations
+- SQL Server Native Client / legacy SQL Server ODBC driver names where installed
+- Named SQL Server instances
+- Explicit TCP ports
+- SQL Authentication
+- Windows Authentication
+- Encryption configuration
+- Trust Server Certificate configuration
+
+The database configuration is stored in:
+
+database/config/database.json
+
+---
+
+# SQL Server Compatibility
+
+Pagination is implemented with SQL Server compatibility in mind.
+
+When the database supports modern pagination, the driver can use the modern implementation.
+
+For older SQL Server compatibility levels where OFFSET/FETCH is unavailable, the framework can fall back to ROW_NUMBER() pagination.
+
+This keeps the JSON API contract independent of the SQL Server pagination syntax used internally.
+
+---
+
+# Windows Runtime
+
+The framework provides an optional prebuilt PHP runtime for Windows.
+
+When using it, PHP does not need to be installed manually.
+
+The runtime is located under:
+
+runtime/windows/php/
+
+Start the framework with:
+
+start-windows.bat
+
+The launcher checks the PHP runtime, PHP configuration, ODBC extension, database connection, API directory, and HTTP port before starting the API.
+
+It also creates the required OPcache and log directories automatically.
+
+The default port starts at 8000, with automatic fallback through 8100 if required.
+
+Users who already have Apache, IIS, Nginx, XAMPP, WAMP, Docker, or another PHP environment can continue using that environment instead.
 
 ---
 
 # Use Cases
 
-The Generic SQL API Framework is suitable for a wide range of applications, including:
+The Generic SQL API Framework is suitable for:
 
-* Business Management Systems
-* Enterprise Resource Planning (ERP)
-* Point of Sale (POS) Systems
-* Inventory Management
-* Reporting Systems
-* Dashboard Applications
-* Mobile Applications
-* Internal Business Tools
-* Data Analytics Platforms
-* Administrative Portals
+- Business Management Systems
+- Enterprise Resource Planning (ERP)
+- Point of Sale (POS) Systems
+- Inventory Management
+- Reporting Systems
+- Dashboard Applications
+- Mobile Applications
+- Internal Business Tools
+- Data Analytics Platforms
+- Administrative Portals
 
 ---
 
 # Benefits
 
-Using the Generic SQL API Framework provides several advantages:
+Using the Generic SQL API Framework provides:
 
-* Faster API development.
-* Reduced duplicate code.
-* Centralized database access.
-* Consistent JSON responses.
-* Improved application security.
-* Easier maintenance.
-* Configurable database connections.
-* Frontend-independent architecture.
-* Clean and extensible project structure.
+- Faster API development
+- Reduced duplicate code
+- Centralized database access
+- Consistent JSON responses
+- Improved application security
+- Easier maintenance
+- Configurable database connections
+- Frontend-independent architecture
+- Clean and extensible project structure
 
 ---
 
 # Project Vision
 
-The long-term vision of the Generic SQL API Framework is to become a flexible, provider-based SQL API framework capable of supporting multiple relational database systems while maintaining a consistent development experience.
+The long-term vision is to provide a reusable provider-based backend platform that simplifies database-driven application development.
 
-Future releases will introduce additional database providers, CRUD operations, transaction management, authentication, export capabilities, and advanced query features without requiring significant changes to existing applications.
+The framework is intended to support multiple database systems and provide reusable components for reporting, dashboards, CRUD operations, and enterprise application development while maintaining a modular and extensible architecture.
 
 ---
 
 # Getting Started
 
-After configuring the database, you can immediately begin sending JSON requests to the Generic SQL API Framework from any frontend application.
+After configuring the database, the framework can accept JSON requests from any frontend application.
 
-Before connecting your frontend, make sure the frontend URL is added to the CORS allowlist in `api/index.php`.
+Before connecting a frontend, make sure its URL is included in the CORS allowlist in api/index.php.
 
 For example:
 
-```php
 $allowed_origins = [
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "https://your-frontend.com"
 ];
-```
 
-For detailed deployment instructions, including CORS configuration, web server setup, and production recommendations, refer to **Hosting.md**.
+For deployment instructions, see Hosting.md.
 
-----
-
-# Conclusion
-
-The Generic SQL API Framework provides a reusable foundation for building secure, configurable, and maintainable SQL APIs. By separating database access, validation, query generation, and configuration into dedicated components, the framework enables developers to rapidly build data-driven applications while maintaining a clean and scalable architecture.
+For request syntax, see JSON-Request-Reference.md.

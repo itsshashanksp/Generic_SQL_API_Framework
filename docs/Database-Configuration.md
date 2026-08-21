@@ -2,287 +2,303 @@
 
 ## Overview
 
-The Generic SQL API Framework uses a JSON-based configuration file to manage database connections. This approach separates database settings from application code, allowing developers to change database providers, connection details, or authentication methods without modifying the framework.
+The Generic SQL API Framework uses a provider-based database configuration.
 
-The configuration is loaded automatically during framework initialization.
+The current database provider is:
 
----
+sqlserver
 
-# Configuration File
+Configuration is stored in:
 
-Location
-
-```
-backend/database/config/database.json
-```
+database/config/database.json
 
 ---
 
 # Configuration Structure
 
-```json
 {
     "provider": "sqlserver",
     "driver": "auto",
-
     "server": "localhost\\SQLEXPRESS",
     "database": "IBMS",
-
     "authentication": "sql",
-
     "username": "sa",
     "password": "password",
-
     "port": 1433,
-
     "options": {
         "encrypt": false,
         "trustServerCertificate": true
     }
 }
-```
 
 ---
 
-# Configuration Properties
+# provider
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| provider | String | Yes | Database provider |
-| driver | String | Yes | Database driver name or `auto` |
-| server | String | Yes | SQL Server hostname or IP |
-| database | String | Yes | Database name |
-| authentication | String | Yes | Authentication mode |
-| username | String | SQL Auth | SQL login username |
-| password | String | SQL Auth | SQL login password |
-| port | Integer | No | Database port |
-| options | Object | No | Additional connection options |
+Specifies the database provider.
 
----
+Example:
 
-# Database Provider
+"provider": "sqlserver"
 
-The provider determines which database driver the framework loads.
+Current implementation:
 
-Current Version
-
-```
 sqlserver
-```
 
-Planned Providers
-
-```
-mysql
-postgresql
-sqlite
-oracle
-```
-
-The framework uses a provider-based architecture, making it easy to add support for new database systems without modifying application logic.
+The provider-based architecture is designed to allow additional database providers in future releases.
 
 ---
 
-# Driver Configuration
+# driver
 
-## Automatic Driver Detection
+Specifies the ODBC driver selection.
 
-Recommended
+Automatic detection:
 
-```json
-{
-    "driver": "auto"
-}
-```
+"driver": "auto"
 
-When `auto` is specified, the framework automatically detects the highest compatible Microsoft ODBC Driver installed on the system.
+When auto is used, the SQL Server driver attempts to detect compatible installed ODBC drivers.
 
-Example
+The detection logic checks supported driver generations from newer to older, including Microsoft ODBC Driver releases and SQL Server Native Client / legacy SQL Server driver names where installed.
 
-```
-ODBC Driver 18 for SQL Server
-```
+This means the framework is not tied to one specific ODBC driver version.
 
-If Driver 18 is unavailable, the framework automatically falls back to:
+A specific installed driver can also be configured where required:
 
-```
-ODBC Driver 17 for SQL Server
-```
+"driver": "ODBC Driver 18 for SQL Server"
 
 ---
 
-## Manual Driver Selection
+# server
 
-```json
-{
-    "driver": "ODBC Driver 18 for SQL Server"
-}
-```
+Specifies the SQL Server host or instance.
 
-Use manual selection when a specific ODBC version is required.
+Default server:
 
----
+"server": "localhost"
 
-# Server Configuration
+Named instance:
 
-Local SQL Express
+"server": "localhost\\SQLEXPRESS"
 
-```json
-{
-    "server": "localhost\\SQLEXPRESS"
-}
-```
-
-Named SQL Server
-
-```json
-{
-    "server": "SERVER01"
-}
-```
-
-Remote SQL Server
-
-```json
-{
-    "server": "192.168.1.100"
-}
-```
+A named SQL Server instance can be used together with an explicit port.
 
 ---
 
-# Database Configuration
+# database
 
-Example
+Specifies the database to connect to.
 
-```json
-{
-    "database": "LOYAL_IBMS"
-}
-```
+Example:
 
-The database must already exist and be accessible to the configured user.
+"database": "IBMS"
+
+The configured login must have permission to access the selected database.
 
 ---
 
-# Authentication Modes
+# authentication
+
+Supported authentication modes:
+
+sql
+windows
 
 ## SQL Authentication
 
-```json
-{
-    "authentication": "sql",
-    "username": "sa",
-    "password": "password"
-}
-```
-
-Uses SQL Server login credentials.
-
----
+"authentication": "sql",
+"username": "sa",
+"password": "password"
 
 ## Windows Authentication
 
-```json
-{
-    "authentication": "windows"
-}
-```
+"authentication": "windows"
 
-Uses the Windows account running the web server.
-
-Username and password are ignored.
+For Windows Authentication, the PHP process uses the Windows account under which the API is running.
 
 ---
 
-# Connection Options
+# username
 
-The `options` object contains database-specific settings.
+Used with SQL Authentication.
 
-Example
+Example:
 
-```json
+"username": "sa"
+
+It is not required for Windows Authentication.
+
+---
+
+# password
+
+Used with SQL Authentication.
+
+Example:
+
+"password": "password"
+
+Do not commit production credentials to source control.
+
+---
+
+# port
+
+Specifies the SQL Server TCP port.
+
+Example:
+
+"port": 1433
+
+The framework supports explicit ports as well as named SQL Server instances.
+
+The server and port are combined when constructing the ODBC connection.
+
+---
+
+# options
+
+Connection options are configured under:
+
+"options": {}
+
+## encrypt
+
+Controls connection encryption.
+
+Example:
+
+"encrypt": false
+
+## trustServerCertificate
+
+Controls whether the SQL Server certificate is trusted without certificate-chain validation.
+
+Example:
+
+"trustServerCertificate": true
+
+Production deployments should use certificate settings appropriate to the organization's security requirements.
+
+---
+
+# SQL Server ODBC Driver Support
+
+The framework uses ODBC for SQL Server connectivity.
+
+The driver supports automatic detection across supported installed driver generations.
+
+Examples include:
+
+ODBC Driver 19 for SQL Server
+ODBC Driver 18 for SQL Server
+ODBC Driver 17 for SQL Server
+ODBC Driver 13.1 for SQL Server
+ODBC Driver 13 for SQL Server
+ODBC Driver 11 for SQL Server
+ODBC Driver 10 for SQL Server
+SQL Server Native Client 11.0
+SQL Server Native Client 10.0
+SQL Server Native Client 9.0
+SQL Native Client
+SQL Server
+
+Not every system will have every driver installed. The framework attempts the available compatible drivers and reports the connection errors if none can establish a connection.
+
+---
+
+# Connection Compatibility
+
+The SQL Server driver supports:
+
+- Modern ODBC Driver releases
+- Older SQL Server ODBC driver releases where installed
+- SQL Server Native Client / legacy driver names
+- SQL Server named instances
+- Explicit ports
+- SQL Authentication
+- Windows Authentication
+- Encryption configuration
+- Trust Server Certificate configuration
+
+---
+
+# SQL Server Pagination Compatibility
+
+The framework does not require the frontend to know which pagination syntax the SQL Server environment supports.
+
+The database layer can detect SQL Server capability and choose a compatible pagination implementation.
+
+Modern environments can use modern pagination.
+
+Older compatibility levels that do not support OFFSET/FETCH can use:
+
+ROW_NUMBER()
+
+pagination instead.
+
+The JSON request remains:
+
 {
-    "options": {
-        "encrypt": false,
-        "trustServerCertificate": true
+    "pagination": {
+        "page": 1,
+        "pageSize": 25
     }
 }
-```
 
-Supported Options
-
-| Option | Description |
-|---------|-------------|
-| encrypt | Enables encrypted connections |
-| trustServerCertificate | Trusts the SQL Server certificate |
+This keeps pagination implementation inside the database layer.
 
 ---
 
-# Configuration Loading
+# Windows Portable Runtime
 
-During startup, the framework performs the following steps:
+Windows users can use the bundled PHP runtime:
 
-1. Reads `database.json`
-2. Loads the configured provider
-3. Detects or loads the database driver
-4. Creates the database connection
-5. Makes the connection available to the Database Engine
+runtime/windows/php/
 
-This process is automatic and requires no application code changes.
+Start it with:
 
----
+start-windows.bat
 
-# Best Practices
+The bundled runtime includes PHP and PHP ODBC support.
 
-- Use `driver: "auto"` whenever possible.
-- Store production credentials securely.
-- Avoid committing production passwords to version control.
-- Use Windows Authentication where appropriate.
-- Keep ODBC drivers up to date.
-- Back up configuration files before making changes.
+The Microsoft SQL Server ODBC driver remains an external system requirement.
 
 ---
 
 # Troubleshooting
 
-## Database Not Found
-
-Verify the configured database name exists.
-
----
-
-## Login Failed
-
-Check the username, password, and authentication mode.
-
----
-
-## Driver Not Found
-
-Install Microsoft ODBC Driver 17 or 18 for SQL Server.
-
----
-
-## Unable to Connect
+## Cannot Open Database
 
 Verify:
 
-- SQL Server is running
-- TCP/IP is enabled
-- Firewall rules allow the connection
-- Server name and port are correct
+- Database name
+- SQL login permissions
+- Windows account permissions when using Windows Authentication
 
----
+## Server Not Found
 
-# Related Documentation
+Verify:
 
-- API.md
-- JSON-Request-Reference.md
-- Hosting.md
+- SQL Server service
+- Server/instance name
+- SQL Server network configuration
+- TCP port
+- ODBC driver installation
 
----
+## Login Failed
 
-# Summary
+Verify:
 
-The Generic SQL API Framework uses a centralized JSON configuration file to manage database connectivity. By separating connection settings from application code, the framework simplifies deployment, improves maintainability, and provides a flexible foundation for supporting multiple database providers in future releases.
+- Username
+- Password
+- Authentication mode
+- Database permissions
+
+## ODBC Driver Not Found
+
+Install a compatible Microsoft SQL Server ODBC driver or configure the correct installed driver explicitly.
+
+## OFFSET Syntax Error
+
+If an older SQL Server compatibility level does not support OFFSET/FETCH, the framework's capability-aware pagination can use ROW_NUMBER() pagination instead.
