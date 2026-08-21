@@ -9,6 +9,8 @@ class QueryRepository
     private QueryEngine $queryEngine;
     private MetadataRepository $metadataRepository;
     private SetOperationBuilder $SetOperationBuilder;
+
+    private ?int $sqlServerCompatibilityLevel = null;
     
     // Table & Alias Map
     private array $tableMap = [];
@@ -18,6 +20,44 @@ class QueryRepository
         $this->queryEngine = new QueryEngine();
         $this->metadataRepository = new MetadataRepository();
         $this->SetOperationBuilder = new SetOperationBuilder($this);
+    }
+
+    /**
+     * Detect SQL Server database compatibility level.
+     *
+     * SQL Server compatibility level 110+
+     * supports OFFSET/FETCH.
+     *
+     * Older compatibility levels use ROW_NUMBER().
+     */
+    private function getSqlServerCompatibilityLevel(): int
+    {
+        if ($this->sqlServerCompatibilityLevel !== null) {
+            return $this->sqlServerCompatibilityLevel;
+        }
+
+        $result = $this->queryEngine->executePrepared(
+            "
+            SELECT compatibility_level AS CompatibilityLevel
+            FROM sys.databases
+            WHERE name = DB_NAME()
+            ",
+            []
+        );
+
+        if (
+            empty($result['data']) ||
+            !isset($result['data'][0]['CompatibilityLevel'])
+        ) {
+            throw new Exception(
+                "Unable to determine SQL Server compatibility level."
+            );
+        }
+
+        $this->sqlServerCompatibilityLevel =
+            (int)$result['data'][0]['CompatibilityLevel'];
+
+        return $this->sqlServerCompatibilityLevel;
     }
     
     private function resolveColumn(string $column): array
@@ -3995,23 +4035,132 @@ if (
     }
 }
 
+/*
+ * Pagination
+ *
+ * SQL Server compatibility level 110+
+ *     -> OFFSET / FETCH
+ *
+ * Older compatibility levels
+ *     -> ROW_NUMBER()
+ */
+if (
+    isset($request['page']) &&
+    isset($request['pageSize'])
+) {
+
+    $page =
+        max(1, (int)$request['page']);
+
+    $pageSize =
+        max(1, (int)$request['pageSize']);
+
+    $offset =
+        ($page - 1) * $pageSize;
+
+    $compatibilityLevel =
+        $this->getSqlServerCompatibilityLevel();
+
+    /*
+     * Modern SQL Server
+     *
+     * Compatibility level 110+
+     */
+    if ($compatibilityLevel >= 110) {
+
+        $sql .= "
+            OFFSET {$offset} ROWS
+            FETCH NEXT {$pageSize} ROWS ONLY
+        ";
+
+    }
+
+    /*
+     * Legacy SQL Server
+     *
+     * Compatibility level below 110
+     */
+    else {
+
         /*
-         * Pagination
+         * The query already contains ORDER BY.
+         *
+         * Remove the ORDER BY from the inner query
+         * and use it inside ROW_NUMBER().
          */
-        if (
-            isset($request['page']) &&
-            isset($request['pageSize'])
-        ) {
+        $orderBy = "ORDER BY 1";
 
-            $offset =
-                ($request['page'] - 1)
-                * $request['pageSize'];
+        if (!empty($request['sort'])) {
 
-            $sql .= "
-                OFFSET {$offset} ROWS
-                FETCH NEXT {$request['pageSize']} ROWS ONLY
-            ";
+            $orders = [];
+
+            foreach ($request['sort'] as $sort) {
+
+                $column =
+                    $sort['column'];
+
+                $direction =
+                    strtoupper(
+                        $sort['direction'] ?? "ASC"
+                    );
+
+                $orders[] =
+                    $column
+                    . " "
+                    . $direction;
+            }
+
+            if (!empty($orders)) {
+
+                $orderBy =
+                    "ORDER BY "
+                    . implode(", ", $orders);
+            }
         }
+        elseif (!empty($request['groupBy'])) {
+
+            $orderBy =
+                "ORDER BY "
+                . $request['groupBy'][0];
+        }
+
+        /*
+         * Remove the existing ORDER BY.
+         */
+        $innerSql =
+            preg_replace(
+                '/\s+ORDER BY\s+.*$/is',
+                '',
+                $sql
+            );
+
+        $startRow =
+            $offset + 1;
+
+        $endRow =
+            $offset + $pageSize;
+
+        $sql = "
+            SELECT *
+            FROM
+            (
+                SELECT
+                    PagedSource.*,
+                    ROW_NUMBER() OVER (
+                        {$orderBy}
+                    ) AS __row_num
+                FROM
+                (
+                    {$innerSql}
+                ) AS PagedSource
+            ) AS PagedQuery
+            WHERE __row_num
+                BETWEEN {$startRow}
+                AND {$endRow}
+            ORDER BY __row_num
+        ";
+    }
+}
         
         $sql = $cteSql . $sql;
 
