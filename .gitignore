@@ -7,11 +7,15 @@
 
 # Logs
 logs/
+*.log
 
 # Generated Files
 exports/
 uploads/
 storage/
+
+# PHP Runtime Generated Files
+runtime/windows/php/opcache/
 
 # Environment
 .env
