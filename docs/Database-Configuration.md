@@ -2,245 +2,268 @@
 
 ## Overview
 
-The Generic SQL API Framework uses a JSON-based configuration file to manage database connections. This approach separates database settings from application code, allowing developers to change database providers, connection details, or authentication methods without modifying the framework.
+Generic SQL API Framework uses a JSON configuration file to manage database connectivity.
 
-The configuration is loaded automatically during framework initialization.
+Database configuration is separated from application code so connection details can be changed without modifying the framework.
 
 ---
 
 # Configuration File
 
-Location
+Location:
 
-```
-backend/database/config/database.json
-```
+database/config/database.json
 
 ---
 
 # Configuration Structure
 
-```json
 {
     "provider": "sqlserver",
     "driver": "auto",
-
     "server": "localhost\\SQLEXPRESS",
-    "database": "IBMS",
-
+    "database": "Database-Name",
     "authentication": "sql",
-
     "username": "sa",
     "password": "password",
-
     "port": 1433,
-
     "options": {
         "encrypt": false,
         "trustServerCertificate": true
     }
 }
-```
 
 ---
 
 # Configuration Properties
 
-| Property | Type | Required | Description |
-|----------|------|----------|-------------|
-| provider | String | Yes | Database provider |
-| driver | String | Yes | Database driver name or `auto` |
-| server | String | Yes | SQL Server hostname or IP |
-| database | String | Yes | Database name |
-| authentication | String | Yes | Authentication mode |
-| username | String | SQL Auth | SQL login username |
-| password | String | SQL Auth | SQL login password |
-| port | Integer | No | Database port |
-| options | Object | No | Additional connection options |
+| Property | Required | Description |
+|---|---|---|
+| provider | Yes | Database provider |
+| driver | Yes | ODBC driver name or auto |
+| server | Yes | SQL Server hostname, IP, or instance |
+| database | Yes | Database name |
+| authentication | Yes | Authentication mode |
+| username | SQL Authentication | SQL username |
+| password | SQL Authentication | SQL password |
+| port | No | SQL Server TCP port |
+| options | No | Connection options |
 
 ---
 
 # Database Provider
 
-The provider determines which database driver the framework loads.
+Current provider:
 
-Current Version
-
-```
 sqlserver
-```
 
-Planned Providers
+The provider determines which database driver is loaded.
 
-```
-mysql
-postgresql
-sqlite
-oracle
-```
-
-The framework uses a provider-based architecture, making it easy to add support for new database systems without modifying application logic.
+The provider-based architecture is designed to allow additional database providers in future releases.
 
 ---
 
-# Driver Configuration
+# ODBC Driver
 
-## Automatic Driver Detection
+## Automatic Detection
 
-Recommended
+Recommended:
 
-```json
 {
     "driver": "auto"
 }
-```
 
-When `auto` is specified, the framework automatically detects the highest compatible Microsoft ODBC Driver installed on the system.
+When auto is selected, the SQL Server driver attempts to detect a compatible installed ODBC driver.
 
-Example
+The driver checks supported Microsoft SQL Server ODBC driver generations from newer to older.
 
-```
+Supported driver names currently include:
+
+ODBC Driver 19 for SQL Server
 ODBC Driver 18 for SQL Server
-```
-
-If Driver 18 is unavailable, the framework automatically falls back to:
-
-```
 ODBC Driver 17 for SQL Server
-```
+ODBC Driver 13.1 for SQL Server
+ODBC Driver 13 for SQL Server
+ODBC Driver 11 for SQL Server
+ODBC Driver 10 for SQL Server
+SQL Server Native Client 11.0
+SQL Server Native Client 10.0
+SQL Server Native Client 9.0
+SQL Native Client
+SQL Server
+
+Not every system will have every driver installed.
+
+The framework tries the available compatible drivers and reports the connection errors if none can establish a connection.
 
 ---
 
-## Manual Driver Selection
+# Manual Driver Selection
 
-```json
+A specific installed driver can be selected manually.
+
+Example:
+
 {
     "driver": "ODBC Driver 18 for SQL Server"
 }
-```
 
-Use manual selection when a specific ODBC version is required.
+Use manual selection when a specific driver version is required.
 
 ---
 
 # Server Configuration
 
-Local SQL Express
+## Local SQL Server
 
-```json
+{
+    "server": "localhost"
+}
+
+## SQL Express Named Instance
+
 {
     "server": "localhost\\SQLEXPRESS"
 }
-```
 
-Named SQL Server
+## Remote SQL Server
 
-```json
-{
-    "server": "SERVER01"
-}
-```
-
-Remote SQL Server
-
-```json
 {
     "server": "192.168.1.100"
 }
-```
+
+## Named SQL Server
+
+{
+    "server": "SERVER01"
+}
 
 ---
 
-# Database Configuration
+# Port
 
-Example
+An explicit SQL Server TCP port can be configured.
 
-```json
+Example:
+
+{
+    "port": 1433
+}
+
+The driver combines the configured server and port when building the connection target.
+
+Port 1433 is commonly used for SQL Server TCP connections, but the framework does not require that specific port.
+
+---
+
+# Database
+
+Example:
+
 {
     "database": "LOYAL_IBMS"
 }
-```
 
-The database must already exist and be accessible to the configured user.
+The database must already exist and the configured login must have permission to access it.
 
 ---
 
-# Authentication Modes
+# Authentication
+
+The SQL Server driver supports:
+
+sql
+
+windows
+
+---
 
 ## SQL Authentication
 
-```json
+Example:
+
 {
     "authentication": "sql",
     "username": "sa",
     "password": "password"
 }
-```
 
-Uses SQL Server login credentials.
+The connection uses SQL Server login credentials.
 
 ---
 
 ## Windows Authentication
 
-```json
+Example:
+
 {
     "authentication": "windows"
 }
-```
 
-Uses the Windows account running the web server.
+The connection uses the Windows account running the PHP process.
 
-Username and password are ignored.
+Username and password are not used for Windows Authentication.
 
 ---
 
 # Connection Options
 
-The `options` object contains database-specific settings.
+The options object contains connection-specific settings.
 
-Example
+Example:
 
-```json
 {
     "options": {
         "encrypt": false,
         "trustServerCertificate": true
     }
 }
-```
 
-Supported Options
+## encrypt
 
-| Option | Description |
-|---------|-------------|
-| encrypt | Enables encrypted connections |
-| trustServerCertificate | Trusts the SQL Server certificate |
+Controls whether the connection requests encryption.
+
+## trustServerCertificate
+
+Controls whether the SQL Server certificate is trusted without normal certificate-chain validation.
+
+Production environments should use certificate settings appropriate to their security requirements.
 
 ---
 
 # Configuration Loading
 
-During startup, the framework performs the following steps:
+During startup:
 
-1. Reads `database.json`
-2. Loads the configured provider
-3. Detects or loads the database driver
-4. Creates the database connection
-5. Makes the connection available to the Database Engine
+database.json
+      |
+      v
+Provider
+      |
+      v
+Driver
+      |
+      v
+Authentication
+      |
+      v
+Connection
 
-This process is automatic and requires no application code changes.
+The database connection is then made available to the Database Engine.
 
 ---
 
-# Best Practices
+# Database Connection Test
 
-- Use `driver: "auto"` whenever possible.
-- Store production credentials securely.
-- Avoid committing production passwords to version control.
-- Use Windows Authentication where appropriate.
-- Keep ODBC drivers up to date.
-- Back up configuration files before making changes.
+The Windows startup script performs a database connection test before starting the API.
+
+If the connection fails:
+
+API startup is aborted
+
+The user is instructed to configure:
+
+database/config/database.json
 
 ---
 
@@ -248,41 +271,71 @@ This process is automatic and requires no application code changes.
 
 ## Database Not Found
 
-Verify the configured database name exists.
+Verify:
 
----
+- Database name
+- Database existence
+- Database permissions
 
 ## Login Failed
 
-Check the username, password, and authentication mode.
+Verify:
 
----
+- Username
+- Password
+- Authentication mode
+- Database permissions
 
-## Driver Not Found
-
-Install Microsoft ODBC Driver 17 or 18 for SQL Server.
-
----
-
-## Unable to Connect
+## Server Not Found
 
 Verify:
 
-- SQL Server is running
-- TCP/IP is enabled
-- Firewall rules allow the connection
-- Server name and port are correct
+- SQL Server service
+- Server name
+- Instance name
+- TCP/IP configuration
+- Port
+
+## ODBC Driver Not Found
+
+Verify that a supported SQL Server ODBC driver is installed.
+
+With:
+
+{
+    "driver": "auto"
+}
+
+the framework attempts compatible installed driver versions automatically.
+
+## Cannot Open Database
+
+If master connects but the selected database does not, verify that the login has access to the selected database.
+
+---
+
+# Security
+
+Do not commit production credentials to source control.
+
+Protect:
+
+database/config/database.json
+
+Use secure credentials and Windows Authentication where appropriate.
 
 ---
 
 # Related Documentation
 
-- API.md
-- JSON-Request-Reference.md
-- Hosting.md
+For deployment:
 
----
+Hosting.md
 
-# Summary
+For the framework's database architecture:
 
-The Generic SQL API Framework uses a centralized JSON configuration file to manage database connectivity. By separating connection settings from application code, the framework simplifies deployment, improves maintainability, and provides a flexible foundation for supporting multiple database providers in future releases.
+Architecture.md
+
+For API request syntax:
+
+JSON-Request-Reference.md

@@ -2,54 +2,50 @@
 
 ## Overview
 
-The Generic SQL API Framework exposes a REST-style HTTP API that allows client applications to communicate with Microsoft SQL Server through a standardized interface.
+The Generic SQL API Framework exposes an HTTP API that allows client applications to communicate with Microsoft SQL Server through a standardized JSON interface.
 
-Instead of allowing applications to connect directly to the database, the framework receives HTTP requests, validates incoming data, executes SQL operations, and returns standardized JSON responses.
+The API acts as the middleware layer between the frontend/application and the database.
 
-The API acts as a secure middleware layer between client applications and the database.
-
----
-
-# API Architecture
-
-```text
-Client Application
-        │
-        ▼
-HTTP Request (JSON)
-        │
-        ▼
-Generic SQL API Framework
-        │
-        ▼
-Microsoft SQL Server
-        │
-        ▼
-HTTP Response (JSON)
-```
+Client applications never need to communicate directly with SQL Server.
 
 ---
 
 # Base URL
 
-Development
+The base URL depends on the hosting environment.
 
-```
-http://localhost/generic-sql-api-framework/backend/api/
-```
+## Windows Bundled Runtime
 
-Production
+When using:
 
-```
-https://your-domain.com/api/
-```
+start-windows.bat
+
+the launcher displays the actual API URL and selected port.
+
+Example:
+
+http://localhost:8000/
+
+The port may change automatically if the default port is already in use.
+
+## Existing Web Server
+
+Example:
+
+http://localhost/generic-sql-api-framework/api/
+
+## Production
+
+Example:
+
+https://api.example.com/
 
 ---
 
-# Communication Protocol
+# Communication
 
 | Property | Value |
-|----------|-------|
+|---|---|
 | Protocol | HTTP / HTTPS |
 | Data Format | JSON |
 | Character Encoding | UTF-8 |
@@ -59,117 +55,103 @@ https://your-domain.com/api/
 
 # HTTP Method
 
-Current Version
+Current API:
 
-| Method | Status |
-|---------|--------|
-| POST | Supported |
+POST
 
-Future Versions
-
-| Method | Status |
-|---------|--------|
-| GET | Planned |
-| PUT | Planned |
-| DELETE | Planned |
+Additional HTTP methods may be introduced in future releases.
 
 ---
 
 # Request Headers
 
-Required
+Required:
 
-```http
 Content-Type: application/json
-```
 
-Recommended
+Recommended:
 
-```http
 Accept: application/json
-```
 
 ---
 
-# Authentication
+# Query Endpoint
 
-Version 1 does not require authentication.
+Current query endpoint:
 
-Future versions will support:
-
-- API Keys
-- JWT Authentication
-- OAuth 2.0
-- Role-Based Access Control (RBAC)
-
----
-
-# Available Endpoints
-
-## Query Endpoint
-
-Executes SQL queries.
-
-```
 POST /query/select.php
-```
 
-Description
+The endpoint accepts a JSON request describing the required query.
 
-Processes JSON requests and executes SELECT queries.
+The request is validated before SQL generation and execution.
 
-Reference
+For the complete request structure, see:
 
-See **JSON-Request-Reference.md** for the complete request format.
-
----
-
-## Metadata Endpoint
-
-Returns database metadata.
-
-```
-GET /metadata/
-```
-
-Status
-
-Planned
+JSON-Request-Reference.md
 
 ---
 
-## Database Endpoint
+# Request Flow
 
-Database management and provider information.
+Client
 
-```
-POST /database/
-```
+↓
 
-Status
+HTTP POST
 
-Planned
+↓
+
+/query/select.php
+
+↓
+
+Request Validation
+
+↓
+
+SQL Builder
+
+↓
+
+Query Engine
+
+↓
+
+SQL Server
+
+↓
+
+JSON Response
 
 ---
 
-## Authentication Endpoint
+# Response Format
 
-Authentication services.
+Successful responses use a standardized structure.
 
-```
-POST /auth/
-```
+Example:
 
-Status
+{
+    "success": true,
+    "message": "Data Loaded Successfully",
+    "data": []
+}
 
-Planned
+Error responses contain:
+
+{
+    "success": false,
+    "message": "Error message"
+}
+
+The exact response fields may depend on the operation.
 
 ---
 
 # HTTP Status Codes
 
-| Code | Description |
-|------|-------------|
+| Code | Meaning |
+|---|---|
 | 200 | Request completed successfully |
 | 400 | Invalid request |
 | 401 | Unauthorized |
@@ -178,27 +160,92 @@ Planned
 | 405 | Method not allowed |
 | 500 | Internal server error |
 
+Authentication-related status codes are reserved for future authentication features.
+
 ---
 
-# API Versioning
+# Current API Scope
 
-Current Version
+The current API focuses on dynamic SQL query operations.
 
-```
+Supported query capabilities include:
+
+- SELECT
+- WHERE
+- GROUP BY
+- HAVING
+- ORDER BY
+- JOIN
+- Pagination
+- SQL functions
+
+Supported JOIN types include:
+
+- INNER JOIN
+- LEFT JOIN
+- RIGHT JOIN
+
+---
+
+# Pagination
+
+Pagination is requested through the JSON request.
+
+Example:
+
+{
+    "page": 1,
+    "pageSize": 25
+}
+
+The database layer handles SQL Server pagination compatibility.
+
+Modern SQL Server environments can use modern pagination.
+
+Older SQL Server compatibility levels can use the ROW_NUMBER() fallback where OFFSET/FETCH is unavailable.
+
+The frontend does not need to change its request format.
+
+---
+
+# Authentication
+
+The current version does not require API authentication.
+
+Future versions may introduce:
+
+- API Keys
+- JWT
+- OAuth
+- Role-Based Access Control
+
+---
+
+# Metadata
+
+Metadata endpoints are planned for future releases.
+
+---
+
+# Versioning
+
+Current framework version:
+
 v1.0
-```
 
-Future versions may introduce additional endpoints while maintaining backward compatibility whenever possible.
+Future API versions may introduce versioned endpoints while attempting to maintain backward compatibility.
 
 ---
 
-# Supported Client Applications
+# Client Compatibility
 
-The API can be consumed by any application capable of making HTTP requests, including:
+The API can be consumed by any application capable of sending HTTP requests.
+
+Examples:
 
 - React
 - Angular
-- Vue.js
+- Vue
 - Flutter
 - React Native
 - Android
@@ -208,24 +255,29 @@ The API can be consumed by any application capable of making HTTP requests, incl
 - Java
 - .NET
 - Node.js
-- Desktop Applications
-- Third-Party Systems
-- REST Clients
+- Desktop applications
+- REST clients
 
 ---
 
 # Related Documentation
 
-- Introduction.md
-- Architecture.md
-- JSON-Request-Reference.md
-- Database-Configuration.md
-- Hosting.md
-- Roadmap.md
-- CHANGELOG.md
+For request structure:
 
----
+JSON-Request-Reference.md
 
-# Summary
+For practical examples:
 
-The Generic SQL API Framework exposes a standardized HTTP API for executing database operations. Applications communicate with the framework using HTTP requests containing JSON payloads, while the framework manages validation, query execution, and response generation. The detailed request structure and supported JSON properties are documented separately in **JSON-Request-Reference.md**.
+Query-Examples.md
+
+For database configuration:
+
+Database-Configuration.md
+
+For deployment:
+
+Hosting.md
+
+For architecture:
+
+Architecture.md

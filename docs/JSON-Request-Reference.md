@@ -2,347 +2,160 @@
 
 ## Overview
 
-The Generic SQL API Framework is driven entirely by JSON requests. Every operation is described using a structured JSON payload, allowing the framework to dynamically validate requests, generate SQL queries, execute them securely, and return standardized JSON responses.
+The Generic SQL API Framework accepts structured JSON requests.
 
-This document serves as the official specification for the JSON request format supported by the framework.
+The request describes the query requirements while the framework handles validation, SQL generation, parameter binding, execution, and response formatting.
 
 ---
 
-# Request Structure
+# Basic Structure
 
-Every request follows a common structure.
+A query request generally contains:
 
-```json
 {
     "controller": "Query",
     "action": "select",
     "table": "CustomerTable",
-    "columns": []
+    "columns": [
+        "Cust_Name"
+    ]
 }
-```
 
 ---
 
-# Complete Request Schema
+# controller
 
-```json
-{
-    "controller": "",
-    "action": "",
-    "table": "",
-    "columns": [],
-    "where": [],
-    "joins": [],
-    "groupBy": [],
-    "having": [],
-    "orderBy": [],
-    "pagination": {}
-}
-```
+Identifies the controller handling the request.
 
-All properties except **controller**, **action**, **table**, and **columns** are optional.
+Example:
+
+"controller": "Query"
 
 ---
 
-# JSON Properties
+# action
 
-## controller
+Identifies the operation requested.
 
-Determines which controller processes the request.
+Example:
 
-Type
+"action": "select"
 
-```
-String
-```
+The currently documented query operation is:
 
-Required
-
-```
-Yes
-```
-
-Supported Values
-
-```
-Query
-```
-
-Example
-
-```json
-{
-    "controller": "Query"
-}
-```
-
----
-
-## action
-
-Defines the operation to perform.
-
-Type
-
-```
-String
-```
-
-Required
-
-```
-Yes
-```
-
-Current Version
-
-```
 select
-```
 
-Future Versions
-
-```
-insert
-update
-delete
-upsert
-```
-
-Example
-
-```json
-{
-    "action": "select"
-}
-```
+Additional operations will be documented when implemented and exposed through the API.
 
 ---
 
-## table
+# table
 
-Specifies the target database table.
+Specifies the primary table.
 
-Type
+Example:
 
-```
-String
-```
-
-Required
-
-```
-Yes
-```
-
-Example
-
-```json
-{
-    "table": "CustomerTable"
-}
-```
+"table": "CustomerTable"
 
 ---
 
-## columns
+# columns
 
-Specifies which columns should be returned.
+Specifies the columns returned by the query.
 
-Type
+Example:
 
-```
-Array
-```
+"columns": [
+    "Cust_Name",
+    "Cust_Code"
+]
 
-Required
+---
 
-```
-Yes
-```
+# Column Alias
 
-Simple Example
+Columns can use aliases where supported by the query builder.
 
-```json
+Example:
+
 {
+    "column": "Cust_Name",
+    "alias": "CustomerName"
+}
+
+---
+
+# SQL Functions
+
+SQL functions can be represented as structured objects.
+
+Example:
+
+{
+    "function": "SUM",
+    "column": "Op_Bal",
+    "alias": "TotalBalance"
+}
+
+Example complete request:
+
+{
+    "controller": "Query",
+    "action": "select",
+    "table": "CustomerTable",
     "columns": [
         "Cust_Name",
-        "Phone"
-    ]
-}
-```
-
-Using SQL Functions
-
-```json
-{
-    "columns": [
         {
             "function": "SUM",
-            "column": "Balance",
+            "column": "Op_Bal",
             "alias": "TotalBalance"
         }
+    ],
+    "groupBy": [
+        "Cust_Name"
     ]
 }
-```
 
 ---
 
-## where
+# WHERE
 
-Defines filtering conditions.
+Filtering is represented through the request's filter/condition structure supported by the current API implementation.
 
-Type
-
-```
-Array
-```
-
-Required
-
-```
-No
-```
-
-Example
-
-```json
-{
-    "where": [
-        {
-            "column": "City",
-            "operator": "=",
-            "value": "Bangalore"
-        }
-    ]
-}
-```
-
-Properties
-
-| Property | Type | Description |
-|----------|------|-------------|
-| column | String | Database column |
-| operator | String | Comparison operator |
-| value | Mixed | Comparison value |
+Refer to Query-Examples.md for working examples.
 
 ---
 
-## joins
+# GROUP BY
 
-Defines SQL JOIN clauses.
+Example:
 
-Type
-
-```
-Array
-```
-
-Required
-
-```
-No
-```
-
-Example
-
-```json
-{
-    "joins": [
-        {
-            "type": "INNER",
-            "table": "InvoiceTable",
-            "on": {
-                "left": "CustomerTable.Cust_ID",
-                "right": "InvoiceTable.Cust_ID"
-            }
-        }
-    ]
-}
-```
-
----
-
-## groupBy
-
-Defines GROUP BY columns.
-
-Type
-
-```
-Array
-```
-
-Required
-
-```
-No
-```
-
-Example
-
-```json
 {
     "groupBy": [
-        "City"
+        "Cust_Name"
     ]
 }
-```
 
 ---
 
-## having
+# HAVING
 
-Defines HAVING conditions.
+HAVING is used with grouped queries.
 
-Type
+The structure must follow the validation rules implemented by the current query builder.
 
-```
-Array
-```
-
-Required
-
-```
-No
-```
-
-Example
-
-```json
-{
-    "having": [
-        {
-            "function": "SUM",
-            "column": "Balance",
-            "operator": ">",
-            "value": 10000
-        }
-    ]
-}
-```
+See Query-Examples.md for examples.
 
 ---
 
-## orderBy
+# ORDER BY
 
-Defines sorting.
+ORDER BY defines result ordering.
 
-Type
+The request can specify the columns and direction supported by the current query builder.
 
-```
-Array
-```
+Example concept:
 
-Required
-
-```
-No
-```
-
-Example
-
-```json
 {
     "orderBy": [
         {
@@ -351,78 +164,76 @@ Example
         }
     ]
 }
-```
 
-Supported Directions
-
-```
-ASC
-DESC
-```
+Use the exact structure supported by the current implementation.
 
 ---
 
-## pagination
+# JOIN
 
-Limits returned records.
+Supported JOIN types include:
 
-Type
+- INNER JOIN
+- LEFT JOIN
+- RIGHT JOIN
 
-```
-Object
-```
+JOIN definitions must identify:
 
-Required
+- Join type
+- Target table
+- Join condition
 
-```
-No
-```
+See Query-Examples.md for working examples.
 
-Example
+---
 
-```json
+# Pagination
+
+Pagination uses:
+
 {
-    "pagination": {
-        "page": 1,
-        "pageSize": 25
-    }
+    "page": 1,
+    "pageSize": 25
 }
-```
+
+Where:
+
+page
+
+Specifies the requested page number.
+
+pageSize
+
+Specifies the number of records returned per page.
 
 ---
 
-# Supported SQL Operators
+# Pagination Compatibility
 
-Comparison Operators
+The frontend request does not need to know which SQL Server pagination syntax is supported.
 
-- =
-- !=
-- >
-- <
-- >=
-- <=
+The database/query layer determines the compatible implementation.
 
-Logical Operators
+Modern SQL Server:
 
-- AND
-- OR
+Modern pagination
 
-Additional Operators
+Older SQL Server compatibility:
 
-- LIKE
-- BETWEEN
-- IN
-- IS NULL
-- IS NOT NULL
+ROW_NUMBER() pagination
+
+This keeps database-specific pagination logic inside the backend.
 
 ---
 
-# Supported SQL Functions
+# SQL Functions
+
+The framework currently supports SQL function categories including:
 
 ## Aggregate
 
-- SUM
 - COUNT
+- SUM
 - AVG
 - MIN
 - MAX
@@ -431,18 +242,19 @@ Additional Operators
 
 - UPPER
 - LOWER
-- CONCAT
-- LEN
+- LTRIM
+- RTRIM
 - TRIM
+- LEN
 
 ## Date
 
-- GETDATE
 - YEAR
 - MONTH
 - DAY
-- DATEADD
-- DATEDIFF
+- DATEPART
+- DATENAME
+- GETDATE
 
 ## Mathematical
 
@@ -450,91 +262,85 @@ Additional Operators
 - ROUND
 - CEILING
 - FLOOR
+- POWER
+- SQRT
+- EXP
+- LOG
 
 ---
 
-# Validation Rules
+# Parameters
 
-Every request passes through the Validation Engine before SQL generation.
+User-provided values must be passed through the request structure supported by the framework.
 
-The framework validates:
-
-- Controller
-- Action
-- Table
-- Columns
-- SQL Functions
-- Operators
-- JOIN clauses
-- Aliases
-
-Invalid requests are rejected before SQL generation.
+The query engine uses parameterized execution rather than directly concatenating user values into SQL.
 
 ---
 
-# Success Response
+# Example
 
-Example
+{
+    "controller": "Query",
+    "action": "select",
+    "table": "CustomerTable",
+    "columns": [
+        "Cust_Name"
+    ]
+}
 
-```json
+---
+
+# Response
+
+Successful response:
+
 {
     "success": true,
-    "message": "Query executed successfully.",
-    "executionTime": 15.34,
-    "rowsReturned": 12,
+    "message": "Data Loaded Successfully",
     "data": []
 }
-```
 
----
+Error response:
 
-# Error Response
-
-Example
-
-```json
 {
     "success": false,
-    "message": "Invalid Table Name"
+    "message": "Error message"
 }
-```
-
-Common Errors
-
-- Invalid controller
-- Invalid action
-- Invalid table
-- Invalid column
-- Invalid SQL function
-- Invalid operator
-- Invalid JOIN
-- Database connection failed
-- Query execution failed
 
 ---
 
-# Future Request Formats
+# Validation
 
-Future versions will support:
+The framework validates request components before execution.
 
-- INSERT
-- UPDATE
-- DELETE
-- UPSERT
-- Stored Procedures
-- Transactions
+Validation includes areas such as:
+
+- Tables
+- Columns
+- SQL functions
+- Operators
+- JOIN definitions
+- Aliases
+- Pagination
+
+Invalid requests are rejected before database execution.
 
 ---
 
 # Related Documentation
 
-- API.md
-- Architecture.md
-- Database-Configuration.md
-- Hosting.md
+For endpoint information:
 
----
+API.md
 
-# Summary
+For real-world requests:
 
-The JSON Request Reference defines the complete request specification used by the Generic SQL API Framework. Every request submitted to the framework must follow this structure to ensure secure validation, reliable SQL generation, and standardized JSON responses.
+Query-Examples.md
+
+For framework architecture:
+
+Architecture.md
+
+For database configuration:
+
+Database-Configuration.md

@@ -2,158 +2,215 @@
 
 ## Overview
 
-The Generic SQL API Framework is a PHP-based backend framework designed to run between client applications and Microsoft SQL Server. It exposes HTTP API endpoints that allow applications to execute SQL operations securely using JSON requests.
+Generic SQL API Framework is a PHP-based backend framework that runs between client applications and Microsoft SQL Server.
 
-The framework can be deployed on any web server capable of running PHP and communicating with Microsoft SQL Server.
+This document explains how to run and deploy the framework.
 
----
+For database connection settings, see:
 
-# Deployment Architecture
-
-A typical deployment consists of three layers.
-
-```text
-                Client Applications
-        (React, Flutter, Mobile, Desktop)
-                    │
-             HTTP / HTTPS
-                    │
-                    ▼
-      Generic SQL API Framework (PHP)
-                    │
-          Database Engine
-                    │
-                    ▼
-          Microsoft SQL Server
-```
-
-The framework acts as the only component allowed to communicate directly with SQL Server.
+Database-Configuration.md
 
 ---
 
-# Development Environment
+# Windows - Bundled PHP Runtime
 
-During development all components usually run on the same machine.
+The project provides a prebuilt PHP runtime for Windows.
 
-```text
-Frontend
-http://localhost:5173
+This allows Windows users to run the framework without manually installing PHP.
 
-        │
+Runtime location:
 
-        ▼
-
-Generic SQL API Framework
-http://localhost/generic-sql-api-framework/backend/api/
-
-        │
-
-        ▼
-
-Microsoft SQL Server
-localhost\SQLEXPRESS
-```
-
-This setup simplifies development and debugging.
+runtime/
+└── windows/
+    └── php/
 
 ---
 
-# Production Deployment
+# Windows Startup
 
-A production environment should separate each component.
+From the project root, run:
 
-```text
-Internet
-    │
-    ▼
-https://api.company.com
-    │
-    ▼
-Apache / IIS / Nginx
-    │
-    ▼
-Generic SQL API Framework
-    │
-    ▼
-Private SQL Server
-```
+start-windows.bat
 
-Only the web server should communicate with SQL Server.
+The startup script checks:
 
-The database server should never be exposed directly to the Internet.
+1. PHP runtime
+2. PHP configuration
+3. Runtime directories
+4. PHP ODBC extension
+5. Database connection
+6. API directory
+7. Available HTTP port
+
+If all checks pass, the API starts automatically.
 
 ---
 
-# Supported Web Servers
+# Runtime Directories
 
-The framework supports:
+The startup script automatically creates required directories when they do not exist.
 
-- Apache HTTP Server
+OPcache:
+
+runtime/windows/php/opcache/
+
+Logs:
+
+logs/
+
+No manual directory creation is required.
+
+---
+
+# Automatic Port Selection
+
+The Windows launcher starts checking from:
+
+8000
+
+If the port is already in use, it checks the next port.
+
+The maximum automatic port is:
+
+8100
+
+Example:
+
+8000 -> occupied
+8001 -> occupied
+8002 -> available
+
+The selected API address is displayed in the terminal.
+
+---
+
+# Database Startup Check
+
+Before starting the API, the Windows launcher runs the database connection check.
+
+If the connection succeeds:
+
+[OK] Database Connected
+
+The API starts.
+
+If the connection fails:
+
+[FAILED] Database connection failed.
+
+The API startup is aborted and the user is instructed to configure:
+
+database/config/database.json
+
+and refer to the documentation.
+
+---
+
+# Existing PHP Environments
+
+The bundled Windows runtime is optional.
+
+The framework can also be deployed using an existing PHP environment.
+
+Supported environments include:
+
+- Apache
 - Microsoft IIS
 - Nginx + PHP-FPM
-- Docker
 - XAMPP
 - WAMP
-- LAMP
+- Docker
+- PHP built-in development server
+
+When using an existing environment, PHP and the required PHP extensions must be installed manually.
+
+The Microsoft SQL Server ODBC driver must also be available.
 
 ---
 
-# Deployment Directory
+# Apache / XAMPP Example
 
-Example using Apache or XAMPP
+Example project location:
 
-```text
 htdocs/
 └── generic-sql-api-framework/
-    ├── backend/
+    ├── api/
+    ├── core/
+    ├── database/
     ├── docs/
     ├── README.md
     └── LICENSE
-```
 
-Linux Example
-
-```text
-/var/www/html/generic-sql-api-framework/
-```
+The web server should expose the API directory through the appropriate application URL.
 
 ---
 
-# Deployment Checklist
+# IIS
 
-Before deploying ensure that:
+For Microsoft IIS:
 
-- PHP 8 or later is installed
-- Microsoft SQL Server is available
-- Microsoft ODBC Driver is installed
-- Required PHP extensions are enabled
-- Database configuration is completed
-- Web server is configured
-- Folder permissions are correct
+1. Install PHP for IIS.
+2. Configure PHP through FastCGI.
+3. Enable the required PHP extensions.
+4. Configure the application/site.
+5. Point the application to the framework.
+6. Configure the database connection.
+7. Test the API endpoint.
 
 ---
 
-# Configuring the Database
+# Nginx + PHP-FPM
 
-Database configuration is documented separately.
+For Nginx:
 
-See:
+Client
+  |
+  v
+Nginx
+  |
+  v
+PHP-FPM
+  |
+  v
+Generic SQL API
+  |
+  v
+SQL Server
 
-```
-Database-Configuration.md
-```
+Configure PHP-FPM and the Nginx site according to the server environment.
+
+---
+
+# Production Architecture
+
+A typical production environment is:
+
+Client Applications
+        |
+      HTTPS
+        |
+        v
+Apache / IIS / Nginx
+        |
+        v
+Generic SQL API
+        |
+        v
+Private SQL Server
+
+The SQL Server should not be exposed directly to the Internet.
 
 ---
 
 # Frontend Integration
 
-Any frontend capable of making HTTP requests can consume the framework.
+Any application capable of making HTTP requests can consume the framework.
 
-Supported technologies include:
+Examples include:
 
 - React
 - Angular
-- Vue.js
+- Vue
 - Flutter
 - React Native
 - Android
@@ -164,227 +221,126 @@ Supported technologies include:
 - Java
 - .NET
 - Node.js
-- Desktop Applications
+- Desktop applications
 
-No framework-specific SDK is required.
+No framework-specific frontend SDK is required.
+
+For API endpoints, continue with:
+
+API.md
+
+For request JSON structure, continue with:
+
+JSON-Request-Reference.md
 
 ---
 
-# CORS Configuration
+# CORS
 
-## Overview
+CORS configuration is handled in:
 
-The Generic SQL API Framework uses a configurable Cross-Origin Resource Sharing (CORS) allowlist to restrict API access to trusted frontend applications.
-
-The allowlist is configured in:
-
-```text
 api/index.php
-```
 
----
+Example:
 
-## Default Configuration
-
-```php
 $allowed_origins = [
     "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "https://myfrontend.com"
+    "http://localhost:3000"
 ];
-```
 
----
+For production:
 
-## Adding Your Frontend
-
-If your frontend runs at:
-
-```text
-http://localhost:5174
-```
-
-Simply add it to the allowlist.
-
-```php
-$allowed_origins = [
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://localhost:5174"
-];
-```
-
-For production deployments:
-
-```php
 $allowed_origins = [
     "https://app.company.com",
     "https://portal.company.com"
 ];
-```
+
+Only trusted frontend origins should be added.
+
+Avoid allowing every origin in production.
 
 ---
 
-## Supported Request Methods
+# Deployment Checklist
 
-The framework automatically handles:
+Before deployment verify:
 
-- GET
-- POST
-- OPTIONS (Preflight Requests)
-
----
-
-## Allowed Headers
-
-The framework allows the following request headers:
-
-- Content-Type
-- Authorization
+- PHP is available, unless using the bundled Windows runtime.
+- PHP ODBC is enabled.
+- Microsoft SQL Server is available.
+- A compatible Microsoft SQL Server ODBC driver is installed.
+- database/config/database.json is configured.
+- The API directory is accessible.
+- CORS is configured where required.
+- HTTPS is enabled in production.
+- SQL Server is not publicly exposed.
+- Database credentials are protected.
 
 ---
 
-## After Updating
+# Updating
 
-After modifying the allowlist:
-
-1. Save `api/index.php`.
-2. Restart Apache, IIS, or PHP if required.
-3. Refresh your frontend application.
-
----
-
-## Security Recommendation
-
-Only add trusted frontend domains to the allowlist.
-
-Avoid using:
-
-```php
-header("Access-Control-Allow-Origin: *");
-```
-
-in production environments, as it allows requests from any origin.
-
-----
-
-# Communication Flow
-
-```text
-Frontend
-
-↓
-
-HTTP POST Request
-
-↓
-
-Generic SQL API Framework
-
-↓
-
-SQL Server
-
-↓
-
-JSON Response
-
-↓
-
-Frontend
-```
-
-The frontend never communicates directly with the database.
-
----
-
-# Security Recommendations
-
-Production deployments should follow these recommendations:
-
-- Enable HTTPS
-- Keep SQL Server on a private network
-- Never expose SQL Server publicly
-- Protect configuration files
-- Use Windows Authentication when appropriate
-- Keep PHP and ODBC drivers updated
-- Enable centralized logging
-- Perform regular database backups
-
----
-
-# Performance Recommendations
-
-For better performance:
-
-- Use the latest ODBC Driver
-- Optimize SQL queries
-- Use indexes appropriately
-- Monitor execution time
-- Enable query logging
-- Use connection pooling if supported
-
----
-
-# Updating the Framework
-
-To upgrade the framework:
+To update the framework:
 
 1. Back up the existing project.
-2. Replace framework files.
-3. Preserve `database.json`.
-4. Review the CHANGELOG.
-5. Test the application.
+2. Review CHANGELOG.md.
+3. Replace/update framework files.
+4. Preserve database/config/database.json.
+5. Test database connectivity.
+6. Test the API.
 
 ---
 
 # Troubleshooting
 
-## API Not Reachable
+## API Does Not Start
 
-- Verify the web server is running.
-- Confirm the project directory is correct.
-- Check firewall rules.
+When using Windows:
 
----
+start-windows.bat
+
+Review the startup checks.
 
 ## Database Connection Failed
 
-Refer to:
+See:
 
-```
 Database-Configuration.md
-```
-
----
-
-## HTTP 500 Error
-
-- Review PHP error logs.
-- Check web server logs.
-- Verify file permissions.
-
----
 
 ## ODBC Driver Missing
 
-Install:
+Install a compatible Microsoft SQL Server ODBC driver.
 
-- Microsoft ODBC Driver 17
-- Microsoft ODBC Driver 18
+## Port Already in Use
+
+The Windows launcher automatically searches from port 8000 through 8100.
+
+## HTTP 500
+
+Check:
+
+- PHP error logs
+- Web server logs
+- PHP configuration
+- File permissions
+- Database configuration
 
 ---
 
-# Related Documentation
+# Next Documentation
 
-- Introduction.md
-- Architecture.md
-- API.md
-- JSON-Request-Reference.md
-- Database-Configuration.md
+For the API interface:
 
----
+API.md
 
-# Summary
+For JSON requests:
 
-The Generic SQL API Framework can be deployed on any standard PHP hosting environment. By acting as the middleware between client applications and Microsoft SQL Server, the framework provides a secure, scalable, and maintainable architecture suitable for modern business applications. Proper deployment, secure configuration, and regular maintenance ensure reliable operation in both development and production environments.
+JSON-Request-Reference.md
+
+For practical examples:
+
+Query-Examples.md
+
+For planned features:
+
+Roadmap.md

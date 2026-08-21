@@ -2,72 +2,68 @@
 
 ## Overview
 
-The Generic SQL API Framework follows a modular, layered architecture designed to separate responsibilities, improve maintainability, and simplify future enhancements.
+Generic SQL API Framework follows a modular, layered architecture designed to separate responsibilities, improve maintainability, and simplify future enhancements.
 
-Each component has a dedicated responsibility and communicates only with adjacent layers. This minimizes dependencies, improves code organization, and allows new features to be introduced without affecting existing components.
-
-The framework processes every request through a well-defined pipeline, from receiving a client request to returning a standardized JSON response.
+Each component has a dedicated responsibility.
 
 ---
 
 # High-Level Architecture
 
-```text
                         Client
-                           │
-                           ▼
+                           |
+                           v
                     HTTP Request
-                           │
-                           ▼
+                           |
+                           v
                      API Controller
-                           │
-                           ▼
+                           |
+                           v
                  Validation Engine
-                           │
-                           ▼
+                           |
+                           v
                     SQL Builder
-                           │
-                           ▼
+                           |
+                           v
                    Query Engine
-                           │
-                           ▼
+                           |
+                           v
                   Database Engine
-                           │
-                           ▼
+                           |
+                           v
                    Driver Factory
-                           │
-                           ▼
+                           |
+                           v
                  SQL Server Driver
-                           │
-                           ▼
+                           |
+                           v
                 Microsoft SQL Server
-                           │
-                           ▼
+                           |
+                           v
                     Query Results
-                           │
-                           ▼
-                  JSON Response
-                           │
-                           ▼
+                           |
+                           v
+                    JSON Response
+                           |
+                           v
                          Client
-```
 
 ---
 
 # Request Lifecycle
 
-Every request follows the same execution pipeline.
+Every request follows the same general pipeline.
 
-1. Client sends an HTTP request containing a JSON payload.
+1. Client sends an HTTP request containing JSON.
 2. API Controller receives and parses the request.
-3. Validation Engine validates all request components.
-4. SQL Builder converts JSON into a parameterized SQL statement.
-5. Query Engine prepares the query for execution.
-6. Database Engine loads the configured database provider.
-7. Driver Factory initializes the appropriate database driver.
-8. SQL Server Driver executes the SQL statement.
-9. Microsoft SQL Server returns the result set.
-10. Query Engine formats the result.
+3. Validation Engine validates the request.
+4. SQL Builder generates the SQL statement.
+5. Query Engine prepares and executes the query.
+6. Database Engine manages database access.
+7. Driver Factory selects the configured database driver.
+8. SQL Server Driver communicates with SQL Server.
+9. SQL Server returns the result.
+10. Query Engine processes the result.
 11. API Controller returns a standardized JSON response.
 
 ---
@@ -98,6 +94,7 @@ Responsibilities:
 - Validate operators
 - Validate JOIN clauses
 - Validate aliases
+- Validate pagination
 
 Invalid requests are rejected before reaching the database.
 
@@ -113,10 +110,10 @@ Responsibilities:
 - Build HAVING clauses
 - Build ORDER BY clauses
 - Build JOIN clauses
-- Build Pagination
+- Build pagination
 - Generate parameterized SQL
 
-The SQL Builder only generates SQL and never communicates directly with the database.
+The SQL Builder generates SQL but does not communicate directly with the database.
 
 ---
 
@@ -125,8 +122,9 @@ The SQL Builder only generates SQL and never communicates directly with the data
 Responsibilities:
 
 - Receive generated SQL
+- Prepare statements
 - Bind parameters
-- Execute prepared statements
+- Execute queries
 - Measure execution time
 - Count returned rows
 - Return structured query results
@@ -141,9 +139,9 @@ Responsibilities:
 - Read provider information
 - Manage database connections
 - Delegate operations to drivers
-- Provide a common interface for all providers
+- Provide a common database interface
 
-The rest of the framework communicates only with the Database Engine.
+The rest of the framework communicates with the Database Engine instead of directly managing database connections.
 
 ---
 
@@ -151,61 +149,60 @@ The rest of the framework communicates only with the Database Engine.
 
 Responsibilities:
 
-- Read configured provider
-- Load the correct database driver
+- Read the configured provider
+- Select the correct database driver
 - Create driver instances
 
-Example:
+Conceptually:
 
-```text
 Provider
-│
-├── sqlserver
-├── mysql
-├── postgresql
-├── sqlite
-└── oracle
-```
+|
+|-- sqlserver
+|-- mysql
+|-- postgresql
+|-- sqlite
+|-- oracle
 
-Current Version:
+Current implementation:
 
-- SQL Server
+SQL Server
 
-Future Versions:
-
-- MySQL
-- PostgreSQL
-- SQLite
-- Oracle
+Additional providers can be introduced in future versions.
 
 ---
 
 ## SQL Server Driver
 
-Responsibilities:
+The SQL Server driver contains SQL Server-specific database behavior.
 
-- Detect ODBC Driver
-- Establish SQL Server connection
-- Execute parameterized queries
-- Return results
-- Handle SQL Server errors
+Responsibilities include:
 
-All SQL Server-specific logic is isolated inside this driver.
+- ODBC driver detection
+- Establishing SQL Server connections
+- SQL Authentication
+- Windows Authentication
+- Named instance handling
+- Port handling
+- Encryption configuration
+- Trust Server Certificate configuration
+- Query execution
+- Transactions
+- Result handling
+
+The SQL Server-specific implementation remains isolated from the rest of the framework.
 
 ---
 
 ## Metadata Engine
 
-Responsibilities:
+The Metadata Engine is responsible for database metadata operations.
 
-- Retrieve available databases
+Planned responsibilities include:
+
+- Retrieve databases
 - Retrieve tables
 - Retrieve columns
 - Retrieve schema information
-
-Status:
-
-Planned for future releases.
 
 ---
 
@@ -217,40 +214,43 @@ Responsibilities:
 - Store execution time
 - Record returned rows
 - Capture exceptions
-- Log database errors
-
-Logging assists with debugging, auditing, and performance monitoring.
+- Record database errors
 
 ---
 
-# Layered Architecture
+# Pagination Compatibility
 
-```text
-Presentation Layer
-        │
-        ▼
-Controller Layer
-        │
-        ▼
-Validation Layer
-        │
-        ▼
-Query Generation Layer
-        │
-        ▼
-Execution Layer
-        │
-        ▼
-Database Layer
-        │
-        ▼
-Driver Layer
-        │
-        ▼
+Pagination is handled by the query/database compatibility layer.
+
+The frontend sends the same pagination information regardless of SQL Server compatibility level.
+
+The framework can select a compatible pagination implementation.
+
+Modern SQL Server capability:
+
+Modern pagination
+
+Older compatibility level where OFFSET/FETCH is unavailable:
+
+ROW_NUMBER() pagination
+
+This keeps database-version-specific pagination logic out of the frontend.
+
+---
+
+# Database Abstraction
+
+The architecture separates:
+
+Application Logic
+       |
+Database Engine
+       |
+Database Driver
+       |
 Database Server
-```
 
-Each layer has a single responsibility and communicates only with neighboring layers.
+This makes it possible to introduce additional database providers without changing the API/controller layer.
 
 ---
 
@@ -258,7 +258,7 @@ Each layer has a single responsibility and communicates only with neighboring la
 
 ## Separation of Concerns
 
-Each module performs one specific responsibility.
+Each component performs a defined responsibility.
 
 ## Modularity
 
@@ -266,37 +266,36 @@ Components can be developed and maintained independently.
 
 ## Reusability
 
-Core framework components can be reused across multiple projects.
+Core components can be reused across multiple applications.
 
 ## Extensibility
 
-New database providers can be added without changing business logic.
+New database providers and framework components can be added without redesigning the entire application.
 
 ## Maintainability
 
-A clear architecture simplifies debugging and future enhancements.
+The layered structure makes debugging and future development easier.
 
 ## Security
 
-All database operations use validated requests and parameterized queries.
+Validation and parameterized SQL execution are performed before database operations.
 
 ---
 
-# Advantages
+# Related Documentation
 
-- Modular architecture
-- Layered design
-- Reusable components
-- Database abstraction
-- Provider-based architecture
-- Improved maintainability
-- Better scalability
-- Easier testing
-- Frontend independence
-- Secure query execution
+For the HTTP layer:
 
----
+API.md
 
-# Summary
+For the JSON request structure:
 
-The Generic SQL API Framework is built on a modular, provider-based architecture that separates request handling, validation, SQL generation, query execution, and database communication into independent components. This design improves maintainability, scalability, security, and provides a strong foundation for supporting multiple database providers in future releases.
+JSON-Request-Reference.md
+
+For database configuration:
+
+Database-Configuration.md
+
+For deployment:
+
+Hosting.md
