@@ -563,7 +563,7 @@ Contributions are welcome.
 
 Before making changes, read:
 
-[Contributing Guide](CONTRIBUTING.md)
+[Contributing Guide](docs/CONTRIBUTING.md)
 
 Keep backend layers separated and update the relevant documentation when changing the API contract.
 
@@ -573,10 +573,12 @@ Keep backend layers separated and update the relevant documentation when changin
 
 See:
 
-[CHANGELOG.md](CHANGELOG.md)
+[CHANGELOG.md](docs/CHANGELOG.md)
 
 ---
 
 ## License
 
 This project is licensed under the MIT License.
+
+See the [LICENSE](LICENSE) file for details.
