@@ -1,0 +1,543 @@
+name: Backend CI
+
+on:
+  push:
+    branches:
+      - main
+
+  pull_request:
+    branches:
+      - main
+
+jobs:
+
+  # ============================================================
+  # WINDOWS BACKEND VALIDATION
+  # ============================================================
+
+  windows-validation:
+
+    name: Windows Backend Validation
+    runs-on: windows-latest
+
+    steps:
+
+      # ----------------------------------------------------------
+      # Checkout
+      # ----------------------------------------------------------
+
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+
+      # ----------------------------------------------------------
+      # PHP Runtime
+      # ----------------------------------------------------------
+
+      - name: Check PHP Runtime
+        shell: powershell
+        run: |
+
+          if (!(Test-Path "runtime/windows/php/php.exe")) {
+              Write-Error "PHP runtime not found."
+              exit 1
+          }
+
+          Write-Host "[OK] PHP runtime found."
+          runtime/windows/php/php.exe -v
+
+
+      # ----------------------------------------------------------
+      # PHP Configuration
+      # ----------------------------------------------------------
+
+      - name: Check PHP Configuration
+        shell: powershell
+        run: |
+
+          if (!(Test-Path "runtime/windows/php/php.ini")) {
+              Write-Error "php.ini not found."
+              exit 1
+          }
+
+          Write-Host "[OK] php.ini found."
+          runtime/windows/php/php.exe --ini
+
+
+      # ----------------------------------------------------------
+      # PHP ODBC Extension
+      # ----------------------------------------------------------
+
+      - name: Check PHP ODBC Extension
+        shell: powershell
+        run: |
+
+          Write-Host "========================================"
+          Write-Host "Checking PHP ODBC Extension"
+          Write-Host "========================================"
+          Write-Host ""
+
+          Write-Host "Checking php_odbc.dll..."
+
+          if (!(Test-Path "runtime/windows/php/ext/php_odbc.dll")) {
+              Write-Error "php_odbc.dll not found."
+              exit 1
+          }
+
+          Write-Host "[OK] php_odbc.dll exists."
+
+          Write-Host ""
+          Write-Host "Checking PHP modules..."
+
+          $modules = & "runtime/windows/php/php.exe" -m 2>&1
+
+          $modules | ForEach-Object {
+              Write-Host $_
+          }
+
+          Write-Host ""
+
+          if ($modules -match "(?im)^\s*odbc\s*$") {
+
+              Write-Host "[OK] PHP ODBC extension loaded."
+              exit 0
+          }
+
+          Write-Host "========================================"
+          Write-Host "ODBC extension failed to load."
+          Write-Host "========================================"
+
+          Write-Host ""
+          Write-Host "PHP startup errors:"
+
+          & "runtime/windows/php/php.exe" `
+              -d display_errors=1 `
+              -m
+
+          exit 1
+
+
+      # ----------------------------------------------------------
+      # SQL Server ODBC Driver
+      # ----------------------------------------------------------
+
+      - name: Check SQL Server ODBC Driver
+        shell: powershell
+        run: |
+
+          Write-Host "========================================"
+          Write-Host "Checking SQL Server ODBC Driver"
+          Write-Host "========================================"
+          Write-Host ""
+
+          $driver = Get-OdbcDriver |
+              Where-Object {
+                  $_.Name -eq "ODBC Driver 18 for SQL Server"
+              }
+
+          if ($driver) {
+
+              Write-Host "[OK] ODBC Driver 18 for SQL Server found."
+              Write-Host "Version: $($driver.Version)"
+
+          }
+          else {
+
+              Write-Host "ODBC Driver 18 not found."
+              Write-Host "Installing Microsoft ODBC Driver 18..."
+
+              $url = "https://go.microsoft.com/fwlink/?linkid=2307162"
+
+              $installer = Join-Path `
+                  $env:TEMP `
+                  "msodbcsql18.msi"
+
+              Invoke-WebRequest `
+                  -Uri $url `
+                  -OutFile $installer
+
+              Start-Process `
+                  -FilePath "msiexec.exe" `
+                  -ArgumentList @(
+                      "/i",
+                      $installer,
+                      "IACCEPTMSODBCSQLLICENSETERMS=YES",
+                      "/qn",
+                      "/norestart"
+                  ) `
+                  -Wait
+
+              Remove-Item `
+                  $installer `
+                  -Force `
+                  -ErrorAction SilentlyContinue
+
+              $driver = Get-OdbcDriver |
+                  Where-Object {
+                      $_.Name -eq "ODBC Driver 18 for SQL Server"
+                  }
+
+              if (!$driver) {
+
+                  Write-Error "ODBC Driver 18 installation failed."
+                  exit 1
+              }
+
+              Write-Host "[OK] ODBC Driver 18 installed."
+          }
+
+
+      # ----------------------------------------------------------
+      # Required Directories
+      # ----------------------------------------------------------
+
+      - name: Check Required Directories
+        shell: powershell
+        run: |
+
+          $directories = @(
+              "api",
+              "database",
+              "scripts",
+              "runtime/windows/php"
+          )
+
+          foreach ($directory in $directories) {
+
+              if (!(Test-Path $directory)) {
+
+                  Write-Error "Required directory missing: $directory"
+                  exit 1
+              }
+
+              Write-Host "[OK] $directory"
+          }
+
+
+      # ----------------------------------------------------------
+      # Required Files
+      # ----------------------------------------------------------
+
+      - name: Check Required Files
+        shell: powershell
+        run: |
+
+          $files = @(
+              "api/index.php",
+              "runtime/windows/php/php.exe",
+              "runtime/windows/php/php.ini",
+              "start-windows.bat"
+          )
+
+          foreach ($file in $files) {
+
+              if (!(Test-Path $file)) {
+
+                  Write-Error "Required file missing: $file"
+                  exit 1
+              }
+
+              Write-Host "[OK] $file"
+          }
+
+
+      # ----------------------------------------------------------
+      # PHP Syntax
+      # ----------------------------------------------------------
+
+      - name: Check PHP Syntax
+        shell: powershell
+        run: |
+
+          $files = Get-ChildItem `
+              -Path . `
+              -Recurse `
+              -Filter *.php |
+              Where-Object {
+                  $_.FullName -notmatch "\\runtime\\" -and
+                  $_.FullName -notmatch "\\vendor\\"
+              }
+
+          if ($files.Count -eq 0) {
+
+              Write-Error "No PHP files found."
+              exit 1
+          }
+
+          $failed = $false
+
+          foreach ($file in $files) {
+
+              Write-Host ""
+              Write-Host "Checking: $($file.FullName)"
+
+              & "runtime/windows/php/php.exe" `
+                  -l `
+                  $file.FullName
+
+              if ($LASTEXITCODE -ne 0) {
+
+                  Write-Error "Syntax error: $($file.FullName)"
+                  $failed = $true
+              }
+          }
+
+          if ($failed) {
+
+              Write-Error "One or more PHP files contain syntax errors."
+              exit 1
+          }
+
+          Write-Host ""
+          Write-Host "[OK] PHP syntax validation passed."
+
+
+      # ----------------------------------------------------------
+      # JSON Validation
+      # ----------------------------------------------------------
+
+      - name: Validate JSON Files
+        shell: powershell
+        run: |
+
+          $files = Get-ChildItem `
+              -Path . `
+              -Recurse `
+              -Filter *.json |
+              Where-Object {
+                  $_.FullName -notmatch "\\runtime\\" -and
+                  $_.FullName -notmatch "\\node_modules\\"
+              }
+
+          foreach ($file in $files) {
+
+              Write-Host "Checking JSON: $($file.FullName)"
+
+              try {
+
+                  Get-Content `
+                      $file.FullName `
+                      -Raw |
+                      ConvertFrom-Json |
+                      Out-Null
+
+              }
+              catch {
+
+                  Write-Error "Invalid JSON: $($file.FullName)"
+                  exit 1
+              }
+          }
+
+          Write-Host "[OK] JSON validation passed."
+
+
+      # ----------------------------------------------------------
+      # Create Runtime Directories
+      # ----------------------------------------------------------
+
+      - name: Create Runtime Directories
+        shell: powershell
+        run: |
+
+          New-Item `
+              -ItemType Directory `
+              -Force `
+              -Path "runtime/windows/php/opcache" |
+              Out-Null
+
+          New-Item `
+              -ItemType Directory `
+              -Force `
+              -Path "logs" |
+              Out-Null
+
+          Write-Host "[OK] Runtime directories created."
+
+
+      # ----------------------------------------------------------
+      # API Startup and Readiness Test
+      # ----------------------------------------------------------
+
+      - name: Start and Test PHP API
+        shell: powershell
+        run: |
+
+          $php = (Resolve-Path "runtime/windows/php/php.exe").Path
+          $api = (Resolve-Path "api").Path
+          $opcache = (Resolve-Path "runtime/windows/php/opcache").Path
+
+          $port = 8000
+
+          $stdout = Join-Path $PWD "logs\api_stdout.log"
+          $stderr = Join-Path $PWD "logs\api_stderr.log"
+
+          Write-Host "========================================"
+          Write-Host "Starting PHP API"
+          Write-Host "========================================"
+          Write-Host ""
+
+          Write-Host "PHP:"
+          Write-Host $php
+
+          Write-Host ""
+          Write-Host "API:"
+          Write-Host $api
+
+          Write-Host ""
+          Write-Host "OPcache:"
+          Write-Host $opcache
+
+          Write-Host ""
+          Write-Host "Port:"
+          Write-Host $port
+
+          Write-Host ""
+          Write-Host "Starting process..."
+
+          $process = Start-Process `
+              -FilePath $php `
+              -ArgumentList @(
+                  "-c",
+                  "runtime/windows/php/php.ini",
+                  "-d",
+                  "opcache.file_cache=$opcache",
+                  "-S",
+                  "127.0.0.1:$port",
+                  "-t",
+                  $api
+              ) `
+              -RedirectStandardOutput $stdout `
+              -RedirectStandardError $stderr `
+              -PassThru
+
+          Write-Host ""
+          Write-Host "PHP process ID:"
+          Write-Host $process.Id
+
+          # ------------------------------------------------------
+          # Wait for API
+          # ------------------------------------------------------
+
+          $apiReady = $false
+
+          for ($i = 1; $i -le 10; $i++) {
+
+              Start-Sleep -Seconds 1
+
+              if ($process.HasExited) {
+
+                  Write-Host ""
+                  Write-Host "========================================"
+                  Write-Host "PHP API PROCESS EXITED"
+                  Write-Host "========================================"
+
+                  Write-Host ""
+                  Write-Host "Exit Code:"
+                  Write-Host $process.ExitCode
+
+                  Write-Host ""
+                  Write-Host "PHP STDOUT:"
+                  Write-Host "----------------------------------------"
+
+                  if (Test-Path $stdout) {
+                      Get-Content $stdout
+                  }
+
+                  Write-Host ""
+                  Write-Host "PHP STDERR:"
+                  Write-Host "----------------------------------------"
+
+                  if (Test-Path $stderr) {
+                      Get-Content $stderr
+                  }
+
+                  Write-Error "PHP API stopped unexpectedly."
+                  exit 1
+              }
+
+              $connection = Test-NetConnection `
+                  -ComputerName 127.0.0.1 `
+                  -Port $port `
+                  -WarningAction SilentlyContinue
+
+              if ($connection.TcpTestSucceeded) {
+
+                  $apiReady = $true
+                  break
+              }
+
+              Write-Host "Waiting for API... ($i/10)"
+          }
+
+          # ------------------------------------------------------
+          # API Ready
+          # ------------------------------------------------------
+
+          if (!$apiReady) {
+
+              Write-Host ""
+              Write-Host "========================================"
+              Write-Host "PHP API DID NOT START"
+              Write-Host "========================================"
+
+              Write-Host ""
+              Write-Host "PHP STDOUT:"
+              Write-Host "----------------------------------------"
+
+              if (Test-Path $stdout) {
+                  Get-Content $stdout
+              }
+
+              Write-Host ""
+              Write-Host "PHP STDERR:"
+              Write-Host "----------------------------------------"
+
+              if (Test-Path $stderr) {
+                  Get-Content $stderr
+              }
+
+              Write-Error "API is not listening on port $port."
+              exit 1
+          }
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "PHP API READY"
+          Write-Host "========================================"
+          Write-Host ""
+
+          Write-Host "[OK] PHP process is running."
+          Write-Host "[OK] API is listening on port $port."
+
+
+      # ----------------------------------------------------------
+      # Stop API
+      # ----------------------------------------------------------
+
+      - name: Stop Test API
+        if: always()
+        shell: powershell
+        run: |
+
+          Get-Process php `
+              -ErrorAction SilentlyContinue |
+              Stop-Process `
+              -Force `
+              -ErrorAction SilentlyContinue
+
+          Write-Host "[OK] Test API process cleaned up."
+
+
+      # ----------------------------------------------------------
+      # CI Complete
+      # ----------------------------------------------------------
+
+      - name: Backend CI Completed
+        shell: powershell
+        run: |
+
+          Write-Host ""
+          Write-Host "========================================"
+          Write-Host "Windows Backend CI PASSED"
+          Write-Host "========================================"
