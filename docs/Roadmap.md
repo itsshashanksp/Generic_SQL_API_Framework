@@ -1,298 +1,501 @@
 # Roadmap
 
-This document describes the planned development direction of the Generic SQL API Framework.
+This roadmap covers the backend and database API only.
 
-The roadmap may change as the framework evolves and new requirements are identified.
+Frontend applications, dashboards, charts, reporting screens, and UI components are outside the scope of this repository.
 
 ---
 
-# Current Release - v1.0
+## v1.0.0 — Core API
 
-## Framework Core
+**Status:** Released
 
-- Dynamic SQL Query Engine
-- Validation Engine
-- SQL Builder
-- Repository Pattern
-- Database Engine
-- Driver Factory
-- Centralized Logging
-- Query Execution Statistics
-- Standardized JSON Responses
-- Global Exception Handling
+The initial release established the basic backend and database query architecture.
 
-## SQL Server
+### Included
 
-- SELECT
-- WHERE
+- JSON-based API requests
+- Controller and action handling
+- Dynamic SQL query generation
+- Query execution
+- Request validation
+- Table validation
+- Column validation
+- SQL function validation
+- Operator validation
+- JOIN support
 - GROUP BY
 - HAVING
 - ORDER BY
 - Pagination
-- INNER JOIN
-- LEFT JOIN
-- RIGHT JOIN
-- SQL Functions
-
-## SQL Server Connectivity
-
-- ODBC connectivity
-- Automatic ODBC driver detection
-- Multiple supported ODBC driver generations
-- SQL Authentication
-- Windows Authentication
-- Named SQL Server instances
-- Explicit SQL Server ports
-- Encryption options
-- Trust Server Certificate options
-
-## Compatibility
-
-- SQL Server capability-aware pagination
-- ROW_NUMBER() fallback for older compatibility levels
-- Frontend-independent pagination
-
-## Windows Deployment
-
-- Bundled Windows PHP runtime
-- start-windows.bat
-- Automatic PHP checks
-- Automatic ODBC checks
-- Automatic database connection check
-- Automatic runtime directory creation
-- Automatic port selection
+- Column aliases
+- SQL expressions
+- Prepared SQL execution
+- Multiple-result query execution
+- SQL file execution
+- Database metadata access
+- Query logging
+- Query execution statistics
+- Exception handling
+- Microsoft SQL Server connectivity through ODBC
 
 ---
 
-# v1.1 - CRUD Operations
+## v1.1.0 — Windows Runtime & SQL Server Connectivity
 
-## Database Operations
+**Status:** Current
+
+This release focuses on making the backend easier to deploy on Windows and improving SQL Server connectivity.
+
+### Windows Runtime
+
+Added a prebuilt Windows PHP runtime:
+
+```text
+runtime/
+└── windows/
+    └── php/
+```
+
+Windows users can run the backend without installing PHP separately.
+
+### Startup Script
+
+Added:
+
+```text
+start-windows.bat
+```
+
+The startup script performs environment checks before starting the API.
+
+It checks:
+
+- PHP runtime
+- `php.ini`
+- Required runtime directories
+- PHP ODBC extension
+- Database configuration
+- Database connection
+- API directory
+- Available port
+
+### Automatic Directories
+
+The launcher automatically creates:
+
+```text
+runtime/windows/php/opcache/
+logs/
+```
+
+No manual directory creation is required.
+
+### Port Handling
+
+The launcher starts at:
+
+```text
+8000
+```
+
+If the port is already in use, it searches for an available port up to:
+
+```text
+8100
+```
+
+### Database Startup Check
+
+The API now verifies the configured database connection before starting.
+
+If the connection fails:
+
+```text
+[FAILED] Database connection failed.
+```
+
+The API startup is aborted.
+
+Users are directed to:
+
+```text
+database/config/database.json
+```
+
+for configuration.
+
+### SQL Server ODBC
+
+The database layer supports SQL Server through ODBC.
+
+The configuration can use automatic driver selection:
+
+```json
+{
+  "provider": "sqlserver",
+  "driver": "auto"
+}
+```
+
+A specific installed ODBC driver can also be selected.
+
+### Authentication
+
+SQL Server configurations can use:
+
+- SQL Authentication
+- Windows Authentication
+
+### Connection Options
+
+The configuration supports SQL Server connection settings such as:
+
+- Server
+- Database
+- Port
+- ODBC driver
+- Encryption
+- Trust Server Certificate
+
+---
+
+## v1.2.0 — CRUD Operations
+
+**Status:** Planned
+
+Expand the query API beyond read operations.
+
+### Planned
 
 - INSERT
 - UPDATE
 - DELETE
 - UPSERT
+- Write-operation validation
+- Prepared write operations
+- Standardized write responses
+- Write-operation error handling
 
-## Validation
+---
 
-- Insert validation
-- Update validation
-- Delete validation
+## v1.3.0 — Transactions
 
-## Transactions
+**Status:** Planned
+
+Add transaction support for operations that require multiple database changes to succeed or fail together.
+
+### Planned
 
 - Begin transaction
 - Commit
 - Rollback
 - Transaction error handling
+- Transaction-aware query execution
+- Transaction logging
+
+Example flow:
+
+```text
+Begin
+  |
+  v
+Operation 1
+  |
+  v
+Operation 2
+  |
+  +---- Error ----> Rollback
+  |
+  v
+Commit
+```
 
 ---
 
-# v1.2 - Advanced SQL
+## v1.4.0 — Advanced SQL
 
-## SQL Features
+**Status:** Planned
 
-- Stored procedures
-- UNION
-- UNION ALL
-- CASE
+Expand the SQL capabilities available through the JSON request format.
+
+### Planned
+
+- CASE expressions
 - COALESCE
 - ISNULL
 - CAST
 - CONVERT
-- Common Table Expressions
+- UNION
+- UNION ALL
+- Additional CTE support
 - Window functions
+- Additional SQL Server expressions
 
-## Operations
-
-- Bulk insert
-- Batch operations
-- Improved transaction management
+The API request format should remain structured rather than requiring clients to send arbitrary SQL.
 
 ---
 
-# v1.3 - Reporting
+## v1.5.0 — Database Metadata
 
-## Report Management
+**Status:** Planned
 
-- Report templates
-- Saved queries
-- Report configuration
-- Report scheduling
+Expand database inspection and metadata capabilities.
 
-## Export
+### Planned
 
-- Excel
-- PDF
-- CSV
-- JSON
+- Schema information
+- Table information
+- Column information
+- Data types
+- Primary keys
+- Foreign keys
+- Index information
+- Database object discovery
+- Metadata caching
 
 ---
 
-# v2.0 - Security
+## v1.6.0 — API Security
 
-## Authentication
+**Status:** Planned
 
-- Login API
-- API Keys
+Add authentication and authorization to the backend API.
+
+### Planned
+
+- API keys
+- Authentication middleware
 - JWT authentication
-- Token validation
-- OAuth support
-
-## Authorization
-
-- Role-Based Access Control
-- User permissions
-- Resource permissions
-
-## Audit
-
-- Audit logs
-- User activity logs
-- API request logs
+- Role-based access
+- Permission checks
+- Authorization middleware
+- Audit logging
+- Rate limiting
 
 ---
 
-# v2.1 - Dashboard Engine
+## v1.7.0 — API Improvements
 
-## Dashboard
+**Status:** Planned
 
-- Dashboard API
-- Dashboard configuration
-- Widget support
-- Layout configuration
+Improve the API contract and developer experience.
 
-## Charts
+### Planned
 
-- Bar charts
-- Line charts
-- Pie charts
-- Area charts
-- KPI cards
+- API versioning
+- Consistent error responses
+- Improved validation messages
+- Health endpoint
+- API status endpoint
+- Better diagnostics
+- OpenAPI documentation
 
 ---
 
-# v2.2 - Performance
+## v1.8.0 — Performance
 
-## Optimization
+**Status:** Planned
+
+Focus on performance and larger workloads.
+
+### Planned
 
 - Query caching
 - Metadata caching
-- Performance monitoring
+- Connection handling improvements
 - Query profiling
-
-## Logging
-
-- Log levels
+- Large-result handling
+- Performance diagnostics
 - Log rotation
-- Log cleanup
-- Improved structured logging
+- Additional execution statistics
 
 ---
 
-# v3.0 - Multi-Database Support
+## v1.9.0 — Additional Database Providers
 
-## Planned Providers
+**Status:** Planned
 
-- Microsoft SQL Server
-- MySQL
-- PostgreSQL
-- MariaDB
+Expand the database layer beyond SQL Server.
 
-## Database Abstraction
+Potential providers:
 
-- Database Driver Interface
-- Driver Factory
-- Query Compatibility Layer
-- Provider-specific SQL handling
+```text
+MySQL
+PostgreSQL
+MariaDB
+SQLite
+```
 
----
+Each provider will require its own database-specific implementation.
 
-# v3.1 - Developer Experience
-
-## API
-
-- Interactive API documentation
-- OpenAPI / Swagger
-- Postman collection
-
-## Development Tools
-
-- CLI tools
-- Project generator
-- Configuration wizard
+The goal is to keep the HTTP API and request structure as consistent as possible between providers.
 
 ---
 
-# v4.0 - Enterprise Features
+## v2.0.0 — Platform & Deployment
 
-## Administration
+**Status:** Future
 
-- User management
-- Organization management
-- Multi-tenant support
+Improve deployment support across different environments.
 
-## Monitoring
+### Planned
 
-- Health checks
-- Metrics
-- System monitoring
-- Performance dashboard
-
-## Integration
-
-- REST API improvements
-- Webhooks
-- Event system
+- Linux runtime/setup
+- Linux startup scripts
+- Docker deployment
+- Environment-based configuration
+- Installation helpers
+- Deployment helpers
+- Configuration validation
+- Deployment diagnostics
+- Expanded automated testing
 
 ---
 
-# Long-Term Vision
+## Testing
 
-The goal is to provide a reusable backend platform that simplifies database-driven application development.
+Testing will continue alongside feature development.
 
-The framework will continue to focus on:
+Important areas include:
 
-- Database abstraction
-- Secure API development
-- Dynamic reporting
-- Enterprise reporting
-- Dashboard integration
-- Developer productivity
-- Maintainability
-- Extensibility
+- JSON request validation
+- SQL generation
+- SQL Server connectivity
+- ODBC driver compatibility
+- Pagination
+- CRUD operations
+- Transactions
+- Error handling
+- Authentication
+- Authorization
+- Database providers
+- Windows startup
+- Future Linux startup
 
 ---
 
-# Documentation Path
+## Project Scope
 
-For the current framework:
+### This repository handles
 
-README.md
-    |
-    v
-Introduction.md
-    |
-    v
-Architecture.md
-    |
-    v
-API.md
-    |
-    v
-JSON-Request-Reference.md
-    |
-    v
-Query-Examples.md
-    |
-    v
-Database-Configuration.md
-    |
-    v
-Hosting.md
-    |
-    v
-Roadmap.md
-    |
-    v
-CHANGELOG.md
+- Backend API
+- JSON request processing
+- SQL generation
+- Query execution
+- Database connectivity
+- Database validation
+- Database metadata
+- Request validation
+- Backend logging
+- Query statistics
+- Authentication and authorization in future versions
+- Deployment support
+
+### This repository does not handle
+
+- Frontend applications
+- Dashboards
+- Charts
+- Reporting UI
+- Frontend routing
+- Frontend state management
+- Website design
+
+Those belong to applications that consume this API.
+
+---
+
+## Current Development Direction
+
+```text
+v1.1.0
+Windows Runtime + SQL Server Connectivity
+        |
+        v
+v1.2.0
+CRUD
+        |
+        v
+v1.3.0
+Transactions
+        |
+        v
+v1.4.0
+Advanced SQL
+        |
+        v
+v1.5.0
+Database Metadata
+        |
+        v
+v1.6.0
+API Security
+        |
+        v
+v1.7.0
+API Improvements
+        |
+        v
+v1.8.0
+Performance
+        |
+        v
+v1.9.0
+Additional Database Providers
+        |
+        v
+v2.0.0
+Platform & Deployment
+```
+
+---
+
+## Versioning
+
+The project follows semantic versioning:
+
+```text
+MAJOR.MINOR.PATCH
+```
+
+### MAJOR
+
+Breaking API or architecture changes.
+
+Example:
+
+```text
+2.0.0
+```
+
+### MINOR
+
+New backward-compatible functionality.
+
+Example:
+
+```text
+1.2.0
+```
+
+### PATCH
+
+Backward-compatible fixes.
+
+Example:
+
+```text
+1.1.1
+```
+
+---
+
+## Related Documentation
+
+- [Introduction](Introduction.md)
+- [Architecture](Architecture.md)
+- [API](API.md)
+- [Database Configuration](Database-Configuration.md)
+- [Hosting](Hosting.md)
+- [Changelog](../CHANGELOG.md)

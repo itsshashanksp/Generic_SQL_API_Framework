@@ -1,168 +1,394 @@
-# Hosting & Deployment Guide
+# Hosting
 
 ## Overview
 
-Generic SQL API Framework is a PHP-based backend framework that runs between client applications and Microsoft SQL Server.
+Generic SQL API Framework is a PHP backend and can be hosted using a normal PHP environment.
 
-This document explains how to run and deploy the framework.
+For Windows, the repository includes a **prebuilt PHP runtime**, so users do not need to install PHP manually when using the bundled runtime.
 
-For database connection settings, see:
+The current bundled runtime is Windows-specific.
 
-Database-Configuration.md
+Linux runtime packaging is planned separately.
 
 ---
 
-# Windows - Bundled PHP Runtime
+## Windows
 
-The project provides a prebuilt PHP runtime for Windows.
+### Bundled PHP Runtime
 
-This allows Windows users to run the framework without manually installing PHP.
+The repository includes:
 
-Runtime location:
-
+```text
 runtime/
 └── windows/
     └── php/
+        ├── php.exe
+        ├── php.ini
+        └── ext/
+```
+
+The runtime contains the PHP installation required by the API, including the PHP ODBC extension.
+
+This means a Windows user does not need:
+
+- A separate PHP installation
+- XAMPP
+- WAMP
+- A manually configured PHP environment
+
+when using the bundled runtime.
 
 ---
 
-# Windows Startup
+## Start the API
 
-From the project root, run:
+From the project root:
 
+```bat
 start-windows.bat
+```
 
-The startup script checks:
-
-1. PHP runtime
-2. PHP configuration
-3. Runtime directories
-4. PHP ODBC extension
-5. Database connection
-6. API directory
-7. Available HTTP port
-
-If all checks pass, the API starts automatically.
+The startup script performs the required checks and starts the API automatically.
 
 ---
 
-# Runtime Directories
+## Windows Startup Process
 
-The startup script automatically creates required directories when they do not exist.
+The startup script checks the environment in this order:
 
-OPcache:
+```text
+Start
+  |
+  v
+PHP Runtime
+  |
+  v
+php.ini
+  |
+  v
+Runtime Directories
+  |
+  v
+PHP ODBC
+  |
+  v
+Database Configuration
+  |
+  v
+Database Connection
+  |
+  v
+API Directory
+  |
+  v
+Available Port
+  |
+  v
+Start PHP Server
+```
 
+If one of the required checks fails, the API startup is stopped.
+
+---
+
+## Runtime Directories
+
+The Windows launcher creates required directories automatically.
+
+### OPcache
+
+```text
 runtime/windows/php/opcache/
+```
 
-Logs:
+### Logs
 
+```text
 logs/
+```
 
-No manual directory creation is required.
+You do not need to create these directories manually.
+
+The startup script creates them when they do not exist.
 
 ---
 
-# Automatic Port Selection
+## PHP Configuration
 
-The Windows launcher starts checking from:
+The bundled PHP configuration is:
 
+```text
+runtime/windows/php/php.ini
+```
+
+The launcher explicitly loads this configuration.
+
+You can verify it with:
+
+```bat
+runtime\windows\php\php.exe --ini
+```
+
+Expected:
+
+```text
+Loaded Configuration File:
+D:\...\runtime\windows\php\php.ini
+```
+
+The exact path depends on where the project is installed.
+
+---
+
+## ODBC
+
+The Windows runtime includes the PHP ODBC extension.
+
+Check it with:
+
+```bat
+runtime\windows\php\php.exe -m | findstr /i odbc
+```
+
+Expected:
+
+```text
+odbc
+```
+
+PHP ODBC provides the connection between PHP and the installed SQL Server ODBC driver.
+
+```text
+PHP
+ |
+ v
+PHP ODBC Extension
+ |
+ v
+SQL Server ODBC Driver
+ |
+ v
+SQL Server
+```
+
+See [Database Configuration](Database-Configuration.md).
+
+---
+
+## Database Configuration
+
+Before starting the API, configure:
+
+```text
+database/config/database.json
+```
+
+The Windows launcher checks the database connection before starting the API.
+
+If the connection fails, the API does not start.
+
+See [Database Configuration](Database-Configuration.md).
+
+---
+
+## Database Startup Check
+
+The startup script runs the database check before starting the PHP server.
+
+Successful flow:
+
+```text
+Checking database connection...
+[OK] Database Connected
+```
+
+Failed flow:
+
+```text
+Checking database connection...
+[FAILED] Database connection failed.
+
+Please configure:
+database/config/database.json
+```
+
+This prevents the API from starting when the backend cannot reach its configured database.
+
+---
+
+## Port Selection
+
+The default starting port is:
+
+```text
 8000
+```
 
-If the port is already in use, it checks the next port.
+If port `8000` is already being used, the launcher automatically checks the next port.
 
-The maximum automatic port is:
+The current range is:
 
-8100
+```text
+8000 - 8100
+```
 
 Example:
 
-8000 -> occupied
-8001 -> occupied
-8002 -> available
+```text
+Port 8000 -> In use
+Port 8001 -> In use
+Port 8002 -> Available
+```
 
-The selected API address is displayed in the terminal.
+The API is then started using:
+
+```text
+http://localhost:8002
+```
+
+The selected URL is printed in the console.
 
 ---
 
-# Database Startup Check
+## PHP Built-in Server
 
-Before starting the API, the Windows launcher runs the database connection check.
+The Windows launcher uses the PHP built-in development server.
 
-If the connection succeeds:
+The command is conceptually:
+
+```bat
+php.exe -S localhost:PORT -t api
+```
+
+The API directory is:
+
+```text
+api/
+```
+
+The entry point is:
+
+```text
+api/index.php
+```
+
+---
+
+## Example Startup Output
+
+A successful startup looks similar to:
+
+```text
+========================================
+         Generic SQL API
+========================================
+
+[OK] PHP Runtime
+[OK] PHP Configuration
+[OK] Runtime Directories
+[OK] PHP ODBC
+
+Checking database connection...
 
 [OK] Database Connected
+[OK] API Directory
 
-The API starts.
+Checking available port...
 
-If the connection fails:
+[OK] Port 8000 Available
 
-[FAILED] Database connection failed.
+========================================
+              API Ready
+========================================
 
-The API startup is aborted and the user is instructed to configure:
+API: http://localhost:8000
 
-database/config/database.json
+Starting API...
+```
 
-and refer to the documentation.
-
----
-
-# Existing PHP Environments
-
-The bundled Windows runtime is optional.
-
-The framework can also be deployed using an existing PHP environment.
-
-Supported environments include:
-
-- Apache
-- Microsoft IIS
-- Nginx + PHP-FPM
-- XAMPP
-- WAMP
-- Docker
-- PHP built-in development server
-
-When using an existing environment, PHP and the required PHP extensions must be installed manually.
-
-The Microsoft SQL Server ODBC driver must also be available.
+If `8000` is unavailable, another port is selected automatically.
 
 ---
 
-# Apache / XAMPP Example
+## Apache
 
-Example project location:
+The API can also be hosted using Apache with PHP.
 
-htdocs/
-└── generic-sql-api-framework/
-    ├── api/
-    ├── core/
-    ├── database/
-    ├── docs/
-    ├── README.md
-    └── LICENSE
+The general architecture is:
 
-The web server should expose the API directory through the appropriate application URL.
+```text
+Client
+  |
+  v
+Apache
+  |
+  v
+PHP
+  |
+  v
+Generic SQL API
+  |
+  v
+ODBC
+  |
+  v
+SQL Server
+```
 
----
-
-# IIS
-
-For Microsoft IIS:
-
-1. Install PHP for IIS.
-2. Configure PHP through FastCGI.
-3. Enable the required PHP extensions.
-4. Configure the application/site.
-5. Point the application to the framework.
-6. Configure the database connection.
-7. Test the API endpoint.
+The bundled PHP runtime is primarily intended to simplify Windows deployment and does not require Apache.
 
 ---
 
-# Nginx + PHP-FPM
+## XAMPP
 
-For Nginx:
+XAMPP can also be used if it is already part of the deployment environment.
 
+However, XAMPP is **not required** when using the bundled Windows runtime.
+
+The project can run directly with:
+
+```bat
+start-windows.bat
+```
+
+This avoids making XAMPP a dependency of the application.
+
+---
+
+## IIS
+
+The API can be hosted through IIS using PHP/FastCGI.
+
+The architecture becomes:
+
+```text
+Client
+  |
+  v
+IIS
+  |
+  v
+FastCGI
+  |
+  v
+PHP
+  |
+  v
+Generic SQL API
+  |
+  v
+SQL Server
+```
+
+The IIS environment must have a working PHP installation and PHP ODBC extension.
+
+---
+
+## Nginx
+
+Nginx can be used with PHP-FPM.
+
+```text
 Client
   |
   v
@@ -175,172 +401,261 @@ PHP-FPM
 Generic SQL API
   |
   v
+ODBC
+  |
+  v
 SQL Server
+```
 
-Configure PHP-FPM and the Nginx site according to the server environment.
+The PHP environment must provide the required ODBC functionality.
 
 ---
 
-# Production Architecture
+## Docker
 
-A typical production environment is:
+The backend can also be packaged into a Docker container.
 
-Client Applications
-        |
-      HTTPS
-        |
-        v
-Apache / IIS / Nginx
-        |
-        v
+A container would require:
+
+```text
+PHP
+PHP ODBC Extension
+SQL Server ODBC Driver
 Generic SQL API
-        |
-        v
-Private SQL Server
+```
 
-The SQL Server should not be exposed directly to the Internet.
+Conceptually:
 
----
+```text
+Docker Container
+       |
+       +-- PHP
+       |
+       +-- ODBC
+       |
+       +-- Generic SQL API
+                |
+                v
+          SQL Server
+```
 
-# Frontend Integration
+Database credentials should be supplied through the deployment environment rather than committed into the container image.
 
-Any application capable of making HTTP requests can consume the framework.
-
-Examples include:
-
-- React
-- Angular
-- Vue
-- Flutter
-- React Native
-- Android
-- iOS
-- Electron
-- PHP
-- Python
-- Java
-- .NET
-- Node.js
-- Desktop applications
-
-No framework-specific frontend SDK is required.
-
-For API endpoints, continue with:
-
-API.md
-
-For request JSON structure, continue with:
-
-JSON-Request-Reference.md
+Docker support is part of future deployment work.
 
 ---
 
-# CORS
+## Production Deployment
 
-CORS configuration is handled in:
+The PHP built-in server is convenient for local development and simple internal deployments.
 
-api/index.php
+For larger production environments, the API can be placed behind a proper web server such as:
 
-Example:
+- Apache
+- IIS
+- Nginx
 
-$allowed_origins = [
-    "http://127.0.0.1:5173",
-    "http://localhost:3000"
-];
+A production deployment should also provide:
 
-For production:
-
-$allowed_origins = [
-    "https://app.company.com",
-    "https://portal.company.com"
-];
-
-Only trusted frontend origins should be added.
-
-Avoid allowing every origin in production.
+- HTTPS
+- Restricted CORS
+- Protected database credentials
+- Appropriate authentication
+- Firewall rules
+- Database backups
+- Application logging
+- PHP updates
+- ODBC driver updates
 
 ---
 
-# Deployment Checklist
+## Security
 
-Before deployment verify:
+Do not expose SQL Server directly to the public Internet.
 
-- PHP is available, unless using the bundled Windows runtime.
-- PHP ODBC is enabled.
-- Microsoft SQL Server is available.
-- A compatible Microsoft SQL Server ODBC driver is installed.
-- database/config/database.json is configured.
-- The API directory is accessible.
-- CORS is configured where required.
-- HTTPS is enabled in production.
-- SQL Server is not publicly exposed.
-- Database credentials are protected.
+The recommended flow is:
+
+```text
+Internet
+   |
+   v
+HTTPS
+   |
+   v
+Web Server
+   |
+   v
+Generic SQL API
+   |
+   v
+Private Network
+   |
+   v
+SQL Server
+```
+
+Protect:
+
+```text
+database/config/database.json
+```
+
+and never commit production credentials.
 
 ---
 
-# Updating
+## Updating PHP
 
-To update the framework:
+The bundled Windows runtime is part of the repository.
 
-1. Back up the existing project.
-2. Review CHANGELOG.md.
-3. Replace/update framework files.
-4. Preserve database/config/database.json.
-5. Test database connectivity.
-6. Test the API.
+When updating PHP:
+
+1. Obtain a compatible PHP build.
+2. Replace the runtime files.
+3. Keep the required extensions enabled.
+4. Verify `php.ini`.
+5. Verify the ODBC extension.
+6. Run the startup script.
+7. Confirm the database connection.
+8. Test the API.
+
+Check the PHP version with:
+
+```bat
+runtime\windows\php\php.exe -v
+```
+
+Check ODBC with:
+
+```bat
+runtime\windows\php\php.exe -m | findstr /i odbc
+```
 
 ---
 
-# Troubleshooting
+## Updating ODBC Drivers
 
-## API Does Not Start
+The PHP runtime and the SQL Server ODBC driver are separate components.
 
-When using Windows:
+```text
+Application
+    |
+    v
+Bundled PHP
+    |
+    v
+PHP ODBC Extension
+    |
+    v
+Installed ODBC Driver
+    |
+    v
+SQL Server
+```
 
-start-windows.bat
+The ODBC driver can therefore be updated independently from the PHP runtime, provided the installed driver remains compatible with the application.
 
-Review the startup checks.
+---
 
-## Database Connection Failed
+## Linux
 
-See:
+Linux hosting can use a normal PHP installation with the required ODBC components.
 
-Database-Configuration.md
+The project does **not currently provide a bundled Linux runtime**.
 
-## ODBC Driver Missing
+Linux-specific runtime packaging and startup scripts are planned for a future release.
 
-Install a compatible Microsoft SQL Server ODBC driver.
+---
 
-## Port Already in Use
+## Troubleshooting
 
-The Windows launcher automatically searches from port 8000 through 8100.
-
-## HTTP 500
+### PHP Runtime Not Found
 
 Check:
 
-- PHP error logs
-- Web server logs
-- PHP configuration
-- File permissions
-- Database configuration
+```text
+runtime/windows/php/php.exe
+```
+
+Then run:
+
+```bat
+runtime\windows\php\php.exe -v
+```
 
 ---
 
-# Next Documentation
+### php.ini Not Found
 
-For the API interface:
+Check:
 
-API.md
+```text
+runtime/windows/php/php.ini
+```
 
-For JSON requests:
+Then run:
 
-JSON-Request-Reference.md
+```bat
+runtime\windows\php\php.exe --ini
+```
 
-For practical examples:
+---
 
-Query-Examples.md
+### ODBC Extension Not Available
 
-For planned features:
+Run:
 
-Roadmap.md
+```bat
+runtime\windows\php\php.exe -m | findstr /i odbc
+```
+
+If `odbc` is not displayed, check the PHP runtime and `php.ini`.
+
+---
+
+### Database Connection Failed
+
+Check:
+
+```text
+database/config/database.json
+```
+
+Then verify:
+
+- SQL Server is running
+- Server name is correct
+- Database name is correct
+- Authentication details are correct
+- ODBC driver is installed
+- SQL Server accepts the configured connection
+- Firewall rules allow the connection
+
+---
+
+### Port Already in Use
+
+The Windows startup script automatically checks another port between:
+
+```text
+8000
+```
+
+and:
+
+```text
+8100
+```
+
+No manual port selection is normally required.
+
+---
+
+## Related Documentation
+
+- [Introduction](Introduction.md)
+- [Architecture](Architecture.md)
+- [API](API.md)
+- [Database Configuration](Database-Configuration.md)
+- [Roadmap](Roadmap.md)
+- [Changelog](../CHANGELOG.md)

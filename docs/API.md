@@ -2,282 +2,428 @@
 
 ## Overview
 
-The Generic SQL API Framework exposes an HTTP API that allows client applications to communicate with Microsoft SQL Server through a standardized JSON interface.
+Generic SQL API Framework provides a JSON-based HTTP API for interacting with the database layer.
 
-The API acts as the middleware layer between the frontend/application and the database.
+A client sends a JSON request to the API, the backend validates and processes the request, executes the required database operation, and returns a JSON response.
 
-Client applications never need to communicate directly with SQL Server.
-
----
-
-# Base URL
-
-The base URL depends on the hosting environment.
-
-## Windows Bundled Runtime
-
-When using:
-
-start-windows.bat
-
-the launcher displays the actual API URL and selected port.
-
-Example:
-
-http://localhost:8000/
-
-The port may change automatically if the default port is already in use.
-
-## Existing Web Server
-
-Example:
-
-http://localhost/generic-sql-api-framework/api/
-
-## Production
-
-Example:
-
-https://api.example.com/
+The API is independent of the frontend application.
 
 ---
 
-# Communication
+## API Entry Point
 
-| Property | Value |
-|---|---|
-| Protocol | HTTP / HTTPS |
-| Data Format | JSON |
-| Character Encoding | UTF-8 |
-| API Style | REST-style |
+The main API entry point is:
+
+```text
+api/index.php
+```
+
+When running the bundled Windows server, the URL will normally be:
+
+```text
+http://localhost:8000/api/index.php
+```
+
+The actual port is selected by `start-windows.bat` and printed when the API starts.
+
+See [Hosting](Hosting.md) for more information.
 
 ---
 
-# HTTP Method
+## HTTP Method
 
-Current API:
+Query requests use:
 
+```http
 POST
-
-Additional HTTP methods may be introduced in future releases.
+```
 
 ---
 
-# Request Headers
+## Request Headers
 
-Required:
+JSON requests should include:
 
+```http
 Content-Type: application/json
+```
 
-Recommended:
-
-Accept: application/json
-
----
-
-# Query Endpoint
-
-Current query endpoint:
-
-POST /query/select.php
-
-The endpoint accepts a JSON request describing the required query.
-
-The request is validated before SQL generation and execution.
-
-For the complete request structure, see:
-
-JSON-Request-Reference.md
+For authenticated deployments, the appropriate authorization header can also be supplied.
 
 ---
 
-# Request Flow
+## Basic Request
 
-Client
+A simple request can look like:
 
-↓
+```json
+{
+  "controller": "Query",
+  "action": "select",
+  "table": "CustomerTable",
+  "columns": [
+    "Cust_Name",
+    "Phone"
+  ]
+}
+```
 
+The request tells the API to:
+
+- Use the `Query` controller.
+- Execute the `select` action.
+- Query `CustomerTable`.
+- Return `Cust_Name` and `Phone`.
+
+---
+
+## Request Processing
+
+The API processes the request roughly as follows:
+
+```text
 HTTP POST
-
-↓
-
-/query/select.php
-
-↓
-
-Request Validation
-
-↓
-
-SQL Builder
-
-↓
-
-Query Engine
-
-↓
-
-SQL Server
-
-↓
-
-JSON Response
+    |
+    v
+api/index.php
+    |
+    v
+Read JSON Body
+    |
+    v
+Resolve Controller
+    |
+    v
+Resolve Action
+    |
+    v
+Validate Request
+    |
+    v
+Build SQL
+    |
+    v
+Execute Query
+    |
+    v
+Create Response
+    |
+    v
+Return JSON
+```
 
 ---
 
-# Response Format
+## Successful Response
 
-Successful responses use a standardized structure.
+A successful request returns a JSON response containing the query result.
 
 Example:
 
+```json
 {
-    "success": true,
-    "message": "Data Loaded Successfully",
-    "data": []
+  "success": true,
+  "message": "Data Loaded Successfully",
+  "data": [
+    {
+      "Cust_Name": "ABC Traders",
+      "Phone": "9876543210"
+    }
+  ]
 }
+```
 
-Error responses contain:
-
-{
-    "success": false,
-    "message": "Error message"
-}
-
-The exact response fields may depend on the operation.
+The exact response structure depends on the current controller and response implementation.
 
 ---
 
-# HTTP Status Codes
+## Error Response
 
-| Code | Meaning |
-|---|---|
-| 200 | Request completed successfully |
-| 400 | Invalid request |
-| 401 | Unauthorized |
-| 403 | Forbidden |
-| 404 | Resource not found |
-| 405 | Method not allowed |
-| 500 | Internal server error |
+When the request cannot be processed, the API returns an error response.
 
-Authentication-related status codes are reserved for future authentication features.
+Example:
+
+```json
+{
+  "success": false,
+  "message": "Invalid JSON Request"
+}
+```
+
+Common request-level errors include:
+
+```text
+Controller Missing
+Action Missing
+Controller Not Found
+Action Not Found
+Invalid JSON Request
+```
+
+Database and query errors are handled by the backend error-handling layer.
 
 ---
 
-# Current API Scope
+## Invalid JSON
 
-The current API focuses on dynamic SQL query operations.
+If the request body is not valid JSON, the API should reject the request instead of attempting to build a query from invalid data.
 
-Supported query capabilities include:
+Example:
 
-- SELECT
-- WHERE
+```text
+{ invalid json
+```
+
+Possible response:
+
+```json
+{
+  "success": false,
+  "message": "Invalid JSON Request"
+}
+```
+
+---
+
+## Controller and Action
+
+The request identifies the operation through:
+
+```json
+{
+  "controller": "Query",
+  "action": "select"
+}
+```
+
+The controller determines which backend component handles the request.
+
+The action determines what operation should be performed.
+
+This keeps the API entry point separate from the actual query implementation.
+
+---
+
+## Query Request
+
+A query request can contain the database information required to build the SQL operation.
+
+Example:
+
+```json
+{
+  "controller": "Query",
+  "action": "select",
+  "table": "CustomerTable",
+  "columns": [
+    "Cust_Name",
+    "Phone"
+  ],
+  "where": [
+    {
+      "left": {
+        "column": "Status"
+      },
+      "operator": "=",
+      "right": "Active"
+    }
+  ]
+}
+```
+
+The complete request structure is documented in:
+
+[JSON Request Reference](JSON-Request-Reference.md)
+
+---
+
+## Query Operations
+
+The query layer supports request components such as:
+
+- Column selection
+- Column aliases
+- Filtering
+- JOINs
 - GROUP BY
 - HAVING
 - ORDER BY
-- JOIN
 - Pagination
 - SQL functions
+- Expressions
 
-Supported JOIN types include:
+Examples are available in:
 
-- INNER JOIN
-- LEFT JOIN
-- RIGHT JOIN
+[Query Examples](Query-Examples.md)
 
 ---
 
-# Pagination
+## CORS
 
-Pagination is requested through the JSON request.
+CORS is configured by the API entry point.
+
+The allowed origins are maintained by the application configuration.
 
 Example:
 
-{
-    "page": 1,
-    "pageSize": 25
-}
+```php
+$allowed_origins = [
+    "http://127.0.0.1:5173",
+    "http://localhost:3000"
+];
+```
 
-The database layer handles SQL Server pagination compatibility.
+For a production deployment, only trusted frontend origins should be allowed.
 
-Modern SQL Server environments can use modern pagination.
-
-Older SQL Server compatibility levels can use the ROW_NUMBER() fallback where OFFSET/FETCH is unavailable.
-
-The frontend does not need to change its request format.
+Avoid using a wildcard origin unless the deployment specifically requires it.
 
 ---
 
-# Authentication
+## OPTIONS Requests
 
-The current version does not require API authentication.
+Browsers can send an `OPTIONS` request before a cross-origin request.
 
-Future versions may introduce:
+The API handles this as a CORS preflight request.
 
-- API Keys
-- JWT
-- OAuth
-- Role-Based Access Control
+Conceptually:
 
----
-
-# Metadata
-
-Metadata endpoints are planned for future releases.
-
----
-
-# Versioning
-
-Current framework version:
-
-v1.0
-
-Future API versions may introduce versioned endpoints while attempting to maintain backward compatibility.
+```text
+Browser
+   |
+   | OPTIONS
+   v
+API
+   |
+   | CORS response
+   v
+Browser
+   |
+   | POST JSON
+   v
+API
+```
 
 ---
 
-# Client Compatibility
+## Testing With curl
 
-The API can be consumed by any application capable of sending HTTP requests.
+### Windows
 
-Examples:
+```bat
+curl -X POST http://localhost:8000/api/index.php ^
+  -H "Content-Type: application/json" ^
+  -d "{\"controller\":\"Query\",\"action\":\"select\",\"table\":\"CustomerTable\",\"columns\":[\"Cust_Name\"]}"
+```
 
-- React
-- Angular
-- Vue
-- Flutter
-- React Native
-- Android
-- iOS
-- PHP
-- Python
-- Java
-- .NET
-- Node.js
-- Desktop applications
-- REST clients
+### Linux / macOS
+
+```bash
+curl -X POST http://localhost:8000/api/index.php \
+  -H "Content-Type: application/json" \
+  -d '{"controller":"Query","action":"select","table":"CustomerTable","columns":["Cust_Name"]}'
+```
 
 ---
 
-# Related Documentation
+## Testing With PowerShell
 
-For request structure:
+The API can also be tested from PowerShell:
 
-JSON-Request-Reference.md
+```powershell
+$body = @{
+    controller = "Query"
+    action     = "select"
+    table      = "CustomerTable"
+    columns    = @("Cust_Name")
+} | ConvertTo-Json
 
-For practical examples:
+Invoke-RestMethod `
+    -Uri "http://localhost:8000/api/index.php" `
+    -Method POST `
+    -ContentType "application/json" `
+    -Body $body
+```
 
-Query-Examples.md
+---
 
-For database configuration:
+## Database Connection
 
-Database-Configuration.md
+Database credentials are not part of normal query requests.
 
-For deployment:
+The API reads database configuration from:
 
-Hosting.md
+```text
+database/config/database.json
+```
 
-For architecture:
+The database connection is handled by the database layer.
 
-Architecture.md
+See [Database Configuration](Database-Configuration.md).
+
+---
+
+## Authentication
+
+Authentication is not currently described as part of the core query request format.
+
+Authentication and authorization are planned for a future version.
+
+See [Roadmap](Roadmap.md).
+
+---
+
+## API Port
+
+When using the Windows startup script, the API starts from port `8000`.
+
+If the port is already in use, the script checks the next available port up to `8100`.
+
+For example:
+
+```text
+Port 8000 -> busy
+Port 8001 -> busy
+Port 8002 -> available
+
+API:
+http://localhost:8002
+```
+
+---
+
+## API Directory
+
+The API entry point is located under:
+
+```text
+api/
+└── index.php
+```
+
+The PHP built-in server serves this directory when started by the Windows launcher.
+
+---
+
+## Production Notes
+
+For production deployments:
+
+- Use HTTPS.
+- Restrict CORS origins.
+- Protect database credentials.
+- Do not expose SQL Server directly to the Internet.
+- Use appropriate authentication before exposing the API publicly.
+- Keep PHP and ODBC components updated.
+- Monitor application logs.
+- Maintain database backups.
+
+---
+
+## Related Documentation
+
+- [Introduction](Introduction.md)
+- [Architecture](Architecture.md)
+- [JSON Request Reference](JSON-Request-Reference.md)
+- [Query Examples](Query-Examples.md)
+- [Database Configuration](Database-Configuration.md)
+- [Hosting](Hosting.md)

@@ -2,345 +2,705 @@
 
 ## Overview
 
-The Generic SQL API Framework accepts structured JSON requests.
+The API uses JSON requests to describe database operations.
 
-The request describes the query requirements while the framework handles validation, SQL generation, parameter binding, execution, and response formatting.
+A request contains the controller and action to execute, along with the information required by the query builder.
+
+This document describes the request structure and the fields currently used by the query layer.
+
+For practical requests, see [Query Examples](Query-Examples.md).
 
 ---
 
-# Basic Structure
+## Basic Structure
 
-A query request generally contains:
-
+```json
 {
-    "controller": "Query",
-    "action": "select",
-    "table": "CustomerTable",
-    "columns": [
-        "Cust_Name"
-    ]
-}
-
----
-
-# controller
-
-Identifies the controller handling the request.
-
-Example:
-
-"controller": "Query"
-
----
-
-# action
-
-Identifies the operation requested.
-
-Example:
-
-"action": "select"
-
-The currently documented query operation is:
-
-select
-
-Additional operations will be documented when implemented and exposed through the API.
-
----
-
-# table
-
-Specifies the primary table.
-
-Example:
-
-"table": "CustomerTable"
-
----
-
-# columns
-
-Specifies the columns returned by the query.
-
-Example:
-
-"columns": [
+  "controller": "Query",
+  "action": "select",
+  "table": "CustomerTable",
+  "columns": [
     "Cust_Name",
-    "Cust_Code"
-]
+    "Phone"
+  ]
+}
+```
 
 ---
 
-# Column Alias
+## Request Fields
 
-Columns can use aliases where supported by the query builder.
+| Field | Type | Description |
+|---|---|---|
+| `controller` | string | Controller that handles the request |
+| `action` | string | Action to execute |
+| `table` | string/object | Main table used by the query |
+| `columns` | array | Columns or expressions to select |
+| `where` | array | Filtering conditions |
+| `joins` | array | JOIN definitions |
+| `groupBy` | array | GROUP BY columns |
+| `having` | array | HAVING conditions |
+| `orderBy` | array | Result ordering |
+| `page` | integer | Requested page |
+| `pageSize` | integer | Number of rows per page |
+
+> The exact accepted structure is determined by the current query builder and validation layer. Do not add fields to a request unless they are supported by the implementation.
+
+---
+
+## controller
+
+Identifies the controller that should process the request.
 
 Example:
 
+```json
 {
-    "column": "Cust_Name",
-    "alias": "CustomerName"
+  "controller": "Query"
 }
+```
+
+A normal query request uses:
+
+```json
+{
+  "controller": "Query"
+}
+```
 
 ---
 
-# SQL Functions
+## action
 
-SQL functions can be represented as structured objects.
+Identifies the operation to execute.
 
 Example:
 
+```json
 {
-    "function": "SUM",
-    "column": "Op_Bal",
-    "alias": "TotalBalance"
+  "action": "select"
 }
+```
 
-Example complete request:
+The controller and action are normally supplied together:
 
+```json
 {
-    "controller": "Query",
-    "action": "select",
-    "table": "CustomerTable",
-    "columns": [
-        "Cust_Name",
-        {
-            "function": "SUM",
-            "column": "Op_Bal",
-            "alias": "TotalBalance"
-        }
-    ],
-    "groupBy": [
-        "Cust_Name"
-    ]
+  "controller": "Query",
+  "action": "select"
 }
+```
 
 ---
 
-# WHERE
+## table
 
-Filtering is represented through the request's filter/condition structure supported by the current API implementation.
+Defines the main table used by the query.
 
-Refer to Query-Examples.md for working examples.
+Simple form:
 
----
+```json
+{
+  "table": "CustomerTable"
+}
+```
 
-# GROUP BY
+When aliases are supported by the request structure, the table can also carry an alias.
 
 Example:
 
+```json
 {
-    "groupBy": [
-        "Cust_Name"
-    ]
+  "table": {
+    "name": "CustomerTable",
+    "alias": "C"
+  }
 }
+```
+
+Use the structure supported by the current request builder.
 
 ---
 
-# HAVING
+## columns
 
-HAVING is used with grouped queries.
+Defines the columns returned by the query.
 
-The structure must follow the validation rules implemented by the current query builder.
+Simple columns:
 
-See Query-Examples.md for examples.
-
----
-
-# ORDER BY
-
-ORDER BY defines result ordering.
-
-The request can specify the columns and direction supported by the current query builder.
-
-Example concept:
-
+```json
 {
-    "orderBy": [
-        {
-            "column": "Cust_Name",
-            "direction": "ASC"
-        }
-    ]
+  "columns": [
+    "Cust_Name",
+    "Phone",
+    "City"
+  ]
 }
+```
 
-Use the exact structure supported by the current implementation.
+Qualified columns can be used when working with table names or aliases:
 
----
-
-# JOIN
-
-Supported JOIN types include:
-
-- INNER JOIN
-- LEFT JOIN
-- RIGHT JOIN
-
-JOIN definitions must identify:
-
-- Join type
-- Target table
-- Join condition
-
-See Query-Examples.md for working examples.
-
----
-
-# Pagination
-
-Pagination uses:
-
+```json
 {
-    "page": 1,
-    "pageSize": 25
+  "columns": [
+    "C.Cust_Name"
+  ]
 }
+```
 
-Where:
+---
 
+## Column Aliases
+
+A column can be given an output alias.
+
+Example:
+
+```json
+{
+  "columns": [
+    {
+      "column": "Cust_Name",
+      "alias": "CustomerName"
+    }
+  ]
+}
+```
+
+The resulting SQL is conceptually:
+
+```sql
+SELECT
+    Cust_Name AS CustomerName
+FROM CustomerTable;
+```
+
+---
+
+## SQL Functions
+
+The query builder supports function-based expressions.
+
+Example:
+
+```json
+{
+  "columns": [
+    {
+      "function": "SUM",
+      "column": "Amount",
+      "alias": "TotalAmount"
+    }
+  ]
+}
+```
+
+The resulting SQL is conceptually:
+
+```sql
+SELECT
+    SUM(Amount) AS TotalAmount
+FROM SalesTable;
+```
+
+### Aggregate Functions
+
+The current query implementation includes aggregate functions such as:
+
+```text
+COUNT
+SUM
+AVG
+MIN
+MAX
+```
+
+### String Functions
+
+```text
+UPPER
+LOWER
+LTRIM
+RTRIM
+TRIM
+LEN
+```
+
+### Date Functions
+
+```text
+YEAR
+MONTH
+DAY
+DATEPART
+DATENAME
+GETDATE
+```
+
+### Mathematical Functions
+
+```text
+ABS
+ROUND
+CEILING
+FLOOR
+POWER
+SQRT
+EXP
+LOG
+```
+
+Refer to [Query Examples](Query-Examples.md) for usage examples.
+
+---
+
+## where
+
+`where` defines filtering conditions.
+
+A condition is represented using:
+
+```text
+left
+operator
+right
+```
+
+Example:
+
+```json
+{
+  "where": [
+    {
+      "left": {
+        "column": "Status"
+      },
+      "operator": "=",
+      "right": "Active"
+    }
+  ]
+}
+```
+
+Conceptually:
+
+```sql
+WHERE Status = 'Active'
+```
+
+---
+
+## Multiple Conditions
+
+Multiple conditions can be supplied through the `where` array.
+
+Example:
+
+```json
+{
+  "where": [
+    {
+      "left": {
+        "column": "Status"
+      },
+      "operator": "=",
+      "right": "Active"
+    },
+    {
+      "left": {
+        "column": "City"
+      },
+      "operator": "=",
+      "right": "Bangalore"
+    }
+  ]
+}
+```
+
+The exact logical combination of conditions should follow the behavior implemented by the current query builder.
+
+---
+
+## Operators
+
+The query builder validates operators before they are used in generated SQL.
+
+Common SQL comparison operators include:
+
+```text
+=
+<>
+!=
+>
+<
+>=
+<=
+```
+
+Additional operators should only be used when supported by the current implementation.
+
+---
+
+## Expressions
+
+The query builder supports structured expressions.
+
+Example:
+
+```json
+{
+  "expression": {
+    "left": {
+      "column": "Amount"
+    },
+    "operator": "+",
+    "right": 100
+  }
+}
+```
+
+Expressions can be used where the query builder accepts expression objects.
+
+---
+
+## JOINs
+
+JOIN definitions are supplied through `joins`.
+
+Example:
+
+```json
+{
+  "joins": [
+    {
+      "type": "INNER",
+      "table": "InvoiceTable",
+      "on": {
+        "left": "CustomerTable.Cust_ID",
+        "right": "InvoiceTable.Cust_ID"
+      }
+    }
+  ]
+}
+```
+
+Conceptually:
+
+```sql
+INNER JOIN InvoiceTable
+    ON CustomerTable.Cust_ID = InvoiceTable.Cust_ID
+```
+
+---
+
+## JOIN Types
+
+The query builder supports JOIN types defined by its validation rules.
+
+Common examples are:
+
+```text
+INNER
+LEFT
+RIGHT
+```
+
+Use the exact JOIN type accepted by the current implementation.
+
+---
+
+## Table Aliases
+
+Aliases allow tables to be referenced using shorter qualified names.
+
+Example:
+
+```json
+{
+  "table": {
+    "name": "CustomerTable",
+    "alias": "C"
+  }
+}
+```
+
+A column can then be referenced as:
+
+```text
+C.Cust_Name
+```
+
+Aliases are especially useful when multiple tables contain columns with the same name.
+
+---
+
+## groupBy
+
+`groupBy` defines the columns used for grouping.
+
+Example:
+
+```json
+{
+  "groupBy": [
+    "City"
+  ]
+}
+```
+
+Combined example:
+
+```json
+{
+  "columns": [
+    "City",
+    {
+      "function": "SUM",
+      "column": "Amount",
+      "alias": "TotalSales"
+    }
+  ],
+  "groupBy": [
+    "City"
+  ]
+}
+```
+
+Conceptually:
+
+```sql
+SELECT
+    City,
+    SUM(Amount) AS TotalSales
+FROM SalesTable
+GROUP BY City;
+```
+
+---
+
+## having
+
+`having` applies conditions to grouped results.
+
+Example:
+
+```json
+{
+  "having": [
+    {
+      "left": {
+        "function": "SUM",
+        "column": "Amount"
+      },
+      "operator": ">",
+      "right": 50000
+    }
+  ]
+}
+```
+
+Conceptually:
+
+```sql
+HAVING SUM(Amount) > 50000
+```
+
+`HAVING` is normally used together with `GROUP BY`.
+
+---
+
+## orderBy
+
+`orderBy` controls the result ordering.
+
+Example:
+
+```json
+{
+  "orderBy": [
+    {
+      "column": "Cust_Name",
+      "direction": "ASC"
+    }
+  ]
+}
+```
+
+Descending order:
+
+```json
+{
+  "orderBy": [
+    {
+      "column": "Cust_Name",
+      "direction": "DESC"
+    }
+  ]
+}
+```
+
+Supported directions are:
+
+```text
+ASC
+DESC
+```
+
+---
+
+## Pagination
+
+Pagination is controlled using:
+
+```text
 page
-
-Specifies the requested page number.
-
 pageSize
+```
 
-Specifies the number of records returned per page.
+Example:
 
----
-
-# Pagination Compatibility
-
-The frontend request does not need to know which SQL Server pagination syntax is supported.
-
-The database/query layer determines the compatible implementation.
-
-Modern SQL Server:
-
-Modern pagination
-
-Older SQL Server compatibility:
-
-ROW_NUMBER() pagination
-
-This keeps database-specific pagination logic inside the backend.
-
----
-
-# SQL Functions
-
-The framework currently supports SQL function categories including:
-
-## Aggregate
-
-- COUNT
-- SUM
-- AVG
-- MIN
-- MAX
-
-## String
-
-- UPPER
-- LOWER
-- LTRIM
-- RTRIM
-- TRIM
-- LEN
-
-## Date
-
-- YEAR
-- MONTH
-- DAY
-- DATEPART
-- DATENAME
-- GETDATE
-
-## Mathematical
-
-- ABS
-- ROUND
-- CEILING
-- FLOOR
-- POWER
-- SQRT
-- EXP
-- LOG
-
----
-
-# Parameters
-
-User-provided values must be passed through the request structure supported by the framework.
-
-The query engine uses parameterized execution rather than directly concatenating user values into SQL.
-
----
-
-# Example
-
+```json
 {
-    "controller": "Query",
-    "action": "select",
-    "table": "CustomerTable",
-    "columns": [
-        "Cust_Name"
-    ]
+  "page": 2,
+  "pageSize": 25
 }
+```
+
+The query layer calculates the required offset.
+
+The current SQL Server implementation uses SQL Server pagination syntax internally.
+
+Conceptually:
+
+```sql
+ORDER BY ...
+OFFSET ... ROWS
+FETCH NEXT ... ROWS ONLY
+```
+
+The client only needs to provide the page information.
 
 ---
 
-# Response
+## Prepared Values
 
-Successful response:
+Values used by query conditions are passed through the query execution layer.
 
-{
-    "success": true,
-    "message": "Data Loaded Successfully",
-    "data": []
-}
+The execution layer supports prepared ODBC statements.
 
-Error response:
+Conceptually:
 
-{
-    "success": false,
-    "message": "Error message"
-}
+```text
+JSON Request
+     |
+     v
+Query Builder
+     |
+     +-- SQL
+     |
+     +-- Values
+     |
+     v
+Prepared Statement
+     |
+     v
+ODBC Execute
+```
+
+This keeps values separate from the generated SQL where prepared execution is used.
 
 ---
 
-# Validation
+## Complete Request
 
-The framework validates request components before execution.
+The following combines several query components:
 
-Validation includes areas such as:
+```json
+{
+  "controller": "Query",
+  "action": "select",
+  "table": "SalesTable",
+  "columns": [
+    "City",
+    {
+      "function": "SUM",
+      "column": "Amount",
+      "alias": "TotalSales"
+    }
+  ],
+  "where": [
+    {
+      "left": {
+        "column": "Status"
+      },
+      "operator": "=",
+      "right": "Completed"
+    }
+  ],
+  "groupBy": [
+    "City"
+  ],
+  "having": [
+    {
+      "left": {
+        "function": "SUM",
+        "column": "Amount"
+      },
+      "operator": ">",
+      "right": 50000
+    }
+  ],
+  "orderBy": [
+    {
+      "column": "TotalSales",
+      "direction": "DESC"
+    }
+  ],
+  "page": 1,
+  "pageSize": 20
+}
+```
 
+---
+
+## Validation
+
+The request is validated before execution.
+
+Validation can cover:
+
+- Request structure
 - Tables
 - Columns
-- SQL functions
+- Functions
 - Operators
-- JOIN definitions
+- JOINs
 - Aliases
-- Pagination
+- Sort directions
+- Query properties
 
-Invalid requests are rejected before database execution.
+Invalid requests should be rejected before they reach the database.
 
 ---
 
-# Related Documentation
+## Important
 
-For endpoint information:
+This document describes the request contract.
 
-API.md
+It does not describe how the SQL is internally generated or executed.
 
-For real-world requests:
+For internal implementation details, see:
 
-Query-Examples.md
+[Architecture](Architecture.md)
 
-For framework architecture:
+For HTTP usage, see:
 
-Architecture.md
+[API](API.md)
 
-For database configuration:
+For copy/paste requests, see:
 
-Database-Configuration.md
+[Query Examples](Query-Examples.md)
+
+For database connection settings, see:
+
+[Database Configuration](Database-Configuration.md)

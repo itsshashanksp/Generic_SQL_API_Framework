@@ -2,340 +2,607 @@
 
 ## Overview
 
-Generic SQL API Framework uses a JSON configuration file to manage database connectivity.
+Generic SQL API Framework currently connects to Microsoft SQL Server through ODBC.
 
-Database configuration is separated from application code so connection details can be changed without modifying the framework.
+Database connection details are kept outside the query request and are loaded from:
 
----
-
-# Configuration File
-
-Location:
-
+```text
 database/config/database.json
+```
+
+The application uses this configuration when establishing the database connection.
 
 ---
 
-# Configuration Structure
+## Configuration File
 
+Create the following file:
+
+```text
+database/
+└── config/
+    └── database.json
+```
+
+A configuration file is required before the API can connect to the database.
+
+Do not commit the real configuration file when it contains production credentials.
+
+The repository already ignores:
+
+```text
+database/config/database.json
+```
+
+---
+
+## Basic Configuration
+
+A SQL Server configuration can look like:
+
+```json
 {
-    "provider": "sqlserver",
-    "driver": "auto",
-    "server": "localhost\\SQLEXPRESS",
-    "database": "Database-Name",
-    "authentication": "sql",
-    "username": "sa",
-    "password": "password",
-    "port": 1433,
-    "options": {
-        "encrypt": false,
-        "trustServerCertificate": true
-    }
+  "provider": "sqlserver",
+  "driver": "auto",
+  "server": "localhost\\SQLEXPRESS",
+  "database": "LOYAL_IBMS",
+  "authentication": "sql",
+  "username": "sa",
+  "password": "password",
+  "port": 1433,
+  "options": {
+    "encrypt": false,
+    "trustServerCertificate": true
+  }
 }
+```
+
+Replace the values with the details of the SQL Server being used.
 
 ---
 
-# Configuration Properties
+## Configuration Fields
 
-| Property | Required | Description |
-|---|---|---|
-| provider | Yes | Database provider |
-| driver | Yes | ODBC driver name or auto |
-| server | Yes | SQL Server hostname, IP, or instance |
-| database | Yes | Database name |
-| authentication | Yes | Authentication mode |
-| username | SQL Authentication | SQL username |
-| password | SQL Authentication | SQL password |
-| port | No | SQL Server TCP port |
-| options | No | Connection options |
-
----
-
-# Database Provider
-
-Current provider:
-
-sqlserver
-
-The provider determines which database driver is loaded.
-
-The provider-based architecture is designed to allow additional database providers in future releases.
+| Field | Description |
+|---|---|
+| `provider` | Database provider |
+| `driver` | ODBC driver selection |
+| `server` | SQL Server hostname, instance, or IP |
+| `database` | Database name |
+| `authentication` | Authentication method |
+| `username` | SQL authentication username |
+| `password` | SQL authentication password |
+| `port` | SQL Server TCP port |
+| `options` | Additional connection options |
 
 ---
 
-# ODBC Driver
+## provider
 
-## Automatic Detection
+The current provider is:
 
-Recommended:
+```json
+"provider": "sqlserver"
+```
 
-{
-    "driver": "auto"
-}
+This tells the database layer to use the SQL Server implementation.
 
-When auto is selected, the SQL Server driver attempts to detect a compatible installed ODBC driver.
+If the provider is unsupported, the database connection check will fail.
 
-The driver checks supported Microsoft SQL Server ODBC driver generations from newer to older.
+---
 
-Supported driver names currently include:
+## driver
 
-ODBC Driver 19 for SQL Server
+The recommended configuration is:
+
+```json
+"driver": "auto"
+```
+
+With automatic selection, the framework can select a supported SQL Server ODBC driver available on the system.
+
+A specific driver can also be configured:
+
+```json
+"driver": "ODBC Driver 18 for SQL Server"
+```
+
+The name must match an ODBC driver installed on the machine.
+
+Examples of commonly installed Microsoft SQL Server ODBC drivers include:
+
+```text
 ODBC Driver 18 for SQL Server
 ODBC Driver 17 for SQL Server
-ODBC Driver 13.1 for SQL Server
 ODBC Driver 13 for SQL Server
-ODBC Driver 11 for SQL Server
-ODBC Driver 10 for SQL Server
-SQL Server Native Client 11.0
-SQL Server Native Client 10.0
-SQL Server Native Client 9.0
-SQL Native Client
-SQL Server
+```
 
-Not every system will have every driver installed.
-
-The framework tries the available compatible drivers and reports the connection errors if none can establish a connection.
+The exact drivers available depend on the machine.
 
 ---
 
-# Manual Driver Selection
+## ODBC Requirement
 
-A specific installed driver can be selected manually.
+PHP must have the ODBC extension enabled.
+
+Check the bundled Windows runtime with:
+
+```bat
+runtime\windows\php\php.exe -m | findstr /i odbc
+```
+
+Expected:
+
+```text
+odbc
+```
+
+You can also check the PHP configuration:
+
+```bat
+runtime\windows\php\php.exe --ini
+```
+
+The loaded configuration should point to:
+
+```text
+runtime/windows/php/php.ini
+```
+
+---
+
+## SQL Server Driver
+
+The PHP ODBC extension is the PHP-side interface.
+
+The Microsoft SQL Server ODBC driver is the system-side driver used to communicate with SQL Server.
+
+The connection path is:
+
+```text
+Generic SQL API
+       |
+       v
+PHP ODBC Extension
+       |
+       v
+SQL Server ODBC Driver
+       |
+       v
+Microsoft SQL Server
+```
+
+The framework therefore does not depend on one fixed ODBC driver version.
+
+The selected driver must, however, be installed and compatible with the environment.
+
+---
+
+## server
+
+### Local SQL Server
+
+```json
+"server": "localhost"
+```
+
+### SQL Server Express
+
+```json
+"server": "localhost\\SQLEXPRESS"
+```
+
+### Named Server
+
+```json
+"server": "SERVER01\\SQLEXPRESS"
+```
+
+### IP Address
+
+```json
+"server": "192.168.1.100"
+```
+
+### SQL Server With Port
+
+```json
+"server": "192.168.1.100",
+"port": 1433
+```
+
+Use the server and port that are configured for the SQL Server instance.
+
+---
+
+## database
+
+The `database` field specifies the database that the API should connect to.
 
 Example:
 
-{
-    "driver": "ODBC Driver 18 for SQL Server"
-}
+```json
+"database": "LOYAL_IBMS"
+```
 
-Use manual selection when a specific driver version is required.
-
----
-
-# Server Configuration
-
-## Local SQL Server
-
-{
-    "server": "localhost"
-}
-
-## SQL Express Named Instance
-
-{
-    "server": "localhost\\SQLEXPRESS"
-}
-
-## Remote SQL Server
-
-{
-    "server": "192.168.1.100"
-}
-
-## Named SQL Server
-
-{
-    "server": "SERVER01"
-}
+The configured account must have permission to access this database.
 
 ---
 
-# Port
+## Authentication
 
-An explicit SQL Server TCP port can be configured.
+The framework supports SQL Server authentication modes provided by the database connection implementation.
+
+### SQL Authentication
+
+Use:
+
+```json
+"authentication": "sql"
+```
+
+and provide:
+
+```json
+"username": "sa",
+"password": "password"
+```
 
 Example:
 
+```json
 {
-    "port": 1433
+  "provider": "sqlserver",
+  "driver": "auto",
+  "server": "localhost\\SQLEXPRESS",
+  "database": "LOYAL_IBMS",
+  "authentication": "sql",
+  "username": "sa",
+  "password": "password"
 }
-
-The driver combines the configured server and port when building the connection target.
-
-Port 1433 is commonly used for SQL Server TCP connections, but the framework does not require that specific port.
+```
 
 ---
 
-# Database
+### Windows Authentication
+
+Use:
+
+```json
+"authentication": "windows"
+```
 
 Example:
 
+```json
 {
-    "database": "LOYAL_IBMS"
+  "provider": "sqlserver",
+  "driver": "auto",
+  "server": "SERVER01\\SQLEXPRESS",
+  "database": "LOYAL_IBMS",
+  "authentication": "windows",
+  "port": 1433
 }
-
-The database must already exist and the configured login must have permission to access it.
-
----
-
-# Authentication
-
-The SQL Server driver supports:
-
-sql
-
-windows
-
----
-
-## SQL Authentication
-
-Example:
-
-{
-    "authentication": "sql",
-    "username": "sa",
-    "password": "password"
-}
-
-The connection uses SQL Server login credentials.
-
----
-
-## Windows Authentication
-
-Example:
-
-{
-    "authentication": "windows"
-}
+```
 
 The connection uses the Windows account running the PHP process.
 
-Username and password are not used for Windows Authentication.
+That account must have the required SQL Server permissions.
 
 ---
 
-# Connection Options
+## Port
 
-The options object contains connection-specific settings.
+The standard SQL Server TCP port is:
+
+```json
+"port": 1433
+```
+
+If the SQL Server instance uses another port, configure that port instead.
 
 Example:
 
-{
-    "options": {
-        "encrypt": false,
-        "trustServerCertificate": true
-    }
+```json
+"port": 1500
+```
+
+For named instances, make sure the server and instance configuration matches the SQL Server environment.
+
+---
+
+## Encryption
+
+Encryption can be configured through the `options` section.
+
+Example:
+
+```json
+"options": {
+  "encrypt": true
 }
+```
 
-## encrypt
-
-Controls whether the connection requests encryption.
-
-## trustServerCertificate
-
-Controls whether the SQL Server certificate is trusted without normal certificate-chain validation.
-
-Production environments should use certificate settings appropriate to their security requirements.
+For production environments, use the encryption settings appropriate for the SQL Server configuration.
 
 ---
 
-# Configuration Loading
+## Trust Server Certificate
 
-During startup:
+The configuration can specify whether the SQL Server certificate should be trusted.
 
+Example:
+
+```json
+"options": {
+  "trustServerCertificate": true
+}
+```
+
+This can be useful in environments using a certificate that is not issued by a trusted certificate authority.
+
+For production, configure certificate validation according to the organization's security requirements.
+
+---
+
+## Complete SQL Authentication Example
+
+```json
+{
+  "provider": "sqlserver",
+  "driver": "auto",
+  "server": "SERVER01\\SQLEXPRESS",
+  "database": "ApplicationDB",
+  "authentication": "sql",
+  "username": "api_user",
+  "password": "YOUR_PASSWORD",
+  "port": 1433,
+  "options": {
+    "encrypt": true,
+    "trustServerCertificate": false
+  }
+}
+```
+
+---
+
+## Complete Windows Authentication Example
+
+```json
+{
+  "provider": "sqlserver",
+  "driver": "auto",
+  "server": "SERVER01\\SQLEXPRESS",
+  "database": "ApplicationDB",
+  "authentication": "windows",
+  "port": 1433,
+  "options": {
+    "encrypt": true,
+    "trustServerCertificate": false
+  }
+}
+```
+
+---
+
+## Startup Database Check
+
+The Windows launcher checks the database before starting the API.
+
+Run:
+
+```bat
+start-windows.bat
+```
+
+The startup flow is:
+
+```text
+PHP Runtime
+     |
+     v
+PHP Configuration
+     |
+     v
+ODBC Extension
+     |
+     v
 database.json
-      |
-      v
-Provider
-      |
-      v
-Driver
-      |
-      v
-Authentication
-      |
-      v
-Connection
+     |
+     v
+Database Connection
+     |
+     +---- Failed ----> Stop API
+     |
+     +---- Connected -> Start API
+```
 
-The database connection is then made available to the Database Engine.
+If the connection fails, the API does not start.
 
----
+The console displays a database connection failure and directs the user to configure:
 
-# Database Connection Test
-
-The Windows startup script performs a database connection test before starting the API.
-
-If the connection fails:
-
-API startup is aborted
-
-The user is instructed to configure:
-
+```text
 database/config/database.json
+```
 
 ---
 
-# Troubleshooting
+## Testing the Configuration
 
-## Database Not Found
+The easiest way to test the configuration is:
 
-Verify:
+```bat
+start-windows.bat
+```
 
-- Database name
-- Database existence
-- Database permissions
+A successful startup should show:
 
-## Login Failed
+```text
+[OK] PHP Runtime
+[OK] PHP Configuration
+[OK] Runtime Directories
+[OK] PHP ODBC
+Checking database connection...
+[OK] Database Connected
+[OK] API Directory
+[OK] Port 8000 Available
+```
 
-Verify:
+The API then starts on the selected port.
+
+---
+
+## Common Errors
+
+### Unsupported Database Provider
+
+Example:
+
+```text
+FAILED: Unsupported database provider.
+```
+
+Check:
+
+```json
+"provider": "sqlserver"
+```
+
+---
+
+### ODBC Extension Not Available
+
+Check:
+
+```bat
+runtime\windows\php\php.exe -m | findstr /i odbc
+```
+
+If nothing is returned, PHP ODBC is not available.
+
+---
+
+### ODBC Driver Not Found
+
+If the PHP ODBC extension is available but the configured driver cannot be found, check the installed ODBC drivers on the system.
+
+If possible, use:
+
+```json
+"driver": "auto"
+```
+
+or specify the exact installed driver name.
+
+---
+
+### Database Login Failed
+
+Check:
 
 - Username
 - Password
 - Authentication mode
+- SQL Server authentication configuration
 - Database permissions
 
-## Server Not Found
+---
 
-Verify:
+### SQL Server Instance Not Found
+
+Verify the configured server:
+
+```json
+"server": "SERVER01\\SQLEXPRESS"
+```
+
+Also verify that SQL Server is running and accepting connections.
+
+---
+
+### Connection Timeout
+
+Check:
 
 - SQL Server service
-- Server name
-- Instance name
 - TCP/IP configuration
+- Firewall
+- Server address
 - Port
-
-## ODBC Driver Not Found
-
-Verify that a supported SQL Server ODBC driver is installed.
-
-With:
-
-{
-    "driver": "auto"
-}
-
-the framework attempts compatible installed driver versions automatically.
-
-## Cannot Open Database
-
-If master connects but the selected database does not, verify that the login has access to the selected database.
+- Remote connection settings
 
 ---
 
-# Security
+## Security
 
-Do not commit production credentials to source control.
+Do not commit production database credentials.
 
-Protect:
+The following file should remain local:
 
+```text
 database/config/database.json
+```
 
-Use secure credentials and Windows Authentication where appropriate.
+Never place production passwords directly into source code.
+
+For production deployments, protect the configuration file and restrict filesystem permissions where possible.
 
 ---
 
-# Related Documentation
+## Configuration Example for Development
 
-For deployment:
+A simple local SQL Server Express setup:
 
-Hosting.md
+```json
+{
+  "provider": "sqlserver",
+  "driver": "auto",
+  "server": "localhost\\SQLEXPRESS",
+  "database": "TestDB",
+  "authentication": "windows",
+  "port": 1433,
+  "options": {
+    "encrypt": false,
+    "trustServerCertificate": true
+  }
+}
+```
 
-For the framework's database architecture:
+Adjust the values to match the local SQL Server installation.
 
-Architecture.md
+---
 
-For API request syntax:
+## Configuration Example for Production
 
-JSON-Request-Reference.md
+A production environment should use the organization's actual SQL Server and security configuration.
+
+Example structure:
+
+```json
+{
+  "provider": "sqlserver",
+  "driver": "auto",
+  "server": "DB-SERVER01",
+  "database": "ProductionDB",
+  "authentication": "sql",
+  "username": "api_user",
+  "password": "YOUR_SECURE_PASSWORD",
+  "port": 1433,
+  "options": {
+    "encrypt": true,
+    "trustServerCertificate": false
+  }
+}
+```
+
+Do not copy these example credentials into a real environment.
+
+---
+
+## Related Documentation
+
+- [Architecture](Architecture.md) — database and query layer design
+- [API](API.md) — HTTP API usage
+- [JSON Request Reference](JSON-Request-Reference.md) — request structure
+- [Hosting](Hosting.md) — running the backend
+- [Roadmap](Roadmap.md) — planned database provider support
