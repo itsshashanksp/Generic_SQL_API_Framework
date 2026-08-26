@@ -1,55 +1,263 @@
 # Roadmap
 
-This roadmap covers the backend and database API only.
+This roadmap covers the Generic SQL API Framework backend and database API only.
 
-Frontend applications, dashboards, charts, reporting screens, and UI components are outside the scope of this repository.
+The project is focused on providing a reusable backend layer for applications that need structured access to database operations.
+
+Frontend applications, dashboards, charts, reporting interfaces, and UI components are outside the scope of this repository.
 
 ---
 
-## v1.0.0 — Core API
+# v1.0.0 — Core API & Advanced SQL
 
 **Status:** Released
 
-The initial release established the basic backend and database query architecture.
+The initial release established the core API, query builder, validation, database execution layer, SQL Server integration, and advanced SQL capabilities.
 
-### Included
+## API
 
 - JSON-based API requests
 - Controller and action handling
+- JSON responses
+- Request parsing
+- API-level error handling
+- CORS handling
+
+---
+
+## Query Engine
+
 - Dynamic SQL query generation
 - Query execution
-- Request validation
+- Prepared SQL execution
+- Multiple-result query execution
+- SQL file execution
+- Query execution statistics
+- Query error handling
+
+---
+
+## Query Builder
+
+- Column selection
+- Column aliases
+- Table aliases
+- WHERE conditions
+- AND / OR conditions
+- JOINs
+- GROUP BY
+- HAVING
+- ORDER BY
+- Pagination
+- SQL expressions
+- SQL functions
+- Subqueries
+- CTE
+- Recursive CTE
+- Set operations
+- Procedure-related query construction
+
+---
+
+## Validation
+
+- Request structure validation
 - Table validation
 - Column validation
-- SQL function validation
+- Function validation
 - Operator validation
-- JOIN support
+- JOIN validation
+- Alias validation
+- Sort direction validation
+- Query component validation
+
+---
+
+## Advanced SQL Support
+
+The following capabilities were implemented and tested as part of v1.0.0.
+
+### Query Features
+
+- SELECT
+- DISTINCT
+- TOP
+- WHERE
+- AND / OR conditions
+- JOINs
 - GROUP BY
 - HAVING
 - ORDER BY
 - Pagination
 - Column aliases
-- SQL expressions
-- Prepared SQL execution
-- Multiple-result query execution
-- SQL file execution
-- Database metadata access
-- Query logging
-- Query execution statistics
-- Exception handling
-- Microsoft SQL Server connectivity through ODBC
+- Table aliases
+- Arithmetic expressions
+- CASE expressions
+- Subqueries
+- EXISTS
+- NOT EXISTS
+- IN
+- NOT IN
+- BETWEEN
+- NOT BETWEEN
+- CTE
+- Recursive CTE
+- UNION
+- UNION ALL
 
 ---
 
-## v1.1.0 — Windows Runtime & SQL Server Connectivity
+## Aggregate Functions
+
+Implemented and tested:
+
+```text
+COUNT
+SUM
+AVG
+MIN
+MAX
+STRING_AGG
+```
+
+---
+
+## String Functions
+
+Implemented and tested:
+
+```text
+UPPER
+LOWER
+LTRIM
+RTRIM
+TRIM
+LEN
+COALESCE
+ISNULL
+CAST
+CONVERT
+NULLIF
+CONCAT
+LEFT
+RIGHT
+SUBSTRING
+REPLACE
+CHARINDEX
+PATINDEX
+FORMAT
+```
+
+---
+
+## Date and Time Functions
+
+Implemented and tested:
+
+```text
+YEAR
+MONTH
+DAY
+DATEPART
+DATENAME
+GETDATE
+DATEADD
+DATEDIFF
+EOMONTH
+ISDATE
+DATEFROMPARTS
+DATETIMEFROMPARTS
+TIMEFROMPARTS
+SYSDATETIME
+CURRENT_TIMESTAMP
+IIF
+```
+
+---
+
+## Mathematical Functions
+
+Implemented and tested:
+
+```text
+ABS
+ROUND
+CEILING
+FLOOR
+POWER
+SQRT
+EXP
+LOG
+```
+
+---
+
+## Window Functions
+
+Implemented and tested:
+
+```text
+ROW_NUMBER
+RANK
+DENSE_RANK
+NTILE
+LAG
+LEAD
+FIRST_VALUE
+LAST_VALUE
+```
+
+---
+
+## Database Object Execution
+
+Implemented and tested:
+
+- Stored procedure execution
+- Scalar function execution
+- Table-valued function execution
+
+---
+
+## Database Support
+
+The initial release provides:
+
+- Microsoft SQL Server support
+- ODBC connectivity
+- Database configuration through JSON
+- Database metadata access
+- Database object validation
+- Database error handling
+
+---
+
+## Logging
+
+Added logging for:
+
+- SQL execution
+- Query parameters
+- Execution time
+- Returned rows
+- Database errors
+- Exceptions
+
+---
+
+# v1.1.0 — Windows Runtime & Deployment
 
 **Status:** Current
 
-This release focuses on making the backend easier to deploy on Windows and improving SQL Server connectivity.
+This release focuses on making the backend easier to install, configure, and run on Windows.
 
-### Windows Runtime
+The Advanced SQL functionality belongs to v1.0.0 and is not repeated as part of this release.
 
-Added a prebuilt Windows PHP runtime:
+---
+
+## Prebuilt Windows PHP Runtime
+
+Added a bundled Windows PHP runtime:
 
 ```text
 runtime/
@@ -57,9 +265,13 @@ runtime/
     └── php/
 ```
 
-Windows users can run the backend without installing PHP separately.
+The bundled runtime allows the API to run on Windows without requiring a separate PHP installation.
 
-### Startup Script
+Users do not need to manually install PHP when using the bundled runtime.
+
+---
+
+## Windows Startup Script
 
 Added:
 
@@ -67,22 +279,48 @@ Added:
 start-windows.bat
 ```
 
-The startup script performs environment checks before starting the API.
+The startup script checks the required environment before starting the API.
 
-It checks:
+### Startup Flow
+
+```text
+PHP Runtime
+    ↓
+PHP Configuration
+    ↓
+Runtime Directories
+    ↓
+PHP ODBC
+    ↓
+Database Configuration
+    ↓
+Database Connection
+    ↓
+API Directory
+    ↓
+Available Port
+    ↓
+Start API
+```
+
+---
+
+## PHP Runtime Validation
+
+The startup script checks:
 
 - PHP runtime
 - `php.ini`
-- Required runtime directories
 - PHP ODBC extension
-- Database configuration
-- Database connection
 - API directory
-- Available port
 
-### Automatic Directories
+If a required component is missing, startup is stopped with an error message.
 
-The launcher automatically creates:
+---
+
+## Automatic Runtime Directories
+
+The startup script creates required directories automatically when they do not exist.
 
 ```text
 runtime/windows/php/opcache/
@@ -91,82 +329,226 @@ logs/
 
 No manual directory creation is required.
 
-### Port Handling
+---
 
-The launcher starts at:
+## OPcache
 
-```text
-8000
-```
+The Windows runtime is configured to use a file cache for OPcache.
 
-If the port is already in use, it searches for an available port up to:
+The startup script also ensures that the OPcache directory exists before starting PHP.
 
-```text
-8100
-```
+---
 
-### Database Startup Check
+## PHP Configuration
 
-The API now verifies the configured database connection before starting.
-
-If the connection fails:
+The bundled PHP configuration is:
 
 ```text
-[FAILED] Database connection failed.
+runtime/windows/php/php.ini
 ```
 
-The API startup is aborted.
+The startup script explicitly loads this configuration when running the database check and API.
 
-Users are directed to:
+---
+
+## ODBC Validation
+
+The startup script checks whether PHP ODBC is available.
+
+Example check:
+
+```bat
+runtime\windows\php\php.exe -m | findstr /i odbc
+```
+
+Expected output:
 
 ```text
-database/config/database.json
+odbc
 ```
 
-for configuration.
+The connection architecture is:
 
-### SQL Server ODBC
+```text
+Generic SQL API
+       |
+       v
+PHP ODBC Extension
+       |
+       v
+SQL Server ODBC Driver
+       |
+       v
+Microsoft SQL Server
+```
 
-The database layer supports SQL Server through ODBC.
+---
+
+## SQL Server Driver Support
+
+The backend uses ODBC for SQL Server connectivity.
 
 The configuration can use automatic driver selection:
 
 ```json
 {
-  "provider": "sqlserver",
-  "driver": "auto"
+    "provider": "sqlserver",
+    "driver": "auto"
 }
 ```
 
-A specific installed ODBC driver can also be selected.
+A specific installed driver can also be configured.
 
-### Authentication
+Example:
 
-SQL Server configurations can use:
+```json
+{
+    "provider": "sqlserver",
+    "driver": "ODBC Driver 18 for SQL Server"
+}
+```
 
-- SQL Authentication
-- Windows Authentication
+The actual driver must be installed on the host machine.
 
-### Connection Options
+---
 
-The configuration supports SQL Server connection settings such as:
+## Database Configuration
 
+Database configuration is stored separately from the application code:
+
+```text
+database/config/database.json
+```
+
+This keeps database credentials and environment-specific connection details outside the API source code.
+
+Example:
+
+```json
+{
+    "provider": "sqlserver",
+    "driver": "auto",
+    "server": "localhost\\SQLEXPRESS",
+    "database": "TestDB",
+    "authentication": "windows",
+    "port": 1433
+}
+```
+
+---
+
+## Database Connection Check
+
+The startup script checks the configured database connection before starting the API.
+
+Successful connection:
+
+```text
+Checking database connection...
+
+[OK] Database Connected
+```
+
+Failed connection:
+
+```text
+Checking database connection...
+
+[FAILED] Database connection failed.
+```
+
+If the connection fails, the API startup is aborted.
+
+The user is directed to configure:
+
+```text
+database/config/database.json
+```
+
+---
+
+## Authentication
+
+The database configuration supports:
+
+- SQL Server authentication
+- Windows authentication
+
+---
+
+## SQL Server Connection Options
+
+The database configuration supports:
+
+- Provider
+- ODBC driver
 - Server
 - Database
+- Authentication
+- Username
+- Password
 - Port
-- ODBC driver
 - Encryption
 - Trust Server Certificate
 
 ---
 
-## v1.2.0 — CRUD Operations
+## Automatic Port Selection
+
+The Windows startup script starts checking from:
+
+```text
+8000
+```
+
+If the port is already in use, it checks the next available port.
+
+The current range is:
+
+```text
+8000 - 8100
+```
+
+Example:
+
+```text
+8000 → In use
+8001 → In use
+8002 → Available
+```
+
+The selected port is displayed before the API starts.
+
+---
+
+## Windows Deployment
+
+The bundled runtime removes the requirement for a separate:
+
+- PHP installation
+- XAMPP installation
+- WAMP installation
+
+when the bundled PHP runtime is used.
+
+The backend can still be hosted using an existing PHP environment such as:
+
+- Apache
+- IIS
+- Nginx
+- XAMPP
+
+if required by the deployment environment.
+
+---
+
+# v1.2.0 — CRUD Operations
 
 **Status:** Planned
 
-Expand the query API beyond read operations.
+The next major backend phase is database write support.
 
-### Planned
+## Planned
 
 - INSERT
 - UPDATE
@@ -177,15 +559,17 @@ Expand the query API beyond read operations.
 - Standardized write responses
 - Write-operation error handling
 
+The existing query architecture will be extended to support write operations.
+
 ---
 
-## v1.3.0 — Transactions
+# v1.3.0 — Transactions
 
 **Status:** Planned
 
-Add transaction support for operations that require multiple database changes to succeed or fail together.
+Add transaction support for operations that need multiple database changes to succeed or fail together.
 
-### Planned
+## Planned
 
 - Begin transaction
 - Commit
@@ -194,10 +578,10 @@ Add transaction support for operations that require multiple database changes to
 - Transaction-aware query execution
 - Transaction logging
 
-Example flow:
+### Expected Flow
 
 ```text
-Begin
+BEGIN
   |
   v
 Operation 1
@@ -205,44 +589,21 @@ Operation 1
   v
 Operation 2
   |
-  +---- Error ----> Rollback
+  +---- Error ----> ROLLBACK
   |
   v
-Commit
+COMMIT
 ```
 
 ---
 
-## v1.4.0 — Advanced SQL
+# v1.4.0 — Database Metadata
 
 **Status:** Planned
 
-Expand the SQL capabilities available through the JSON request format.
+Expand database metadata and schema inspection capabilities.
 
-### Planned
-
-- CASE expressions
-- COALESCE
-- ISNULL
-- CAST
-- CONVERT
-- UNION
-- UNION ALL
-- Additional CTE support
-- Window functions
-- Additional SQL Server expressions
-
-The API request format should remain structured rather than requiring clients to send arbitrary SQL.
-
----
-
-## v1.5.0 — Database Metadata
-
-**Status:** Planned
-
-Expand database inspection and metadata capabilities.
-
-### Planned
+## Planned
 
 - Schema information
 - Table information
@@ -254,15 +615,17 @@ Expand database inspection and metadata capabilities.
 - Database object discovery
 - Metadata caching
 
+The goal is to allow applications to retrieve database structure through the API instead of implementing their own database inspection logic.
+
 ---
 
-## v1.6.0 — API Security
+# v1.5.0 — API Security
 
 **Status:** Planned
 
 Add authentication and authorization to the backend API.
 
-### Planned
+## Planned
 
 - API keys
 - Authentication middleware
@@ -273,33 +636,35 @@ Add authentication and authorization to the backend API.
 - Audit logging
 - Rate limiting
 
+The goal is to allow multiple applications to use the API while controlling access to database operations.
+
 ---
 
-## v1.7.0 — API Improvements
+# v1.6.0 — API Improvements
 
 **Status:** Planned
 
-Improve the API contract and developer experience.
+Improve the API contract, diagnostics, and developer experience.
 
-### Planned
+## Planned
 
 - API versioning
-- Consistent error responses
+- Consistent error response structure
 - Improved validation messages
 - Health endpoint
 - API status endpoint
-- Better diagnostics
+- Improved diagnostics
 - OpenAPI documentation
 
 ---
 
-## v1.8.0 — Performance
+# v1.7.0 — Performance
 
 **Status:** Planned
 
-Focus on performance and larger workloads.
+Improve performance for larger databases, larger result sets, and higher API usage.
 
-### Planned
+## Planned
 
 - Query caching
 - Metadata caching
@@ -310,15 +675,19 @@ Focus on performance and larger workloads.
 - Log rotation
 - Additional execution statistics
 
+Performance improvements should not bypass validation or security controls.
+
 ---
 
-## v1.9.0 — Additional Database Providers
+# v1.8.0 — Additional Database Providers
 
 **Status:** Planned
 
-Expand the database layer beyond SQL Server.
+The current database implementation is focused on Microsoft SQL Server.
 
-Potential providers:
+Future versions may add additional database providers.
+
+Potential providers include:
 
 ```text
 MySQL
@@ -329,70 +698,98 @@ SQLite
 
 Each provider will require its own database-specific implementation.
 
-The goal is to keep the HTTP API and request structure as consistent as possible between providers.
+The goal is to keep the API request structure and application-facing behavior as consistent as possible between providers.
 
 ---
 
-## v2.0.0 — Platform & Deployment
+# v2.0.0 — Platform & Deployment
 
 **Status:** Future
 
-Improve deployment support across different environments.
+Expand deployment support beyond the current Windows runtime.
 
-### Planned
+---
+
+## Linux
+
+Planned:
 
 - Linux runtime/setup
-- Linux startup scripts
-- Docker deployment
+- Linux startup script
+- Linux deployment documentation
+
+Linux support is intentionally deferred until the Windows deployment and backend features are further developed.
+
+---
+
+## Docker
+
+Planned:
+
+- Docker image
+- Container configuration
 - Environment-based configuration
+- Container deployment documentation
+
+---
+
+## Deployment Improvements
+
+Planned:
+
 - Installation helpers
 - Deployment helpers
 - Configuration validation
 - Deployment diagnostics
-- Expanded automated testing
+- Production deployment improvements
 
 ---
 
-## Testing
+# Testing
 
-Testing will continue alongside feature development.
+The currently implemented query, SQL function, database object, SQL Server, and Windows runtime features have been tested during development.
 
-Important areas include:
+Testing will continue as new functionality is added.
 
-- JSON request validation
-- SQL generation
-- SQL Server connectivity
-- ODBC driver compatibility
-- Pagination
+Future testing work includes:
+
 - CRUD operations
 - Transactions
-- Error handling
 - Authentication
 - Authorization
-- Database providers
-- Windows startup
-- Future Linux startup
+- Additional database providers
+- Regression testing
+- Automated testing
+- Production deployment testing
+- Future Linux deployment testing
+- Docker deployment testing
 
 ---
 
-## Project Scope
+# Project Scope
 
-### This repository handles
+This repository is focused on the backend database API.
+
+## Included
 
 - Backend API
 - JSON request processing
-- SQL generation
-- Query execution
+- Query generation
+- SQL execution
 - Database connectivity
 - Database validation
+- Advanced SQL
+- SQL functions
 - Database metadata
-- Request validation
-- Backend logging
+- Database object execution
+- Logging
 - Query statistics
 - Authentication and authorization in future versions
-- Deployment support
+- Runtime and deployment support
 
-### This repository does not handle
+## Not Included
+
+The following belong to applications that consume this API and are outside the scope of this repository:
 
 - Frontend applications
 - Dashboards
@@ -401,20 +798,23 @@ Important areas include:
 - Frontend routing
 - Frontend state management
 - Website design
-
-Those belong to applications that consume this API.
+- UI components
 
 ---
 
-## Current Development Direction
+# Development Direction
 
 ```text
+v1.0.0
+Core API + Advanced SQL
+        |
+        v
 v1.1.0
-Windows Runtime + SQL Server Connectivity
+Windows Runtime + Deployment
         |
         v
 v1.2.0
-CRUD
+CRUD Operations
         |
         v
 v1.3.0
@@ -422,26 +822,22 @@ Transactions
         |
         v
 v1.4.0
-Advanced SQL
-        |
-        v
-v1.5.0
 Database Metadata
         |
         v
-v1.6.0
+v1.5.0
 API Security
         |
         v
-v1.7.0
+v1.6.0
 API Improvements
         |
         v
-v1.8.0
+v1.7.0
 Performance
         |
         v
-v1.9.0
+v1.8.0
 Additional Database Providers
         |
         v
@@ -451,15 +847,15 @@ Platform & Deployment
 
 ---
 
-## Versioning
+# Versioning
 
-The project follows semantic versioning:
+The project follows Semantic Versioning:
 
 ```text
 MAJOR.MINOR.PATCH
 ```
 
-### MAJOR
+## MAJOR
 
 Breaking API or architecture changes.
 
@@ -469,7 +865,7 @@ Example:
 2.0.0
 ```
 
-### MINOR
+## MINOR
 
 New backward-compatible functionality.
 
@@ -479,7 +875,7 @@ Example:
 1.2.0
 ```
 
-### PATCH
+## PATCH
 
 Backward-compatible fixes.
 
@@ -491,11 +887,14 @@ Example:
 
 ---
 
-## Related Documentation
+# Related Documentation
 
-- [Introduction](Introduction.md)
-- [Architecture](Architecture.md)
-- [API](API.md)
-- [Database Configuration](Database-Configuration.md)
-- [Hosting](Hosting.md)
-- [Changelog](../CHANGELOG.md)
+- [Introduction](Introduction.md) — project purpose and scope
+- [Architecture](Architecture.md) — backend architecture and internal flow
+- [API](API.md) — HTTP API usage
+- [JSON Request Reference](JSON-Request-Reference.md) — JSON request structure
+- [Query Examples](Query-Examples.md) — practical query examples
+- [Database Configuration](Database-Configuration.md) — SQL Server and ODBC configuration
+- [Hosting](Hosting.md) — running and deploying the backend
+- [Contributing](../CONTRIBUTING.md) — development guidelines
+- [Changelog](../CHANGELOG.md) — released changes
