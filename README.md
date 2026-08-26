@@ -186,7 +186,7 @@ Example:
               API Ready
 ========================================
 
-API: http://localhost:8000
+API: http://localhost:8000/index.php
 ```
 
 ---

@@ -180,7 +180,7 @@ echo ========================================
 echo              API Ready
 echo ========================================
 echo.
-echo API: http://localhost:%PORT%
+echo API: http://localhost:%PORT%/index.php
 echo.
 echo Starting API...
 echo.
