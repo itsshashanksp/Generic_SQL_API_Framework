@@ -3723,28 +3723,103 @@ if (
                 continue;
             }
 
-            if (
-                strtoupper($filter['operator']) == "BETWEEN"
-                || strtoupper($filter['operator']) == "NOT BETWEEN"
-            ) {
+if (
+    strtoupper($filter['operator']) == "BETWEEN"
+    || strtoupper($filter['operator']) == "NOT BETWEEN"
+) {
+
+    if (
+        !is_array($filter['value']) ||
+        count($filter['value']) != 2
+    ) {
+        throw new Exception(
+            "{$filter['operator']} requires exactly two values."
+        );
+    }
+
+    $resolved =
+        $this->resolveColumn(
+            $filter['column']
+        );
+
+    $table =
+        $resolved['table']
+        ?? $request['table'];
+
+    $column =
+        $resolved['column'];
+
+    $dataType =
+        $this->metadataRepository
+            ->getColumnDataType(
+                $table,
+                $column
+            );
+
+    /*
+     * SQL Server INT date storage.
+     *
+     * Example:
+     *
+     * 2017-05-10
+     *     ↓
+     * 20170510
+     *
+     * Only convert values that look like
+     * HTML date input values.
+     */
+    if (
+        in_array(
+            strtolower((string) $dataType),
+            [
+                "int",
+                "bigint",
+                "smallint",
+                "tinyint"
+            ],
+            true
+        )
+    ) {
+
+        foreach (
+            [0, 1] as $index
+        ) {
+
+            $value =
+                $filter['value'][$index];
 
             if (
-                !is_array($filter['value']) ||
-                count($filter['value']) != 2
+                is_string($value) &&
+                preg_match(
+                    '/^\d{4}-\d{2}-\d{2}$/',
+                    $value
+                )
             ) {
-                throw new Exception(
-                    "{$filter['operator']} requires exactly two values."
-              );
+
+                $filter['value'][$index] =
+                    (int) str_replace(
+                        "-",
+                        "",
+                        $value
+                    );
+
             }
 
-            $conditions[] =
-                 "{$filter['column']} {$filter['operator']} ? AND ?";
+        }
 
-            $params[] = $filter['value'][0];
-            $params[] = $filter['value'][1];
+    }
 
-            continue;
-     }
+    $conditions[] =
+        "{$filter['column']} {$filter['operator']} ? AND ?";
+
+    $params[] =
+        $filter['value'][0];
+
+    $params[] =
+        $filter['value'][1];
+
+    continue;
+}
 
      $conditions[] =
           "{$filter['column']} {$filter['operator']} ?";

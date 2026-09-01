@@ -38,8 +38,8 @@ class MetadataRepository
     }
 
     /**
-    * Get Views
-    */
+     * Get Views
+     */
     public function getViews()
     {
         return $this->queryEngine->executeFile(
@@ -48,8 +48,8 @@ class MetadataRepository
     }
 
     /**
-    * Get Stored Procedures
-    */
+     * Get Stored Procedures
+     */
     public function getProcedures()
     {
         return $this->queryEngine->executeFile(
@@ -58,57 +58,94 @@ class MetadataRepository
     }
 
     /**
-    * Check Table Exists
-    */
+     * Check Table Exists
+     */
     public function tableExists($table)
     {
-       $sql = "
-          SELECT
-            COUNT(*) AS Total
-          FROM
-            INFORMATION_SCHEMA.TABLES
-          WHERE
-            TABLE_NAME = ?
-    ";
+        $sql = "
+            SELECT
+                COUNT(*) AS Total
+            FROM
+                INFORMATION_SCHEMA.TABLES
+            WHERE
+                TABLE_NAME = ?
+        ";
 
         $result = $this->queryEngine->executePrepared(
-           $sql,
-           [$table]
+            $sql,
+            [$table]
         );
 
-    return (($result["data"][0]["Total"] ?? 0) > 0);
+        return (
+            ($result["data"][0]["Total"] ?? 0) > 0
+        );
     }
 
     /**
-    * Check Column Exists
-    */
+     * Check Column Exists
+     */
     public function columnExists($table, $column)
     {
         $sql = "
             SELECT
-            COUNT(*) AS Total
-        FROM
-            INFORMATION_SCHEMA.COLUMNS
-        WHERE
-            TABLE_NAME = ?
-        AND
-            COLUMN_NAME = ?
-    ";
+                COUNT(*) AS Total
+            FROM
+                INFORMATION_SCHEMA.COLUMNS
+            WHERE
+                TABLE_NAME = ?
+            AND
+                COLUMN_NAME = ?
+        ";
 
         $result = $this->queryEngine->executePrepared(
             $sql,
-        [
-            $table,
-            $column
-        ]
-    );
+            [
+                $table,
+                $column
+            ]
+        );
 
-    return (($result["data"][0]["Total"] ?? 0) > 0);
+        return (
+            ($result["data"][0]["Total"] ?? 0) > 0
+        );
     }
 
     /**
-    * Get Schema
-    */
+     * Get Column Data Type
+     *
+     * Returns the SQL Server DATA_TYPE for
+     * the specified table column.
+     */
+    public function getColumnDataType(
+        $table,
+        $column
+    ) {
+        $sql = "
+            SELECT
+                DATA_TYPE
+            FROM
+                INFORMATION_SCHEMA.COLUMNS
+            WHERE
+                TABLE_NAME = ?
+            AND
+                COLUMN_NAME = ?
+        ";
+
+        $result = $this->queryEngine->executePrepared(
+            $sql,
+            [
+                $table,
+                $column
+            ]
+        );
+
+        return $result["data"][0]["DATA_TYPE"]
+            ?? null;
+    }
+
+    /**
+     * Get Schema
+     */
     public function schema()
     {
         return $this->queryEngine->executeFile(
