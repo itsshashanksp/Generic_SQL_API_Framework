@@ -85,6 +85,131 @@ class QueryRepository
     ];
     }
 
+    /**
+     * Build validated ORDER BY items.
+     *
+     * When ordering a derived pagination source, selected aliases and
+     * unqualified output column names must be used because source table
+     * qualifiers are no longer visible outside the derived table.
+     */
+    private function buildOrderItems(
+        array $orders,
+        array $request,
+        bool $allowSelectedAliases = false,
+        bool $useOutputNames = false
+    ): array {
+        $sqlOrders = [];
+
+        foreach ($orders as $order) {
+            if (
+                !is_array($order)
+                || empty($order['column'])
+                || !is_string($order['column'])
+            ) {
+                throw new Exception("ORDER BY column is required.");
+            }
+
+            $isAlias = false;
+
+            if ($allowSelectedAliases) {
+                foreach ($request['columns'] as $selectedColumn) {
+                    if (
+                        is_array($selectedColumn)
+                        && !empty($selectedColumn['alias'])
+                        && $selectedColumn['alias'] === $order['column']
+                    ) {
+                        $isAlias = true;
+                        break;
+                    }
+                }
+            }
+
+            if ($isAlias) {
+                $columnName = "[" . $order['column'] . "]";
+            } else {
+                $resolved = $this->resolveColumn($order['column']);
+                $table = $resolved['table'] ?? $request['table'];
+
+                if (
+                    !$this->metadataRepository->columnExists(
+                        $table,
+                        $resolved['column']
+                    )
+                ) {
+                    throw new Exception(
+                        "Invalid ORDER BY column: {$order['column']}"
+                    );
+                }
+
+                $columnName = $useOutputNames
+                    ? "[" . $resolved['column'] . "]"
+                    : $order['column'];
+            }
+
+            $direction = strtoupper($order['direction'] ?? "ASC");
+
+            if (!in_array($direction, ["ASC", "DESC"], true)) {
+                throw new Exception(
+                    "Invalid sort direction: {$direction}"
+                );
+            }
+
+            $sqlOrders[] = $columnName . " " . $direction;
+        }
+
+        return $sqlOrders;
+    }
+
+    /**
+     * Resolve the first selected output name for deterministic pagination
+     * when the request does not specify sorting.
+     */
+    private function getDefaultOrderColumn(array $request): string
+    {
+        foreach ($request['columns'] as $column) {
+            if (is_string($column)) {
+                if ($column === "*") {
+                    continue;
+                }
+
+                $resolved = $this->resolveColumn($column);
+                return "[" . $resolved['column'] . "]";
+            }
+
+            if (!empty($column['alias'])) {
+                return "[" . $column['alias'] . "]";
+            }
+
+            if (isset($column['case'])) {
+                return "[" . ($column['case']['alias'] ?? "CaseValue") . "]";
+            }
+
+            if (isset($column['expression'])) {
+                return "[Expression]";
+            }
+
+            if (isset($column['function'])) {
+                return "[" . strtolower($column['function']) . "]";
+            }
+
+            if (!empty($column['column'])) {
+                $resolved = $this->resolveColumn($column['column']);
+                return "[" . $resolved['column'] . "]";
+            }
+        }
+
+        $metadata = $this->metadataRepository->getColumns($request['table']);
+        $firstColumn = $metadata['data'][0]['COLUMN_NAME'] ?? null;
+
+        if (empty($firstColumn)) {
+            throw new Exception(
+                "Unable to determine a column for pagination ordering."
+            );
+        }
+
+        return "[" . $firstColumn . "]";
+    }
+
 /*
  * Build SQL Value
  */
@@ -2998,31 +3123,10 @@ if ($function == "CHOOSE") {
  */
 if ($function == "ROW_NUMBER") {
 
-    $orders = [];
-
-    foreach ($column["orderBy"] as $order) {
-
-        $resolved =
-            $this->resolveColumn(
-                $order["column"]
-            );
-
-        $columnName =
-            !empty($resolved["table"])
-            ? $resolved["table"] . "." . $resolved["column"]
-            : $resolved["column"];
-
-        $direction =
-            strtoupper(
-                $order["direction"] ?? "ASC"
-            );
-
-        $orders[] =
-            $columnName
-            . " "
-            . $direction;
-
-    }
+    $orders = $this->buildOrderItems(
+        $column["orderBy"],
+        $request
+    );
 
     $selectColumns[] =
         "ROW_NUMBER() OVER (ORDER BY "
@@ -3040,31 +3144,10 @@ if ($function == "ROW_NUMBER") {
  */
 if ($function == "RANK") {
 
-    $orders = [];
-
-    foreach ($column["orderBy"] as $order) {
-
-        $resolved =
-            $this->resolveColumn(
-                $order["column"]
-            );
-
-        $columnName =
-            !empty($resolved["table"])
-            ? $resolved["table"] . "." . $resolved["column"]
-            : $resolved["column"];
-
-        $direction =
-            strtoupper(
-                $order["direction"] ?? "ASC"
-            );
-
-        $orders[] =
-            $columnName
-            . " "
-            . $direction;
-
-    }
+    $orders = $this->buildOrderItems(
+        $column["orderBy"],
+        $request
+    );
 
     $selectColumns[] =
         "RANK() OVER (ORDER BY "
@@ -3082,31 +3165,10 @@ if ($function == "RANK") {
  */
 if ($function == "DENSE_RANK") {
 
-    $orders = [];
-
-    foreach ($column["orderBy"] as $order) {
-
-        $resolved =
-            $this->resolveColumn(
-                $order["column"]
-            );
-
-        $columnName =
-            !empty($resolved["table"])
-            ? $resolved["table"] . "." . $resolved["column"]
-            : $resolved["column"];
-
-        $direction =
-            strtoupper(
-                $order["direction"] ?? "ASC"
-            );
-
-        $orders[] =
-            $columnName
-            . " "
-            . $direction;
-
-    }
+    $orders = $this->buildOrderItems(
+        $column["orderBy"],
+        $request
+    );
 
     $selectColumns[] =
         "DENSE_RANK() OVER (ORDER BY "
@@ -3124,31 +3186,10 @@ if ($function == "DENSE_RANK") {
  */
 if ($function == "NTILE") {
 
-    $orders = [];
-
-    foreach ($column["orderBy"] as $order) {
-
-        $resolved =
-            $this->resolveColumn(
-                $order["column"]
-            );
-
-        $columnName =
-            !empty($resolved["table"])
-            ? $resolved["table"] . "." . $resolved["column"]
-            : $resolved["column"];
-
-        $direction =
-            strtoupper(
-                $order["direction"] ?? "ASC"
-            );
-
-        $orders[] =
-            $columnName
-            . " "
-            . $direction;
-
-    }
+    $orders = $this->buildOrderItems(
+        $column["orderBy"],
+        $request
+    );
 
     $selectColumns[] =
         "NTILE("
@@ -3168,31 +3209,10 @@ if ($function == "NTILE") {
  */
 if ($function == "LAG") {
 
-    $orders = [];
-
-    foreach ($column["orderBy"] as $order) {
-
-        $resolved =
-            $this->resolveColumn(
-                $order["column"]
-            );
-
-        $columnName =
-            !empty($resolved["table"])
-            ? $resolved["table"] . "." . $resolved["column"]
-            : $resolved["column"];
-
-        $direction =
-            strtoupper(
-                $order["direction"] ?? "ASC"
-            );
-
-        $orders[] =
-            $columnName
-            . " "
-            . $direction;
-
-    }
+    $orders = $this->buildOrderItems(
+        $column["orderBy"],
+        $request
+    );
 
     $offset =
         (int)($column["offset"] ?? 1);
@@ -3234,31 +3254,10 @@ if ($function == "LAG") {
  */
 if ($function == "LEAD") {
 
-    $orders = [];
-
-    foreach ($column["orderBy"] as $order) {
-
-        $resolved =
-            $this->resolveColumn(
-                $order["column"]
-            );
-
-        $columnName =
-            !empty($resolved["table"])
-            ? $resolved["table"] . "." . $resolved["column"]
-            : $resolved["column"];
-
-        $direction =
-            strtoupper(
-                $order["direction"] ?? "ASC"
-            );
-
-        $orders[] =
-            $columnName
-            . " "
-            . $direction;
-
-    }
+    $orders = $this->buildOrderItems(
+        $column["orderBy"],
+        $request
+    );
 
     $offset =
         (int)($column["offset"] ?? 1);
@@ -3300,31 +3299,10 @@ if ($function == "LEAD") {
  */
 if ($function == "FIRST_VALUE") {
 
-    $orders = [];
-
-    foreach ($column["orderBy"] as $order) {
-
-        $resolved =
-            $this->resolveColumn(
-                $order["column"]
-            );
-
-        $columnName =
-            !empty($resolved["table"])
-            ? $resolved["table"] . "." . $resolved["column"]
-            : $resolved["column"];
-
-        $direction =
-            strtoupper(
-                $order["direction"] ?? "ASC"
-            );
-
-        $orders[] =
-            $columnName
-            . " "
-            . $direction;
-
-    }
+    $orders = $this->buildOrderItems(
+        $column["orderBy"],
+        $request
+    );
 
     $selectColumns[] =
         "FIRST_VALUE("
@@ -3344,31 +3322,10 @@ if ($function == "FIRST_VALUE") {
  */
 if ($function == "LAST_VALUE") {
 
-    $orders = [];
-
-    foreach ($column["orderBy"] as $order) {
-
-        $resolved =
-            $this->resolveColumn(
-                $order["column"]
-            );
-
-        $columnName =
-            !empty($resolved["table"])
-            ? $resolved["table"] . "." . $resolved["column"]
-            : $resolved["column"];
-
-        $direction =
-            strtoupper(
-                $order["direction"] ?? "ASC"
-            );
-
-        $orders[] =
-            $columnName
-            . " "
-            . $direction;
-
-    }
+    $orders = $this->buildOrderItems(
+        $column["orderBy"],
+        $request
+    );
 
     $selectColumns[] =
         "LAST_VALUE("
@@ -3406,31 +3363,10 @@ if ($function == "STRING_AGG") {
 
     if (!empty($column["orderBy"])) {
 
-        $orders = [];
-
-        foreach ($column["orderBy"] as $order) {
-
-            $resolved =
-                $this->resolveColumn(
-                    $order["column"]
-                );
-
-            $columnName =
-                !empty($resolved["table"])
-                ? $resolved["table"] . "." . $resolved["column"]
-                : $resolved["column"];
-
-            $direction =
-                strtoupper(
-                    $order["direction"] ?? "ASC"
-                );
-
-            $orders[] =
-                $columnName
-                . " "
-                . $direction;
-
-        }
+        $orders = $this->buildOrderItems(
+            $column["orderBy"],
+            $request
+        );
 
         $sql .=
             " WITHIN GROUP (ORDER BY "
@@ -3982,84 +3918,48 @@ if (
      /*
      * ORDER BY
      */
+    $sqlWithoutOrderBy = $sql;
+    $paginationOrderBy = null;
+
     if (!$isUnion) {
 
     if (!empty($request['sort'])) {
 
-        $allowedDirections = [
-            "ASC",
-            "DESC"
-        ];
+        $orders = $this->buildOrderItems(
+            $request['sort'],
+            $request,
+            true
+        );
 
-        $orders = [];
-
-        foreach ($request['sort'] as $sort) {
-
-        $isAlias = false;
-
-    foreach ($request['columns'] as $selectedColumn) {
-
-        if (
-            is_array($selectedColumn)
-            && !empty($selectedColumn['alias'])
-            && $selectedColumn['alias'] === $sort['column']
-        ) {
-            $isAlias = true;
-            break;
-        }
-    }
-
-    if (!$isAlias) {
-
-        $resolved = $this->resolveColumn($sort['column']);
-
-        $table = $resolved['table'] ?? $request['table'];
-
-        if (
-            !$this->metadataRepository->columnExists(
-                $table,
-                $resolved['column']
-            )
-        ) {
-            throw new Exception(
-                "Invalid ORDER BY column: {$sort['column']}"
-            );
-        }
-    }
-
-        if (
-            !in_array(
-                strtoupper($sort['direction']),
-                $allowedDirections
-            )
-        ) {
-            throw new Exception(
-                "Invalid sort direction: {$sort['direction']}"
-           );
-        }
-
-        $orderColumn = $sort['column'];
-
-    if ($isAlias) {
-        $orderColumn = "[" . $orderColumn . "]";
-    }
-
-        $orders[] =
-            $orderColumn . " "
-            . strtoupper($sort['direction']);
-    }
+        $paginationOrders = $this->buildOrderItems(
+            $request['sort'],
+            $request,
+            true,
+            true
+        );
 
         $sql .= " ORDER BY " . implode(", ", $orders);
+        $paginationOrderBy =
+            "ORDER BY " . implode(", ", $paginationOrders);
 
     }
     elseif (!empty($request['groupBy'])) {
 
         $sql .= " ORDER BY " . $request['groupBy'][0];
 
+        $resolved = $this->resolveColumn($request['groupBy'][0]);
+        $paginationOrderBy =
+            "ORDER BY [" . $resolved['column'] . "] ASC";
+
     }
     else {
 
-        $sql .= " ORDER BY 1";
+        $defaultOrderColumn =
+            $this->getDefaultOrderColumn($request);
+
+        $sql .= " ORDER BY " . $defaultOrderColumn . " ASC";
+        $paginationOrderBy =
+            "ORDER BY " . $defaultOrderColumn . " ASC";
 
     }
 
@@ -4076,16 +3976,7 @@ if (
     isset($request['page']) &&
     isset($request['pageSize'])
 ) {
-    $countBaseSql = $sql;
-
-    /*
-     * Remove ORDER BY from count query.
-     */
-    $countBaseSql = preg_replace(
-        '/\s+ORDER BY\s+.*$/is',
-        '',
-        $countBaseSql
-    );
+    $countBaseSql = $sqlWithoutOrderBy;
 
     $countSql =
         "SELECT COUNT(*) AS TotalRows
@@ -4158,56 +4049,10 @@ if (
     else {
 
         /*
-         * The query already contains ORDER BY.
-         *
-         * Remove the ORDER BY from the inner query
-         * and use it inside ROW_NUMBER().
+         * Reuse the validated result-column ordering inside ROW_NUMBER().
          */
-        $orderBy = "ORDER BY 1";
-
-        if (!empty($request['sort'])) {
-
-            $orders = [];
-
-            foreach ($request['sort'] as $sort) {
-
-                $column =
-                    $sort['column'];
-
-                $direction =
-                    strtoupper(
-                        $sort['direction'] ?? "ASC"
-                    );
-
-                $orders[] =
-                    $column
-                    . " "
-                    . $direction;
-            }
-
-            if (!empty($orders)) {
-
-                $orderBy =
-                    "ORDER BY "
-                    . implode(", ", $orders);
-            }
-        }
-        elseif (!empty($request['groupBy'])) {
-
-            $orderBy =
-                "ORDER BY "
-                . $request['groupBy'][0];
-        }
-
-        /*
-         * Remove the existing ORDER BY.
-         */
-        $innerSql =
-            preg_replace(
-                '/\s+ORDER BY\s+.*$/is',
-                '',
-                $sql
-            );
+        $orderBy = $paginationOrderBy;
+        $innerSql = $sqlWithoutOrderBy;
 
         $startRow =
             $offset + 1;
