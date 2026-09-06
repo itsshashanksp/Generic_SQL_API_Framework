@@ -37,10 +37,9 @@ Example request:
 
 ```json
 {
-  "controller": "Query",
   "action": "select",
-  "table": "CustomerTable",
-  "columns": [
+  "source": { "table": "CustomerTable" },
+  "fields": [
     "Cust_Name",
     "Phone"
   ]
@@ -306,10 +305,9 @@ Content-Type: application/json
 
 ```json
 {
-  "controller": "Query",
   "action": "select",
-  "table": "CustomerTable",
-  "columns": [
+  "source": { "table": "CustomerTable" },
+  "fields": [
     "Cust_Name",
     "Phone"
   ]
@@ -323,12 +321,20 @@ Example:
 ```json
 {
   "success": true,
+  "message": "Data Loaded Successfully",
   "data": [
     {
       "Cust_Name": "ABC Traders",
       "Phone": "9876543210"
     }
-  ]
+  ],
+  "meta": {
+    "page": null,
+    "pageSize": null,
+    "totalRows": 1,
+    "rowsReturned": 1,
+    "executionTime": 1.2
+  }
 }
 ```
 
@@ -344,20 +350,17 @@ Filtering:
 
 ```json
 {
-  "controller": "Query",
   "action": "select",
-  "table": "CustomerTable",
-  "columns": [
+  "source": { "table": "CustomerTable" },
+  "fields": [
     "Cust_Name",
     "City"
   ],
-  "where": [
+  "filters": [
     {
-      "left": {
-        "column": "City"
-      },
+      "field": "City",
       "operator": "=",
-      "right": "Bangalore"
+      "value": "Bangalore"
     }
   ]
 }

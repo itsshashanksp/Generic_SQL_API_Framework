@@ -37,10 +37,9 @@ Example:
 
 ```json
 {
-  "controller": "Query",
   "action": "select",
-  "table": "CustomerTable",
-  "columns": [
+  "source": { "table": "CustomerTable" },
+  "fields": [
     "Cust_Name",
     "Phone"
   ]

@@ -170,15 +170,16 @@ For example, a request such as:
 
 ```json
 {
-  "table": "CustomerTable",
-  "columns": [
+  "action": "select",
+  "source": { "table": "CustomerTable" },
+  "fields": [
     "Cust_Name",
     "Phone"
   ]
 }
 ```
 
-can be represented internally as:
+produces SQL equivalent to:
 
 ```sql
 SELECT
@@ -187,7 +188,7 @@ SELECT
 FROM CustomerTable;
 ```
 
-The query builder is responsible for constructing the SQL structure while the execution layer is responsible for running it.
+The public request is normalized behind the validation boundary. That private representation is intentionally not part of the API contract. The query builder constructs the SQL structure while the execution layer runs it.
 
 ---
 

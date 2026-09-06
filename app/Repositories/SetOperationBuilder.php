@@ -1,16 +1,17 @@
 <?php
 
-require_once __DIR__ . '/QueryRepository.php';
-
 class SetOperationBuilder
 {
     private QueryRepository $queryRepository;
     private QueryEngine $queryEngine;
 
-public function __construct(QueryRepository $queryRepository)
+public function __construct(
+    QueryRepository $queryRepository,
+    ?QueryEngine $queryEngine = null
+)
 {
     $this->queryRepository = $queryRepository;
-    $this->queryEngine = new QueryEngine();
+    $this->queryEngine = $queryEngine ?? new QueryEngine();
 }
 
     public function build(array $request)

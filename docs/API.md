@@ -1,429 +1,341 @@
-# API Reference
+# Universal JSON API Contract
 
 ## Overview
 
-Generic SQL API Framework provides a JSON-based HTTP API for interacting with the database layer.
+The Generic SQL API accepts query intent as JSON and always returns JSON. Consumers do not send SQL and do not need to know how SQL generation, parameters, ODBC, or pagination are implemented.
 
-A client sends a JSON request to the API, the backend validates and processes the request, executes the required database operation, and returns a JSON response.
+Send a `POST` request with `Content-Type: application/json` to the configured API endpoint.
 
-The API is independent of the frontend application.
-
----
-
-## API Entry Point
-
-The main API entry point is:
-
-```text
-api/index.php
-```
-
-When running the bundled Windows server, the URL will normally be:
-
-```text
-http://localhost:8000/api/index.php
-```
-
-The actual port is selected by `start-windows.bat` and printed when the API starts.
-
-See [Hosting](Hosting.md) for more information.
-
----
-
-## HTTP Method
-
-Query requests use:
-
-```http
-POST
-```
-
----
-
-## Request Headers
-
-JSON requests should include:
-
-```http
-Content-Type: application/json
-```
-
-For authenticated deployments, the appropriate authorization header can also be supplied.
-
----
-
-## Basic Request
-
-A simple request can look like:
+## SELECT request
 
 ```json
 {
-  "controller": "Query",
   "action": "select",
-  "table": "CustomerTable",
-  "columns": [
-    "Cust_Name",
-    "Phone"
-  ]
+  "source": {
+    "table": "CustomerTable",
+    "alias": "C"
+  },
+  "fields": [
+    "C.Cust_Name",
+    {
+      "function": "COUNT",
+      "field": "C.Cust_Name",
+      "alias": "TotalCustomers"
+    }
+  ],
+  "filters": [
+    {
+      "field": "C.City",
+      "operator": "=",
+      "value": "Pune"
+    }
+  ],
+  "joins": [],
+  "groupBy": ["C.Cust_Name"],
+  "having": [
+    {
+      "function": "COUNT",
+      "field": "C.Cust_Name",
+      "operator": ">",
+      "value": 1
+    }
+  ],
+  "sort": [
+    {
+      "field": "C.Cust_Name",
+      "direction": "ASC"
+    }
+  ],
+  "pagination": {
+    "page": 1,
+    "pageSize": 50
+  }
 }
 ```
 
-The request tells the API to:
+Only `action`, `source`, and `fields` are required for SELECT.
 
-- Use the `Query` controller.
-- Execute the `select` action.
-- Query `CustomerTable`.
-- Return `Cust_Name` and `Phone`.
+## Response
 
----
-
-## Request Processing
-
-The API processes the request roughly as follows:
-
-```text
-HTTP POST
-    |
-    v
-api/index.php
-    |
-    v
-Read JSON Body
-    |
-    v
-Resolve Controller
-    |
-    v
-Resolve Action
-    |
-    v
-Validate Request
-    |
-    v
-Build SQL
-    |
-    v
-Execute Query
-    |
-    v
-Create Response
-    |
-    v
-Return JSON
-```
-
----
-
-## Successful Response
-
-A successful request returns a JSON response containing the query result.
-
-Example:
+Every successful operation uses the same envelope:
 
 ```json
 {
   "success": true,
   "message": "Data Loaded Successfully",
-  "data": [
-    {
-      "Cust_Name": "ABC Traders",
-      "Phone": "9876543210"
-    }
+  "data": [],
+  "meta": {
+    "page": 1,
+    "pageSize": 50,
+    "totalRows": 0,
+    "rowsReturned": 0,
+    "executionTime": 12.34
+  }
+}
+```
+
+`page`, `pageSize`, and `executionTime` are `null` when they do not apply. `data` is always an array.
+
+## Error response
+
+```json
+{
+  "success": false,
+  "message": "Invalid request.",
+  "error": {
+    "code": "INVALID_REQUEST",
+    "details": [
+      {
+        "path": "pagination.page",
+        "message": "Must be a positive integer."
+      }
+    ]
+  },
+  "data": []
+}
+```
+
+Public error codes include `INVALID_JSON`, `INVALID_REQUEST`, and `QUERY_ERROR`. Database driver messages, stack traces, credentials, paths, and PHP implementation details are not returned. Detailed failures are written to backend logs.
+
+## Source
+
+SELECT supports a table source and optional alias:
+
+```json
+{ "source": { "table": "Items", "alias": "I" } }
+```
+
+Routine actions use the same source concept:
+
+```json
+{ "action": "procedure", "source": { "procedure": "RunReport" }, "parameters": [1] }
+{ "action": "function", "source": { "function": "dbo.Score" }, "parameters": [1] }
+{ "action": "tableFunction", "source": { "function": "dbo.Rows" }, "parameters": [1] }
+```
+
+Routine parameters are positional and are executed as prepared values.
+
+## Fields and aliases
+
+Plain fields are strings. Aliases and functions use an object:
+
+```json
+{
+  "fields": [
+    "ItemCode",
+    { "field": "Description", "alias": "ItemName" },
+    { "function": "SUM", "field": "Amount", "alias": "TotalAmount" }
   ]
 }
 ```
 
-The exact response structure depends on the current controller and response implementation.
+`"*"` is supported as a plain field. Identifiers and aliases must use letters, numbers, underscores, and optional table qualifiers; identifiers cannot start with a number.
 
----
+Supported functions match the query implementation:
 
-## Error Response
+- Aggregates: `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`, `STRING_AGG`
+- String/conversion: `UPPER`, `LOWER`, `LTRIM`, `RTRIM`, `TRIM`, `LEN`, `COALESCE`, `ISNULL`, `CAST`, `CONVERT`, `NULLIF`, `CONCAT`, `LEFT`, `RIGHT`, `SUBSTRING`, `REPLACE`, `CHARINDEX`, `PATINDEX`, `FORMAT`, `CHOOSE`
+- Date/time: `YEAR`, `MONTH`, `DAY`, `DATEPART`, `DATENAME`, `GETDATE`, `DATEADD`, `DATEDIFF`, `EOMONTH`, `ISDATE`, `DATEFROMPARTS`, `DATETIMEFROMPARTS`, `TIMEFROMPARTS`, `SYSDATETIME`, `CURRENT_TIMESTAMP`, `IIF`
+- Math: `ABS`, `ROUND`, `CEILING`, `FLOOR`, `POWER`, `SQRT`, `EXP`, `LOG`
+- Window: `ROW_NUMBER`, `RANK`, `DENSE_RANK`, `NTILE`, `LAG`, `LEAD`, `FIRST_VALUE`, `LAST_VALUE`
 
-When the request cannot be processed, the API returns an error response.
+Function-specific options use the names supported by the function, such as `datepart`, `number`, `start`, `end`, `datatype`, `style`, `separator`, `offset`, `default`, `buckets`, or `values`. Functions that accept several fields use `fields`.
 
-Example:
-
-```json
-{
-  "success": false,
-  "message": "Invalid JSON Request"
-}
-```
-
-Common request-level errors include:
-
-```text
-Controller Missing
-Action Missing
-Controller Not Found
-Action Not Found
-Invalid JSON Request
-```
-
-Database and query errors are handled by the backend error-handling layer.
-
----
-
-## Invalid JSON
-
-If the request body is not valid JSON, the API should reject the request instead of attempting to build a query from invalid data.
-
-Example:
-
-```text
-{ invalid json
-```
-
-Possible response:
+CASE and arithmetic expressions use the same public field terminology:
 
 ```json
 {
-  "success": false,
-  "message": "Invalid JSON Request"
-}
-```
-
----
-
-## Controller and Action
-
-The request identifies the operation through:
-
-```json
-{
-  "controller": "Query",
-  "action": "select"
-}
-```
-
-The controller determines which backend component handles the request.
-
-The action determines what operation should be performed.
-
-This keeps the API entry point separate from the actual query implementation.
-
----
-
-## Query Request
-
-A query request can contain the database information required to build the SQL operation.
-
-Example:
-
-```json
-{
-  "controller": "Query",
-  "action": "select",
-  "table": "CustomerTable",
-  "columns": [
-    "Cust_Name",
-    "Phone"
-  ],
-  "where": [
+  "fields": [
     {
-      "left": {
-        "column": "Status"
+      "case": {
+        "when": [
+          {
+            "condition": { "field": "Status", "operator": "=", "value": "Active" },
+            "then": "Open"
+          }
+        ],
+        "else": "Closed"
       },
-      "operator": "=",
-      "right": "Active"
+      "alias": "StatusLabel"
+    },
+    {
+      "expression": { "left": "Amount", "operator": "+", "right": 1 },
+      "alias": "AdjustedAmount"
     }
   ]
 }
 ```
 
-The complete request structure is documented in:
+Arithmetic operators are limited to `+`, `-`, `*`, `/`, and `%`. Expression fields, CASE fields, operators, and aliases are validated before SQL generation; literal values are safely encoded by the expression layer.
 
-[JSON Request Reference](JSON-Request-Reference.md)
+## Filters
 
----
-
-## Query Operations
-
-The query layer supports request components such as:
-
-- Column selection
-- Column aliases
-- Filtering
-- JOINs
-- GROUP BY
-- HAVING
-- ORDER BY
-- Pagination
-- SQL functions
-- Expressions
-
-Examples are available in:
-
-[Query Examples](Query-Examples.md)
-
----
-
-## CORS
-
-CORS is configured by the API entry point.
-
-The allowed origins are maintained by the application configuration.
-
-Example:
-
-```php
-$allowed_origins = [
-    "http://127.0.0.1:5173",
-    "http://localhost:3000"
-];
+```json
+{
+  "filters": [
+    { "field": "Status", "operator": "=", "value": "Active" },
+    { "field": "Id", "operator": "IN", "value": [1, 2, 3] },
+    { "field": "Created", "operator": "BETWEEN", "value": ["2026-01-01", "2026-01-31"] },
+    { "field": "DeletedAt", "operator": "IS NULL" }
+  ],
+  "filterLogic": "AND"
+}
 ```
 
-For a production deployment, only trusted frontend origins should be allowed.
+Supported operators are `=`, `!=`, `<>`, `>`, `<`, `>=`, `<=`, `LIKE`, `NOT LIKE`, `IN`, `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `IS NULL`, `IS NOT NULL`, `EXISTS`, and `NOT EXISTS`. `filterLogic` is `AND` or `OR` and defaults to `AND`. Values continue through prepared parameter handling.
 
-Avoid using a wildcard origin unless the deployment specifically requires it.
+## Subqueries and EXISTS
 
----
+Use `query` for a nested SELECT:
 
-## OPTIONS Requests
-
-Browsers can send an `OPTIONS` request before a cross-origin request.
-
-The API handles this as a CORS preflight request.
-
-Conceptually:
-
-```text
-Browser
-   |
-   | OPTIONS
-   v
-API
-   |
-   | CORS response
-   v
-Browser
-   |
-   | POST JSON
-   v
-API
+```json
+{
+  "filters": [
+    {
+      "field": "GroupId",
+      "operator": "IN",
+      "query": {
+        "source": { "table": "Groups" },
+        "fields": ["Id"],
+        "filters": [{ "field": "Active", "operator": "=", "value": 1 }]
+      }
+    }
+  ]
+}
 ```
 
----
+For `EXISTS` and `NOT EXISTS`, omit `field` and provide `query`.
 
-## Testing With curl
+## Joins
 
-### Windows
+The current implementation supports one equality condition per `INNER`, `LEFT`, or `RIGHT` join:
 
-```bat
-curl -X POST http://localhost:8000/api/index.php ^
-  -H "Content-Type: application/json" ^
-  -d "{\"controller\":\"Query\",\"action\":\"select\",\"table\":\"CustomerTable\",\"columns\":[\"Cust_Name\"]}"
+```json
+{
+  "joins": [
+    {
+      "type": "LEFT",
+      "source": { "table": "Orders", "alias": "O" },
+      "on": {
+        "left": "C.Id",
+        "operator": "=",
+        "right": "O.CustomerId"
+      }
+    }
+  ]
+}
 ```
 
-### Linux / macOS
+Other join operators and multiple conditions per join are not currently supported.
 
-```bash
-curl -X POST http://localhost:8000/api/index.php \
-  -H "Content-Type: application/json" \
-  -d '{"controller":"Query","action":"select","table":"CustomerTable","columns":["Cust_Name"]}'
+## Grouping and HAVING
+
+`groupBy` contains logical field names. HAVING supports aggregate functions and comparison operators:
+
+```json
+{
+  "groupBy": ["Category"],
+  "having": [
+    { "function": "SUM", "field": "Amount", "operator": ">", "value": 1000 }
+  ]
+}
 ```
 
----
+## Sorting
 
-## Testing With PowerShell
-
-The API can also be tested from PowerShell:
-
-```powershell
-$body = @{
-    controller = "Query"
-    action     = "select"
-    table      = "CustomerTable"
-    columns    = @("Cust_Name")
-} | ConvertTo-Json
-
-Invoke-RestMethod `
-    -Uri "http://localhost:8000/api/index.php" `
-    -Method POST `
-    -ContentType "application/json" `
-    -Body $body
+```json
+{
+  "sort": [
+    { "field": "ItemCode", "direction": "ASC" },
+    { "field": "Description", "direction": "DESC" }
+  ]
+}
 ```
 
----
+Sort entries always identify logical fields or selected aliases. Numeric SQL positions such as `1` are rejected by the public contract. The server validates and resolves fields for both normal and window-based pagination ordering.
 
-## Database Connection
+## Pagination
 
-Database credentials are not part of normal query requests.
-
-The API reads database configuration from:
-
-```text
-database/config/database.json
+```json
+{ "pagination": { "page": 2, "pageSize": 50 } }
 ```
 
-The database connection is handled by the database layer.
+Both values must be positive integers. SQL Server compatibility detection and the choice between `OFFSET/FETCH` and `ROW_NUMBER` are private implementation details.
 
-See [Database Configuration](Database-Configuration.md).
+## DISTINCT and row limits
 
----
-
-## Authentication
-
-Authentication is not currently described as part of the core query request format.
-
-Authentication and authorization are planned for a future version.
-
-See [Roadmap](Roadmap.md).
-
----
-
-## API Port
-
-When using the Windows startup script, the API starts from port `8000`.
-
-If the port is already in use, the script checks the next available port up to `8100`.
-
-For example:
-
-```text
-Port 8000 -> busy
-Port 8001 -> busy
-Port 8002 -> available
-
-API:
-http://localhost:8002
+```json
+{
+  "distinct": true,
+  "limit": 100
+}
 ```
 
----
+`limit` maps to the supported SQL Server TOP behavior and must be a positive integer.
 
-## API Directory
+## Window functions
 
-The API entry point is located under:
+Window ordering uses logical public fields:
 
-```text
-api/
-└── index.php
+```json
+{
+  "fields": [
+    "ItemCode",
+    {
+      "function": "ROW_NUMBER",
+      "alias": "RowNumber",
+      "sort": [{ "field": "ItemCode", "direction": "ASC" }]
+    }
+  ]
+}
 ```
 
-The PHP built-in server serves this directory when started by the Windows launcher.
+## CTEs
 
----
+A non-recursive CTE uses `with.query`:
 
-## Production Notes
+```json
+{
+  "action": "select",
+  "source": { "table": "ActiveItems" },
+  "fields": ["ItemCode"],
+  "with": {
+    "name": "ActiveItems",
+    "query": {
+      "source": { "table": "Items" },
+      "fields": ["ItemCode"],
+      "filters": [{ "field": "Active", "operator": "=", "value": 1 }]
+    }
+  }
+}
+```
 
-For production deployments:
+Recursive CTEs use `with.name`, `with.anchor`, and `with.recursive`, where both branches are SELECT request bodies.
 
-- Use HTTPS.
-- Restrict CORS origins.
-- Protect database credentials.
-- Do not expose SQL Server directly to the Internet.
-- Use appropriate authentication before exposing the API publicly.
-- Keep PHP and ODBC components updated.
-- Monitor application logs.
-- Maintain database backups.
+## UNION and UNION ALL
 
----
+```json
+{
+  "action": "unionAll",
+  "queries": [
+    { "source": { "table": "CurrentItems" }, "fields": ["ItemCode"] },
+    { "source": { "table": "ArchivedItems" }, "fields": ["ItemCode"] }
+  ]
+}
+```
 
-## Related Documentation
+Use `action: "union"` for duplicate-removing UNION. Each query uses the SELECT body without a nested `action` property.
 
-- [Introduction](Introduction.md)
-- [Architecture](Architecture.md)
-- [JSON Request Reference](JSON-Request-Reference.md)
-- [Query Examples](Query-Examples.md)
-- [Database Configuration](Database-Configuration.md)
-- [Hosting](Hosting.md)
+## Metadata actions
+
+Existing metadata operations use these public actions:
+
+- `metadata.tables`
+- `metadata.columns` with `source.table`
+- `metadata.views`
+- `metadata.procedures`
+- `metadata.schema`
+
+## Validation and security
+
+Requests are validated before normalization and SQL construction. Public terminology is translated to an internal query model that is not part of this contract. Source names, fields, aliases, sort fields, functions, operators, joins, and pagination are validated. Filter and HAVING values remain parameterized. Raw SQL is not accepted anywhere in the public contract.

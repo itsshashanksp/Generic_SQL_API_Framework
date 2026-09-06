@@ -10,7 +10,7 @@ set "API=%ROOT%api"
 set "DB_CHECK=%ROOT%scripts\check-database.php"
 
 echo ========================================
-echo          Generic SQL API
+echo          Generic SQL API Framework
 echo ========================================
 echo.
 
