@@ -1,129 +1,58 @@
 # Generic SQL API Framework
 
-A reusable PHP backend framework for building database APIs using structured JSON requests.
+Generic SQL API Framework is a backend-only PHP API that turns a validated JSON query description into SQL Server SQL, executes it through ODBC, and returns a stable JSON envelope. It is intended for clients that need reusable read/query endpoints without adding a controller for every report query. Clients never submit raw SQL.
 
-The framework handles request processing, validation, SQL query construction, database execution, and JSON responses.
+The existing PHP implementation is the source of truth. Microsoft SQL Server through ODBC is the only working provider. Driver stubs for MySQL, PostgreSQL, Oracle, and SQLite are not selectable by `DriverFactory` and are not supported providers.
 
-The current database implementation is focused on **Microsoft SQL Server through ODBC**.
+## Public API
 
----
-
-## What It Does
-
-Instead of creating separate backend code for every database query, the API accepts a structured JSON request and builds the required query through the backend query layer.
-
-Basic flow:
-
-```text
-Client
-  |
-  | JSON Request
-  v
-Generic SQL API
-  |
-  +-- Request Validation
-  |
-  +-- Query Builder
-  |
-  +-- Query Execution
-  |
-  +-- Database Layer
-  |
-  v
-SQL Server
-```
-
-Example request:
+Send JSON to `api/index.php` (normally with `POST` and `Content-Type: application/json`):
 
 ```json
 {
   "action": "select",
-  "source": { "table": "CustomerTable" },
+  "source": { "table": "Items", "alias": "I" },
   "fields": [
-    "Cust_Name",
-    "Phone"
-  ]
+    "I.ItemCode",
+    { "field": "I.Description", "alias": "ItemName" }
+  ],
+  "filters": [
+    { "field": "I.Active", "operator": "=", "value": 1 }
+  ],
+  "sort": [{ "field": "I.ItemCode", "direction": "ASC" }],
+  "pagination": { "page": 1, "pageSize": 50 }
 }
 ```
 
-The frontend or client only needs to send the request. The backend handles the SQL generation and execution.
+The public actions are `select`, `union`, `unionAll`, `procedure`, `function`, `tableFunction`, and the five metadata actions documented in [API.md](docs/API.md). Public property names such as `source`, `fields`, `field`, `filters`, and `pagination` are normalized to a private builder representation. Internal names such as `table`, `columns`, `column`, `where`, `top`, `page`, and `pageSize` are not accepted as public JSON.
 
----
+Current query support includes SELECT, DISTINCT, SQL Server TOP through `limit`, aliases, CASE and arithmetic expressions, an allow-list of SQL functions, prepared WHERE values, INNER/LEFT/RIGHT equality joins, GROUP BY, aggregate HAVING, multi-field sorting, pagination, eight window functions, subqueries in selected filters, one CTE (including the recursive form), UNION/UNION ALL, routines, and database metadata reads. See the definitive [JSON request reference](docs/JSON-Request-Reference.md) and [capability matrix](docs/API.md#capability-matrix) for exact boundaries.
 
-## Current Features
+## Architecture
 
-### API
-
-- JSON-based requests
-- Controller/action handling
-- JSON responses
-- Request validation
-- CORS handling
-- Error handling
-
-### Query Engine
-
-- SELECT queries
-- WHERE conditions
-- JOINs
-- GROUP BY
-- HAVING
-- ORDER BY
-- Pagination
-- Column aliases
-- Table aliases
-- SQL expressions
-- SQL functions
-- Prepared query execution
-- Multiple-result execution
-- SQL file execution
-- Query execution statistics
-
-### Database
-
-- Microsoft SQL Server
-- ODBC connectivity
-- SQL Server authentication
-- Windows authentication
-- Automatic ODBC driver selection
-- Specific ODBC driver selection
-- Database metadata access
-- Database connection validation
-
-### Runtime
-
-Windows includes a prebuilt PHP runtime.
+The actual HTTP flow is:
 
 ```text
-runtime/
-└── windows/
-    └── php/
+Client -> api/index.php -> QueryRequestValidator -> QueryRequestNormalizer
+       -> Controller -> Service -> QueryRepository
+       -> specialized query builders -> QueryEngine -> Database/ODBC -> SQL Server
 ```
 
-Therefore, a Windows deployment does not require a separate PHP installation when using the bundled runtime.
+Results return through the same layers and `Response` creates the public envelope. `QueryRepository` is an execution/orchestration facade; SQL construction remains split across `SelectBuilder`, `WhereBuilder`, `JoinBuilder`, `GroupByBuilder`, `HavingBuilder`, `OrderByBuilder`, `PaginationBuilder`, `WindowFunctionBuilder`, `SqlExpressionBuilder`, `RoutineBuilder`, and `SetOperationBuilder`.
 
----
+See [Architecture.md](docs/Architecture.md) for responsibilities and request/response flow.
 
-## Windows Quick Start
+## Configure SQL Server
 
-### 1. Configure the Database
-
-Create:
-
-```text
-database/config/database.json
-```
-
-Example:
+Create the ignored local file `database/config/database.json`:
 
 ```json
 {
   "provider": "sqlserver",
   "driver": "auto",
   "server": "localhost\\SQLEXPRESS",
-  "database": "TestDB",
+  "database": "ApplicationDb",
   "authentication": "windows",
-  "port": 1433,
   "options": {
     "encrypt": false,
     "trustServerCertificate": true
@@ -131,457 +60,65 @@ Example:
 }
 ```
 
-See:
+For SQL authentication use `"authentication": "sql"` plus `username` and `password`. The host must have a compatible SQL Server ODBC driver. Details and actual defaults are in [Database-Configuration.md](docs/Database-Configuration.md).
 
-[Database Configuration](docs/Database-Configuration.md)
+## Start the backend
 
----
-
-### 2. Start the API
-
-Run from the project root:
+On Windows, run:
 
 ```bat
 start-windows.bat
 ```
 
-The startup script automatically checks:
+The repository includes `runtime/windows/php/`, so XAMPP or a separate PHP installation is not required. The launcher validates PHP, `php.ini`, PHP ODBC, the database connection, and the API directory; creates OPcache/log directories; chooses the first free port from 8000 through 8100; then starts PHP's development server. A working database is required to start through this launcher because it deliberately runs `scripts/check-database.php` first.
 
-```text
-PHP Runtime
-PHP Configuration
-Runtime Directories
-PHP ODBC
-Database Configuration
-Database Connection
-API Directory
-Available Port
+With another PHP installation, after configuring the database:
+
+```bash
+php -S 127.0.0.1:8000 -t api
 ```
 
-Required runtime directories are also created automatically.
+The built-in server is suitable for local use, not production. See [Hosting.md](docs/Hosting.md).
 
----
+## Test without a database
 
-### 3. API Starts
+Normal backend tests use fakes for query execution and metadata, so they require no SQL Server, ODBC extension, credentials, running server, or `database/config/database.json`:
 
-The default port starts from:
-
-```text
-8000
+```bash
+php tests/run.php
 ```
 
-If the port is already being used, the script automatically searches for another available port up to:
+Syntax-check the maintained backend source with:
 
-```text
-8100
+```bash
+find api app config core database scripts tests -type f -name '*.php' -exec php -l {} \;
 ```
 
-The selected API URL is printed in the console.
+`.github/workflows/backend-tests.yml` runs both checks on every push and pull request using PHP 8.2. There is no mandatory live-database integration workflow.
 
-Example:
+## Responses
 
-```text
-========================================
-              API Ready
-========================================
+Successful operations return `success`, `message`, `data`, and `meta`. Metadata includes `page`, `pageSize`, `totalRows`, `rowsReturned`, and `executionTime`; there is no query-result column-description metadata. Errors return `success: false`, an `error` object, and an empty `data` array. See [API.md](docs/API.md).
 
-API: http://localhost:8000/index.php
-```
+## Project status
 
----
+- v1.0.0 — Core API and advanced SQL: released
+- v1.1.0 — Windows runtime and deployment: current
+- v1.2.0 onward — CRUD, transactions, richer metadata, security, API improvements, performance, and additional providers: planned
 
-## Windows Runtime
-
-The bundled runtime is intended to make Windows deployment simpler.
-
-You do **not** need to install:
-
-```text
-PHP
-XAMPP
-WAMP
-```
-
-just to run the API with the bundled runtime.
-
-The project can still be hosted using an existing PHP environment such as:
-
-```text
-Apache
-IIS
-Nginx
-XAMPP
-```
-
-when required by the deployment.
-
-The bundled runtime is currently provided for Windows.
-
-Linux runtime packaging is planned for a future release.
-
-See:
-
-[Hosting](docs/Hosting.md)
-
----
-
-## Database Connectivity
-
-The current database connection flow is:
-
-```text
-Generic SQL API
-      |
-      v
-PHP ODBC Extension
-      |
-      v
-SQL Server ODBC Driver
-      |
-      v
-Microsoft SQL Server
-```
-
-The API does not depend on only one fixed SQL Server ODBC driver version.
-
-The configuration can use:
-
-```json
-"driver": "auto"
-```
-
-or specify an installed driver explicitly.
-
-For example:
-
-```json
-"driver": "ODBC Driver 18 for SQL Server"
-```
-
-The required ODBC driver must be installed on the host system.
-
-See:
-
-[Database Configuration](docs/Database-Configuration.md)
-
----
-
-## Database Startup Check
-
-The Windows launcher verifies the database connection before starting the API.
-
-Successful:
-
-```text
-Checking database connection...
-
-[OK] Database Connected
-```
-
-Failed:
-
-```text
-[FAILED] Database connection failed.
-```
-
-If the connection fails, the API startup is aborted.
-
-The database configuration file is:
-
-```text
-database/config/database.json
-```
-
----
-
-## API Example
-
-A basic request:
-
-```http
-POST /api/index.php
-Content-Type: application/json
-```
-
-```json
-{
-  "action": "select",
-  "source": { "table": "CustomerTable" },
-  "fields": [
-    "Cust_Name",
-    "Phone"
-  ]
-}
-```
-
-The API returns JSON containing the result.
-
-Example:
-
-```json
-{
-  "success": true,
-  "message": "Data Loaded Successfully",
-  "data": [
-    {
-      "Cust_Name": "ABC Traders",
-      "Phone": "9876543210"
-    }
-  ],
-  "meta": {
-    "page": null,
-    "pageSize": null,
-    "totalRows": 1,
-    "rowsReturned": 1,
-    "executionTime": 1.2
-  }
-}
-```
-
-See:
-
-[API Reference](docs/API.md)
-
----
-
-## Query Example
-
-Filtering:
-
-```json
-{
-  "action": "select",
-  "source": { "table": "CustomerTable" },
-  "fields": [
-    "Cust_Name",
-    "City"
-  ],
-  "filters": [
-    {
-      "field": "City",
-      "operator": "=",
-      "value": "Bangalore"
-    }
-  ]
-}
-```
-
-For more examples:
-
-[Query Examples](docs/Query-Examples.md)
-
-For the complete JSON request structure:
-
-[JSON Request Reference](docs/JSON-Request-Reference.md)
-
----
-
-## Project Structure
-
-The main project areas are:
-
-```text
-Generic SQL API
-│
-├── api/
-│   └── index.php
-│
-├── database/
-│   └── config/
-│       └── database.json
-│
-├── docs/
-│
-├── runtime/
-│   └── windows/
-│       └── php/
-│
-├── scripts/
-│
-├── logs/
-│
-├── start-windows.bat
-│
-├── CONTRIBUTING.md
-├── CHANGELOG.md
-└── README.md
-```
-
-Generated and local files such as database credentials, logs, and runtime cache should not be committed.
-
----
-
-## Architecture
-
-The backend is separated into layers:
-
-```text
-HTTP/API
-   |
-   v
-Controller
-   |
-   v
-Validation
-   |
-   v
-Query Repository
-   |
-   v
-Query Builder
-   |
-   v
-Query Engine
-   |
-   v
-Database Layer
-   |
-   v
-ODBC
-   |
-   v
-SQL Server
-```
-
-More details:
-
-[Architecture](docs/Architecture.md)
-
----
+The roadmap is backend-only. See [Roadmap.md](docs/Roadmap.md) and [CHANGELOG.md](CHANGELOG.md).
 
 ## Documentation
 
-| Document | Purpose |
-|---|---|
-| [Introduction](docs/Introduction.md) | Project overview and scope |
-| [Architecture](docs/Architecture.md) | Backend structure and internal flow |
-| [API](docs/API.md) | HTTP API usage |
-| [JSON Request Reference](docs/JSON-Request-Reference.md) | JSON request fields and structure |
-| [Query Examples](docs/Query-Examples.md) | Practical API requests |
-| [Database Configuration](docs/Database-Configuration.md) | SQL Server and ODBC configuration |
-| [Hosting](docs/Hosting.md) | Running and deploying the backend |
-| [Roadmap](docs/Roadmap.md) | Planned backend features |
-| [Contributing](CONTRIBUTING.md) | Development and contribution guidelines |
-| [Changelog](CHANGELOG.md) | Version history |
+- [Introduction](docs/Introduction.md)
+- [Architecture](docs/Architecture.md)
+- [HTTP API](docs/API.md)
+- [JSON request reference](docs/JSON-Request-Reference.md)
+- [Query examples](docs/Query-Examples.md)
+- [Database configuration](docs/Database-Configuration.md)
+- [Hosting](docs/Hosting.md)
+- [Roadmap](docs/Roadmap.md)
+- [Contributing](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
 
----
-
-## Security
-
-Do not commit production database credentials.
-
-Keep:
-
-```text
-database/config/database.json
-```
-
-out of Git when it contains real credentials.
-
-For production deployments:
-
-- Use HTTPS.
-- Restrict CORS origins.
-- Protect database credentials.
-- Do not expose SQL Server directly to the Internet.
-- Use appropriate authentication.
-- Keep PHP and ODBC components updated.
-- Monitor application logs.
-- Maintain database backups.
-
----
-
-## Project Scope
-
-This repository is focused on the **backend database API**.
-
-### Included
-
-- Backend API
-- JSON request processing
-- SQL query generation
-- Query execution
-- Database connectivity
-- Database validation
-- Database metadata
-- ODBC integration
-- Logging
-- Query statistics
-- Runtime/deployment support
-
-### Not Included
-
-This repository does not provide:
-
-- Frontend UI
-- Dashboards
-- Charts
-- Reporting screens
-- Frontend routing
-- Frontend state management
-- Website design
-
-These are handled by applications that consume the API.
-
----
-
-## Roadmap
-
-Planned backend work includes:
-
-```text
-CRUD
-  |
-  v
-Transactions
-  |
-  v
-Advanced SQL
-  |
-  v
-Database Metadata
-  |
-  v
-API Security
-  |
-  v
-Performance
-  |
-  v
-Additional Database Providers
-  |
-  v
-Linux / Deployment Improvements
-```
-
-See:
-
-[Roadmap](docs/Roadmap.md)
-
----
-
-## Contributing
-
-Contributions are welcome.
-
-Before making changes, read:
-
-[Contributing Guide](docs/CONTRIBUTING.md)
-
-Keep backend layers separated and update the relevant documentation when changing the API contract.
-
----
-
-## Changelog
-
-See:
-
-[CHANGELOG.md](docs/CHANGELOG.md)
-
----
-
-## License
-
-This project is licensed under the MIT License.
-
-See the [LICENSE](LICENSE) file for details.
+Do not commit database credentials or logs. The project scope is the backend API; dashboards, charts, report widgets, and other frontend features belong to consumers, not this repository's backend roadmap.

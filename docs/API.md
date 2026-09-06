@@ -1,82 +1,80 @@
-# Universal JSON API Contract
+# HTTP API
 
-## Overview
+## Endpoint and transport
 
-The Generic SQL API accepts query intent as JSON and always returns JSON. Consumers do not send SQL and do not need to know how SQL generation, parameters, ODBC, or pagination are implemented.
+The entry point is `api/index.php`. Use:
 
-Send a `POST` request with `Content-Type: application/json` to the configured API endpoint.
+```http
+POST /api/index.php
+Content-Type: application/json
+```
 
-## SELECT request
+The script advertises `GET, POST, OPTIONS` for CORS and returns 200 immediately for `OPTIONS`. It does not otherwise enforce the HTTP method, but `POST` is the supported client convention because every operation requires a JSON request body. Allowed browser origins are currently hard-coded to `http://127.0.0.1:5173` and `http://localhost:5173`.
+
+## Request flow and actions
+
+The body must be one JSON object. The required `action` is one of:
+
+- `select`
+- `union`, `unionAll`
+- `procedure`, `function`, `tableFunction`
+- `metadata.tables`, `metadata.columns`, `metadata.views`, `metadata.procedures`, `metadata.schema`
+
+For SELECT, `source.table` and a non-empty `fields` array are also required. Refer to [JSON-Request-Reference.md](JSON-Request-Reference.md) for every field and default.
 
 ```json
 {
   "action": "select",
-  "source": {
-    "table": "CustomerTable",
-    "alias": "C"
-  },
-  "fields": [
-    "C.Cust_Name",
-    {
-      "function": "COUNT",
-      "field": "C.Cust_Name",
-      "alias": "TotalCustomers"
-    }
-  ],
-  "filters": [
-    {
-      "field": "C.City",
-      "operator": "=",
-      "value": "Pune"
-    }
-  ],
-  "joins": [],
-  "groupBy": ["C.Cust_Name"],
-  "having": [
-    {
-      "function": "COUNT",
-      "field": "C.Cust_Name",
-      "operator": ">",
-      "value": 1
-    }
-  ],
-  "sort": [
-    {
-      "field": "C.Cust_Name",
-      "direction": "ASC"
-    }
-  ],
-  "pagination": {
-    "page": 1,
-    "pageSize": 50
-  }
+  "source": { "table": "Items", "alias": "I" },
+  "fields": ["I.ItemCode", { "field": "I.Description", "alias": "ItemName" }],
+  "sort": [{ "field": "I.ItemCode", "direction": "ASC" }],
+  "pagination": { "page": 1, "pageSize": 25 }
 }
 ```
 
-Only `action`, `source`, and `fields` are required for SELECT.
+Unknown properties are rejected. Raw SQL, arbitrary SELECT parameters, client-supplied controller names, and internal query-builder keys are not part of the public contract.
 
-## Response
+## Success response
 
-Every successful operation uses the same envelope:
+All controllers use the same envelope:
 
 ```json
 {
   "success": true,
   "message": "Data Loaded Successfully",
-  "data": [],
+  "data": [{ "ItemCode": "A001", "ItemName": "Example" }],
   "meta": {
     "page": 1,
-    "pageSize": 50,
-    "totalRows": 0,
-    "rowsReturned": 0,
-    "executionTime": 12.34
+    "pageSize": 25,
+    "totalRows": 37,
+    "rowsReturned": 1,
+    "executionTime": 2.41
   }
 }
 ```
 
-`page`, `pageSize`, and `executionTime` are `null` when they do not apply. `data` is always an array.
+- `data` is always an array.
+- `page` and `pageSize` copy the public pagination request, or are `null`.
+- For paginated SELECT, `totalRows` is obtained with a separate count query. Otherwise it equals `rowsReturned`.
+- `executionTime` is elapsed database execution time in milliseconds, rounded to two decimals, or `null` if the underlying result did not supply it.
+- `rowsReturned` counts rows collected across the executed result.
+- Query results do not include a separate column-schema/column-metadata property. The `metadata.columns` action returns column rows as ordinary `data`.
+- SELECT/UNION messages are `Data Loaded Successfully`; routine actions use their corresponding executed-successfully message; metadata actions use their loaded-successfully message.
 
-## Error response
+## Error responses
+
+Malformed JSON is HTTP 400:
+
+```json
+{
+  "success": false,
+  "message": "Invalid JSON request.",
+  "error": { "code": "INVALID_JSON", "details": [] },
+  "data": []
+}
+```
+
+Contract validation failures are HTTP 400 and include one or more path/message details:
 
 ```json
 {
@@ -85,257 +83,80 @@ Every successful operation uses the same envelope:
   "error": {
     "code": "INVALID_REQUEST",
     "details": [
-      {
-        "path": "pagination.page",
-        "message": "Must be a positive integer."
-      }
+      { "path": "pagination.page", "message": "Must be a positive integer." }
     ]
   },
   "data": []
 }
 ```
 
-Public error codes include `INVALID_JSON`, `INVALID_REQUEST`, and `QUERY_ERROR`. Database driver messages, stack traces, credentials, paths, and PHP implementation details are not returned. Detailed failures are written to backend logs.
-
-## Source
-
-SELECT supports a table source and optional alias:
-
-```json
-{ "source": { "table": "Items", "alias": "I" } }
-```
-
-Routine actions use the same source concept:
-
-```json
-{ "action": "procedure", "source": { "procedure": "RunReport" }, "parameters": [1] }
-{ "action": "function", "source": { "function": "dbo.Score" }, "parameters": [1] }
-{ "action": "tableFunction", "source": { "function": "dbo.Rows" }, "parameters": [1] }
-```
-
-Routine parameters are positional and are executed as prepared values.
-
-## Fields and aliases
-
-Plain fields are strings. Aliases and functions use an object:
+Unhandled builder, metadata, connection, or execution failures are HTTP 500:
 
 ```json
 {
-  "fields": [
-    "ItemCode",
-    { "field": "Description", "alias": "ItemName" },
-    { "function": "SUM", "field": "Amount", "alias": "TotalAmount" }
-  ]
+  "success": false,
+  "message": "Query execution failed.",
+  "error": { "code": "QUERY_ERROR", "details": [] },
+  "data": []
 }
 ```
 
-`"*"` is supported as a plain field. Identifiers and aliases must use letters, numbers, underscores, and optional table qualifiers; identifiers cannot start with a number.
+The response does not expose the underlying exception. The exception handler writes details to the dated file in `logs/`.
 
-Supported functions match the query implementation:
+## Pagination and ordering
 
-- Aggregates: `COUNT`, `SUM`, `AVG`, `MIN`, `MAX`, `STRING_AGG`
-- String/conversion: `UPPER`, `LOWER`, `LTRIM`, `RTRIM`, `TRIM`, `LEN`, `COALESCE`, `ISNULL`, `CAST`, `CONVERT`, `NULLIF`, `CONCAT`, `LEFT`, `RIGHT`, `SUBSTRING`, `REPLACE`, `CHARINDEX`, `PATINDEX`, `FORMAT`, `CHOOSE`
-- Date/time: `YEAR`, `MONTH`, `DAY`, `DATEPART`, `DATENAME`, `GETDATE`, `DATEADD`, `DATEDIFF`, `EOMONTH`, `ISDATE`, `DATEFROMPARTS`, `DATETIMEFROMPARTS`, `TIMEFROMPARTS`, `SYSDATETIME`, `CURRENT_TIMESTAMP`, `IIF`
-- Math: `ABS`, `ROUND`, `CEILING`, `FLOOR`, `POWER`, `SQRT`, `EXP`, `LOG`
-- Window: `ROW_NUMBER`, `RANK`, `DENSE_RANK`, `NTILE`, `LAG`, `LEAD`, `FIRST_VALUE`, `LAST_VALUE`
+`pagination` requires positive integer `page` and `pageSize`. SQL Server compatibility level 110+ uses `OFFSET/FETCH`; older compatibility levels use a `ROW_NUMBER()` wrapper. The backend runs a count query before the page query.
 
-Function-specific options use the names supported by the function, such as `datepart`, `number`, `start`, `end`, `datatype`, `style`, `separator`, `offset`, `default`, `buckets`, or `values`. Functions that accept several fields use `fields`.
+Public sorting uses validated logical fields or a selected alias and `ASC`/`DESC`; numeric positions such as `"1"` are rejected. Window functions likewise require a logical sort field. This prevents invalid SQL Server output such as `ROW_NUMBER() OVER (ORDER BY 1)`. If top-level `sort` is omitted, the builder supplies an order based on the first usable projection (or table metadata when needed); grouped requests default to the first group field.
 
-CASE and arithmetic expressions use the same public field terminology:
+## Capability matrix
 
-```json
-{
-  "fields": [
-    {
-      "case": {
-        "when": [
-          {
-            "condition": { "field": "Status", "operator": "=", "value": "Active" },
-            "then": "Open"
-          }
-        ],
-        "else": "Closed"
-      },
-      "alias": "StatusLabel"
-    },
-    {
-      "expression": { "left": "Amount", "operator": "+", "right": 1 },
-      "alias": "AdjustedAmount"
-    }
-  ]
-}
-```
+`Supported` means the feature passes the public validator/normalizer and has a current builder/execution path. SQL Server capabilities that are not exposed remain unsupported by this API.
 
-Arithmetic operators are limited to `+`, `-`, `*`, `/`, and `%`. Expression fields, CASE fields, operators, and aliases are validated before SQL generation; literal values are safely encoded by the expression layer.
+| Feature | Backend support | Public JSON representation | Validation | Notes |
+|---|---|---|---|---|
+| SELECT | Supported | `action: "select"`, `source`, `fields` | Table/field identifier shape, then live metadata | Read-only query action |
+| DISTINCT | Supported | `distinct: true` | Boolean | Default `false` |
+| TOP | Supported | `limit: 10` | Positive integer | Normalizes to internal `top` |
+| Column/table aliases | Supported | field `alias`; `source.alias` | Identifier | Selected aliases may be used by top-level sort |
+| CASE | Supported | field object with `case.when`, optional `else`, `alias` | Comparison conditions only | CASE values are rendered as controlled literals |
+| Arithmetic expressions | Supported | `expression: {left, operator, right}` | Operands are numbers/identifiers; `+ - * / %` | One binary expression level in public shape |
+| COUNT/SUM/AVG/MIN/MAX | Supported | field `function`, `field`, optional `alias` | Function allow-list and metadata | `COUNT` accepts `*` |
+| STRING_AGG | Supported | plus `separator`, optional `sort` | Aggregate/function options checked by builder | SQL Server syntax |
+| String functions | Supported | function field object | Allow-list | UPPER, LOWER, LTRIM, RTRIM, TRIM, LEN, CONCAT, LEFT, RIGHT, SUBSTRING, REPLACE, CHARINDEX, PATINDEX, FORMAT |
+| Date/time functions | Supported, except TIMEFROMPARTS | function field object | Allow-list plus builder-required options | YEAR, MONTH, DAY convert integer `YYYYMMDD` values using style 112; see JSON reference |
+| Math functions | Supported | function field object | Allow-list | ABS, ROUND, CEILING, FLOOR, POWER, SQRT, EXP, LOG |
+| Conditional functions | Supported | `IIF`, `CHOOSE` field objects | Allow-list; builder validates required options | CASE is also supported |
+| CAST/CONVERT | Supported | `datatype`, optional CONVERT `style` | Datatype pattern allow-list | No free-form SQL datatype expression |
+| NULL functions | Supported | COALESCE/ISNULL/NULLIF field objects | Function allow-list; builder-required options | COALESCE public `fields` are identifiers |
+| WHERE comparisons | Supported | `filters[]` | `= != <> > < >= <=` | Values use prepared placeholders |
+| LIKE/NOT LIKE | Supported | `filters[]` | Operator allow-list | Pattern is a prepared value |
+| IN/NOT IN | Supported | array `value` or `query` | Non-empty array or valid nested SELECT | Prepared list values |
+| BETWEEN/NOT BETWEEN | Supported | two-element `value` | Exactly two values | Integer date columns convert `YYYY-MM-DD` to `YYYYMMDD` |
+| IS NULL/IS NOT NULL | Supported | filter without value | Operator allow-list | No placeholder |
+| EXISTS/NOT EXISTS | Supported | filter `query`, no `field` required | Nested SELECT required | Filter subquery only |
+| INNER/LEFT/RIGHT JOIN | Supported | `joins[]` | Valid source, logical left/right, equality only | One `on` equality per join |
+| FULL/CROSS JOIN | Not supported | None | Rejected join type | Not exposed |
+| GROUP BY | Supported | `groupBy[]` | Identifier plus metadata | Array of fields |
+| HAVING | Supported | `having[]` | Aggregate + comparison + value | Conditions are combined with AND |
+| ORDER BY | Supported | `sort[]` | Logical field/alias and ASC/DESC | Multiple fields supported; direction defaults ASC |
+| Positional ORDER BY | Internal compatibility only | None | Numeric public sort fields rejected | Internal positions are resolved to real fields in window contexts |
+| Pagination | Supported | `pagination.page/pageSize` | Both positive integers | Count + OFFSET/FETCH or ROW_NUMBER fallback |
+| Window functions | Supported | field `function` plus `sort` | Function allow-list and mandatory sort | ROW_NUMBER, RANK, DENSE_RANK, NTILE, LAG, LEAD, FIRST_VALUE, LAST_VALUE |
+| Window PARTITION BY | Not supported | None | `partitionBy` rejected | Only window ORDER BY is exposed |
+| Filter subqueries | Supported | IN/NOT IN/EXISTS/NOT EXISTS `query` | Nested SELECT validation | Subqueries are not general field/table expressions |
+| CTE | Supported | `with: {name, query}` | One named SELECT body | One CTE per request |
+| Recursive CTE | Supported | `with: {name, anchor, recursive}` | Both SELECT bodies required | Builder combines branches with UNION ALL |
+| UNION/UNION ALL | Supported | top-level `action` plus `queries` | At least one SELECT body | Branch actions are omitted |
+| INTERSECT/EXCEPT | Internal builder only | None | Public action rejected | Not a public API feature |
+| Stored procedure | Supported | `procedure` action, `source.procedure`, `parameters` | Identifier and array parameters | Positional prepared parameters |
+| Scalar function | Supported | `function` action, `source.function`, `parameters` | Identifier and array parameters | Returns `Result` column |
+| Table-valued function | Supported | `tableFunction` action | Identifier and array parameters | Executes `SELECT * FROM function(...)` |
+| SELECT parameters | Values only | filter/HAVING values | Prepared by builders | No arbitrary public `parameters` on SELECT |
+| Metadata | Supported | five `metadata.*` actions | Action allow-list; columns requires source table | Database-backed |
+| Column description metadata | Not supported in query envelope | None | N/A | Use `metadata.columns` separately |
+| Validation/error envelope | Supported | N/A | Unknown properties and invalid shapes rejected | 400 contract errors; generic 500 query errors |
 
-## Filters
+Known contract boundary: `TIMEFROMPARTS` is named in the function allow-list and exists in the internal builder, but its required `fractions` property is not accepted by the public field-property allow-list. It is therefore not a usable public feature and is not shown as a supported example.
 
-```json
-{
-  "filters": [
-    { "field": "Status", "operator": "=", "value": "Active" },
-    { "field": "Id", "operator": "IN", "value": [1, 2, 3] },
-    { "field": "Created", "operator": "BETWEEN", "value": ["2026-01-01", "2026-01-31"] },
-    { "field": "DeletedAt", "operator": "IS NULL" }
-  ],
-  "filterLogic": "AND"
-}
-```
-
-Supported operators are `=`, `!=`, `<>`, `>`, `<`, `>=`, `<=`, `LIKE`, `NOT LIKE`, `IN`, `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `IS NULL`, `IS NOT NULL`, `EXISTS`, and `NOT EXISTS`. `filterLogic` is `AND` or `OR` and defaults to `AND`. Values continue through prepared parameter handling.
-
-## Subqueries and EXISTS
-
-Use `query` for a nested SELECT:
-
-```json
-{
-  "filters": [
-    {
-      "field": "GroupId",
-      "operator": "IN",
-      "query": {
-        "source": { "table": "Groups" },
-        "fields": ["Id"],
-        "filters": [{ "field": "Active", "operator": "=", "value": 1 }]
-      }
-    }
-  ]
-}
-```
-
-For `EXISTS` and `NOT EXISTS`, omit `field` and provide `query`.
-
-## Joins
-
-The current implementation supports one equality condition per `INNER`, `LEFT`, or `RIGHT` join:
-
-```json
-{
-  "joins": [
-    {
-      "type": "LEFT",
-      "source": { "table": "Orders", "alias": "O" },
-      "on": {
-        "left": "C.Id",
-        "operator": "=",
-        "right": "O.CustomerId"
-      }
-    }
-  ]
-}
-```
-
-Other join operators and multiple conditions per join are not currently supported.
-
-## Grouping and HAVING
-
-`groupBy` contains logical field names. HAVING supports aggregate functions and comparison operators:
-
-```json
-{
-  "groupBy": ["Category"],
-  "having": [
-    { "function": "SUM", "field": "Amount", "operator": ">", "value": 1000 }
-  ]
-}
-```
-
-## Sorting
-
-```json
-{
-  "sort": [
-    { "field": "ItemCode", "direction": "ASC" },
-    { "field": "Description", "direction": "DESC" }
-  ]
-}
-```
-
-Sort entries always identify logical fields or selected aliases. Numeric SQL positions such as `1` are rejected by the public contract. The server validates and resolves fields for both normal and window-based pagination ordering.
-
-## Pagination
-
-```json
-{ "pagination": { "page": 2, "pageSize": 50 } }
-```
-
-Both values must be positive integers. SQL Server compatibility detection and the choice between `OFFSET/FETCH` and `ROW_NUMBER` are private implementation details.
-
-## DISTINCT and row limits
-
-```json
-{
-  "distinct": true,
-  "limit": 100
-}
-```
-
-`limit` maps to the supported SQL Server TOP behavior and must be a positive integer.
-
-## Window functions
-
-Window ordering uses logical public fields:
-
-```json
-{
-  "fields": [
-    "ItemCode",
-    {
-      "function": "ROW_NUMBER",
-      "alias": "RowNumber",
-      "sort": [{ "field": "ItemCode", "direction": "ASC" }]
-    }
-  ]
-}
-```
-
-## CTEs
-
-A non-recursive CTE uses `with.query`:
-
-```json
-{
-  "action": "select",
-  "source": { "table": "ActiveItems" },
-  "fields": ["ItemCode"],
-  "with": {
-    "name": "ActiveItems",
-    "query": {
-      "source": { "table": "Items" },
-      "fields": ["ItemCode"],
-      "filters": [{ "field": "Active", "operator": "=", "value": 1 }]
-    }
-  }
-}
-```
-
-Recursive CTEs use `with.name`, `with.anchor`, and `with.recursive`, where both branches are SELECT request bodies.
-
-## UNION and UNION ALL
-
-```json
-{
-  "action": "unionAll",
-  "queries": [
-    { "source": { "table": "CurrentItems" }, "fields": ["ItemCode"] },
-    { "source": { "table": "ArchivedItems" }, "fields": ["ItemCode"] }
-  ]
-}
-```
-
-Use `action: "union"` for duplicate-removing UNION. Each query uses the SELECT body without a nested `action` property.
-
-## Metadata actions
-
-Existing metadata operations use these public actions:
-
-- `metadata.tables`
-- `metadata.columns` with `source.table`
-- `metadata.views`
-- `metadata.procedures`
-- `metadata.schema`
-
-## Validation and security
-
-Requests are validated before normalization and SQL construction. Public terminology is translated to an internal query model that is not part of this contract. Source names, fields, aliases, sort fields, functions, operators, joins, and pagination are validated. Filter and HAVING values remain parameterized. Raw SQL is not accepted anywhere in the public contract.
+The source validator technically accepts `source.alias` for routines and `metadata.columns`; normalization ignores that alias, so it has no public effect. Routine `parameters` should be a JSON list because placeholders are positional.

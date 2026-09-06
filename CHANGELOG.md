@@ -1,0 +1,53 @@
+# Changelog
+
+All notable backend changes are recorded here. The project follows semantic versioning.
+
+## [Unreleased]
+
+### Added
+
+- Database-independent `tests/run.php` entry point and broader logic coverage for every public filter operator, public joins, representative function families, all window functions, pagination counts, set-operation assembly, and response formatting.
+- Ubuntu/PHP 8.2 GitHub Actions workflow for backend syntax checks and all standalone tests without SQL Server, ODBC, credentials, or database configuration.
+- Definitive backend capability matrix and detailed public JSON field reference.
+- Modularized query construction through `SelectBuilder`, `WhereBuilder`, `JoinBuilder`, `GroupByBuilder`, `HavingBuilder`, `OrderByBuilder`, `PaginationBuilder`, `WindowFunctionBuilder`, `SqlExpressionBuilder`, `RoutineBuilder`, and `SetOperationBuilder`, with `QueryRepository` retained as the facade.
+- Public validation/normalization and universal API contract regression coverage.
+
+### Changed
+
+- Reconciled README, architecture, API, examples, database configuration, hosting, roadmap, and contribution guidance with the current implementation.
+- Replaced the prior Windows/ODBC environment-validation workflow with logic-focused normal CI. Windows runtime and live database validation remain runtime/manual concerns.
+
+### Fixed
+
+- Resolved internal positional ordering to validated logical fields for window functions and legacy pagination, preventing SQL Server from receiving `ROW_NUMBER() OVER (ORDER BY 1)`.
+- Added regression coverage that preserves top-level ordering while protecting window contexts.
+
+## [1.1.0] - 2026-08-21
+
+### Added
+
+- Bundled Windows PHP runtime in `runtime/windows/php/`.
+- `start-windows.bat` with PHP/php.ini checks, runtime-directory creation, PHP ODBC validation, database validation, API-path checks, and automatic port selection from 8000 through 8100.
+- `scripts/check-database.php` startup connection check.
+- SQL and Windows authentication configuration, explicit or automatic SQL Server ODBC driver selection, and encryption/trust options.
+
+### Changed
+
+- Windows users can run the backend without installing PHP/XAMPP when using the bundled runtime; a compatible SQL Server ODBC driver and reachable database remain required.
+
+## [1.0.0] - Initial release
+
+### Added
+
+- JSON API routing, controller/service layers, public request validation/normalization, CORS, and standard responses.
+- SQL Server SELECT generation with fields/aliases, DISTINCT/TOP, CASE/arithmetic, allow-listed functions, prepared filters, joins, grouping/HAVING, sorting, and compatibility-aware pagination.
+- Window functions, filter subqueries, CTE/recursive CTE, UNION/UNION ALL, stored procedures, scalar functions, table-valued functions, and metadata actions.
+- SQL execution timing, returned-row counts, and success/error logging.
+
+### Fixed
+
+- BETWEEN date strings can be converted to `YYYYMMDD` integers for integer-family date columns discovered through metadata.
+
+## Planned
+
+Planned work is maintained in [docs/Roadmap.md](docs/Roadmap.md) and is not part of the current API until implemented and tested.
