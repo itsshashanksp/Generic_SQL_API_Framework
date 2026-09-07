@@ -24,7 +24,13 @@ Send JSON to `api/index.php` (normally with `POST` and `Content-Type: applicatio
 }
 ```
 
-The public actions are `select`, `union`, `unionAll`, `procedure`, `function`, `tableFunction`, and the five metadata actions documented in [API.md](docs/API.md). Public property names such as `source`, `fields`, `field`, `filters`, and `pagination` are normalized to a private builder representation. Internal names such as `table`, `columns`, `column`, `where`, `top`, `page`, and `pageSize` are not accepted as public JSON.
+The public actions are `select`, `sql`, `union`, `unionAll`, `procedure`, `function`, `tableFunction`, and the five metadata actions documented in [API.md](docs/API.md). Public property names such as `source`, `fields`, `field`, `filters`, and `pagination` are normalized to a private execution model. Internal names such as `table`, `columns`, `column`, `where`, `top`, `page`, and `pageSize` are not accepted as public JSON.
+
+`sql` is a controlled report-resource action, not a raw-SQL endpoint. A client
+sends an allowlisted resource ID plus optional runtime filters, sorting, and
+pagination. The server loads the registered file under `queries/`, validates
+runtime fields against that resource's exposed output columns, binds all user
+values as prepared parameters, and uses the existing SQL Server connection.
 
 Current query support includes SELECT, DISTINCT, SQL Server TOP through `limit`, aliases, CASE and arithmetic expressions, an allow-list of SQL functions, prepared WHERE values, INNER/LEFT/RIGHT equality joins, GROUP BY, aggregate HAVING, multi-field sorting, pagination, eight window functions, subqueries in selected filters, one CTE (including the recursive form), UNION/UNION ALL, routines, and database metadata reads. See the definitive [JSON request reference](docs/JSON-Request-Reference.md) and [capability matrix](docs/API.md#capability-matrix) for exact boundaries.
 
@@ -34,8 +40,8 @@ The actual HTTP flow is:
 
 ```text
 Client -> api/index.php -> QueryRequestValidator -> QueryRequestNormalizer
-       -> Controller -> Service -> QueryRepository
-       -> specialized query builders -> QueryEngine -> Database/ODBC -> SQL Server
+       -> QueryController/QueryRepository or SQLController/SqlRepository
+       -> QueryEngine -> Database/ODBC -> SQL Server
 ```
 
 Results return through the same layers and `Response` creates the public envelope. `QueryRepository` is an execution/orchestration facade; SQL construction remains split across `SelectBuilder`, `WhereBuilder`, `JoinBuilder`, `GroupByBuilder`, `HavingBuilder`, `OrderByBuilder`, `PaginationBuilder`, `WindowFunctionBuilder`, `SqlExpressionBuilder`, `RoutineBuilder`, and `SetOperationBuilder`.

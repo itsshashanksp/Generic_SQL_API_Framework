@@ -5,6 +5,17 @@ class QueryRequestNormalizer
     public function normalize(array $request): array
     {
         $action = $request['action'];
+        if ($action === 'sql') {
+            return [
+                'controller' => 'SQL',
+                'action' => 'execute',
+                'resource' => $request['resource'],
+                ...isset($request['filters']) ? ['filters' => $request['filters']] : [],
+                ...isset($request['sort']) ? ['sort' => $request['sort']] : [],
+                ...isset($request['pagination']) ? ['pagination' => $request['pagination']] : [],
+                ...isset($request['filterLogic']) ? ['filterLogic' => strtoupper($request['filterLogic'])] : [],
+            ];
+        }
         if ($action === 'select') {
             return ['controller' => 'Query', 'action' => 'select'] + $this->normalizeSelect($request);
         }

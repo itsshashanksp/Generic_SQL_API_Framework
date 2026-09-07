@@ -1,11 +1,12 @@
 <?php
 
 require_once __DIR__ . '/ApiRequestException.php';
+require_once __DIR__ . '/SqlRequestValidator.php';
 
 class QueryRequestValidator
 {
     private const ACTIONS = [
-        'select', 'union', 'unionAll', 'procedure', 'function', 'tableFunction',
+        'select', 'sql', 'union', 'unionAll', 'procedure', 'function', 'tableFunction',
         'metadata.tables', 'metadata.columns', 'metadata.views',
         'metadata.procedures', 'metadata.schema'
     ];
@@ -44,6 +45,9 @@ class QueryRequestValidator
         $action = $request['action'] ?? null;
         if (!is_string($action) || !in_array($action, self::ACTIONS, true)) {
             $errors[] = ['path' => 'action', 'message' => 'A supported action is required.'];
+        } elseif ($action === 'sql') {
+            (new SqlRequestValidator())->validate($request);
+            return;
         } elseif ($action === 'select') {
             $this->validateSelect($request, '', $errors);
         } elseif ($action === 'union' || $action === 'unionAll') {

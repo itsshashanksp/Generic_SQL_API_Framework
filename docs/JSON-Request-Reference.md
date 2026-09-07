@@ -13,6 +13,7 @@ Unknown top-level properties are rejected for every action.
 | Action | Required fields | Optional fields |
 |---|---|---|
 | `select` | `source`, `fields` | `filters`, `joins`, `groupBy`, `having`, `sort`, `pagination`, `distinct`, `limit`, `filterLogic`, `with` |
+| `sql` | `resource` | `filters`, `sort`, `pagination`, `filterLogic` |
 | `union`, `unionAll` | non-empty `queries` | none |
 | `procedure` | `source.procedure` | `parameters` |
 | `function`, `tableFunction` | `source.function` | `parameters` |
@@ -20,6 +21,11 @@ Unknown top-level properties are rejected for every action.
 | `metadata.tables`, `metadata.views`, `metadata.procedures`, `metadata.schema` | none beyond `action` | none |
 
 Identifiers use `^[A-Za-z_][A-Za-z0-9_.]*$`: letters/underscore first, then letters, digits, underscores, or dot qualifiers. This is syntax validation; SELECT builders also check tables and columns against live metadata.
+
+The `sql` action is documented in [API](API.md#controlled-sql-resource-request).
+Its resource IDs use the stricter `^[A-Za-z0-9][A-Za-z0-9_-]*$` shape and must
+also exist in the server registry. Its filter/sort fields are unqualified output
+aliases exposed by that resource, not arbitrary database columns.
 
 ## SELECT fields
 

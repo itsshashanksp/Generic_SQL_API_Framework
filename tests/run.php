@@ -3,7 +3,8 @@
 $tests = [
     __DIR__ . '/UniversalApiContractTest.php',
     __DIR__ . '/OrderByWindowRegressionTest.php',
-    __DIR__ . '/BackendLogicTest.php'
+    __DIR__ . '/BackendLogicTest.php',
+    __DIR__ . '/SqlControllerTest.php'
 ];
 
 foreach ($tests as $test) {

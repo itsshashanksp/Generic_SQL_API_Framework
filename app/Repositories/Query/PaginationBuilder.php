@@ -15,7 +15,8 @@ class PaginationBuilder
         string $sqlWithoutOrderBy,
         array $params,
         array $request,
-        ?string $paginationOrderBy
+        ?string $paginationOrderBy,
+        bool $paginateData = true
     ): array {
         $totalRows = null;
 
@@ -32,7 +33,7 @@ class PaginationBuilder
             }
         }
 
-        if (isset($request['page']) && isset($request['pageSize'])) {
+        if ($paginateData && isset($request['page']) && isset($request['pageSize'])) {
             $page = max(1, (int)$request['page']);
             $pageSize = max(1, (int)$request['pageSize']);
             $offset = ($page - 1) * $pageSize;

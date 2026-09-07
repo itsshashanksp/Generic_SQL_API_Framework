@@ -16,6 +16,7 @@ The script advertises `GET, POST, OPTIONS` for CORS and returns 200 immediately 
 The body must be one JSON object. The required `action` is one of:
 
 - `select`
+- `sql`
 - `union`, `unionAll`
 - `procedure`, `function`, `tableFunction`
 - `metadata.tables`, `metadata.columns`, `metadata.views`, `metadata.procedures`, `metadata.schema`
@@ -33,6 +34,31 @@ For SELECT, `source.table` and a non-empty `fields` array are also required. Ref
 ```
 
 Unknown properties are rejected. Raw SQL, arbitrary SELECT parameters, client-supplied controller names, and internal query-builder keys are not part of the public contract.
+
+### Controlled SQL resource request
+
+```json
+{
+  "action": "sql",
+  "resource": "item",
+  "filters": [{ "field": "Item_Desc", "operator": "LIKE", "value": "%pen%" }],
+  "sort": [{ "field": "Item_Code", "direction": "DESC" }],
+  "pagination": { "page": 1, "pageSize": 25 },
+  "filterLogic": "AND"
+}
+```
+
+`resource` must match the exact ID of an entry in `config/sql-resources.php`;
+paths, filenames, URLs, SQL text, connection settings, and unknown properties
+are rejected. Each entry maps an internal file to exposed output aliases and a
+default sort. SQL runtime filters support comparisons, LIKE, IN, BETWEEN, and
+NULL checks on those aliases. Filter values are prepared parameters. Runtime
+sort accepts exposed aliases and `ASC`/`DESC`; pagination uses the same count
+and SQL Server compatibility strategy as JSON SELECT mode.
+
+The registered SQL owns static projections, joins, grouping, HAVING, and other
+business logic. Dynamic grouping and free-text search are not SQL action
+properties. Clients should send only the runtime properties documented above.
 
 ## Success response
 
@@ -115,7 +141,8 @@ Public sorting uses validated logical fields or a selected alias and `ASC`/`DESC
 
 | Feature | Backend support | Public JSON representation | Validation | Notes |
 |---|---|---|---|---|
-| SELECT | Supported | `action: "select"`, `source`, `fields` | Table/field identifier shape, then live metadata | Read-only query action |
+| SELECT | Supported | `action: "select"`, `source`, `fields` | Table/field identifier shape, then live metadata | Existing JSON query action |
+| Controlled SQL resource | Supported | `action: "sql"`, `resource` | Explicit resource registry and output-column allowlist | No raw SQL or client paths |
 | DISTINCT | Supported | `distinct: true` | Boolean | Default `false` |
 | TOP | Supported | `limit: 10` | Positive integer | Normalizes to internal `top` |
 | Column/table aliases | Supported | field `alias`; `source.alias` | Identifier | Selected aliases may be used by top-level sort |
