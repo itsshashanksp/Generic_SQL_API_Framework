@@ -67,7 +67,15 @@ Create the ignored local file `database/config/database.json`:
 }
 ```
 
-For SQL authentication use `"authentication": "sql"` plus `username` and `password`. The password may remain a plain string for compatibility or use the optional AES-256-GCM encrypted format with a separately managed `GENERIC_SQL_API_ENCRYPTION_KEY`. Encrypted passwords require PHP OpenSSL; all connections require a compatible SQL Server ODBC driver. Setup, migration, and actual defaults are in [Database-Configuration.md](docs/Database-Configuration.md).
+For SQL authentication use `"authentication": "sql"` plus `username` and `password`. The password may remain a plain string for compatibility or use the optional AES-256-GCM encrypted format. Encrypted passwords require PHP OpenSSL and `GENERIC_SQL_API_ENCRYPTION_KEY`, which must contain a Base64-encoded 32-byte key and must be kept separately from `database.json`.
+
+Windows users can perform the one-time migration of an existing plaintext password with:
+
+```bat
+setup-database-encryption.bat
+```
+
+The setup saves the key in the Windows User environment, encrypts the existing password in `database.json`, and validates the connection. It does not retain a plaintext configuration backup. Open a new terminal before later startup so it inherits the saved variable. Do not commit the key or `database.json` containing real credentials. See [Database Configuration](docs/Database-Configuration.md) for the encrypted format, cross-platform manual setup, failure behavior, and security limitations.
 
 ## Start the backend
 
@@ -77,7 +85,7 @@ On Windows, run:
 start-windows.bat
 ```
 
-The repository includes `runtime/windows/php/`, so XAMPP or a separate PHP installation is not required. The launcher validates PHP, `php.ini`, PHP ODBC, the database connection, and the API directory; creates OPcache/log directories; chooses the first free port from 8000 through 8100; then starts PHP's development server. A working database is required to start through this launcher because it deliberately runs `scripts/check-database.php` first.
+The repository includes `runtime/windows/php/`, so XAMPP or a separate PHP installation is not required. The launcher validates PHP, `php.ini`, PHP ODBC, PHP OpenSSL, any required encrypted-credential environment key, the database connection, and the API directory; creates OPcache/log directories; chooses the first free port from 8000 through 8100; then starts PHP's development server. A working database is required to start through this launcher because it deliberately runs `scripts/check-database.php` first.
 
 With another PHP installation, after configuring the database:
 
@@ -111,7 +119,7 @@ Successful operations return `success`, `message`, `data`, and `meta`. Metadata 
 
 - v1.0.0 — Core API and advanced SQL: released
 - v1.1.0 — Windows runtime and deployment: current
-- v1.2.0 onward — CRUD, transactions, richer metadata, security, API improvements, performance, and additional providers: planned
+- v1.2.0 onward — CRUD, transactions, richer metadata, API authentication/authorization, API improvements, performance, and additional providers: planned
 
 The roadmap is backend-only. See [Roadmap.md](docs/Roadmap.md) and [CHANGELOG.md](CHANGELOG.md).
 
@@ -128,4 +136,4 @@ The roadmap is backend-only. See [Roadmap.md](docs/Roadmap.md) and [CHANGELOG.md
 - [Contributing](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
 
-Do not commit database credentials or logs. The project scope is the backend API; dashboards, charts, report widgets, and other frontend features belong to consumers, not this repository's backend roadmap.
+Do not commit database credentials, `GENERIC_SQL_API_ENCRYPTION_KEY`, or logs. The project scope is the backend API; dashboards, charts, report widgets, and other frontend features belong to consumers, not this repository's backend roadmap.

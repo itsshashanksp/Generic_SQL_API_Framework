@@ -17,9 +17,10 @@ Current boundaries remain documented in the [capability matrix](API.md#capabilit
 ## v1.1.0 — Windows Runtime & Deployment — Current
 
 - bundled `runtime/windows/php/`
-- `start-windows.bat` checks PHP, configuration, ODBC, database connectivity, API path, and ports
+- `start-windows.bat` checks PHP, configuration, ODBC, OpenSSL, encrypted-credential readiness, database connectivity, API path, and ports
 - automatic OPcache/log directory creation and port selection from 8000 through 8100
 - SQL Server/Windows authentication modes and automatic/specific ODBC driver configuration
+- cross-platform AES-256-GCM database password protection, environment-managed keys, and one-time Windows setup
 - modular `QueryRepository` facade with specialized query builders
 - public validation/normalization plus API-contract and ORDER BY/window regression coverage
 - database-independent backend test runner and GitHub Actions syntax/logic workflow

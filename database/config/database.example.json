@@ -5,7 +5,7 @@
     "database": "ApplicationDb",
     "authentication": "sql",
     "username": "api_user",
-    "password": "replace-with-a-local-password-or-encrypted-object",
+    "password": "your-database-password",
     "port": "1433",
     "options": {
         "encrypt": true,

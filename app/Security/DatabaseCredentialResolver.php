@@ -4,6 +4,19 @@ require_once __DIR__ . '/DatabaseCredentialEncryption.php';
 
 class DatabaseCredentialResolver
 {
+    public static function usesEncryption($password): bool
+    {
+        return is_array($password)
+            && ($password['encrypted'] ?? null) === true;
+    }
+
+    public static function encryptionKeyIsAvailable(): bool
+    {
+        $key = getenv(DatabaseCredentialEncryption::ENVIRONMENT_VARIABLE);
+
+        return $key !== false && trim($key) !== '';
+    }
+
     public static function resolve($password): string
     {
         if (is_string($password)) {

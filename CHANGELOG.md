@@ -6,6 +6,10 @@ All notable backend changes are recorded here. The project follows semantic vers
 
 ### Added
 
+- Cross-platform AES-256-GCM database password encryption with a versioned nonce/ciphertext/authentication-tag format and a Base64-encoded 32-byte key supplied through `GENERIC_SQL_API_ENCRYPTION_KEY`.
+- Database credential resolution that preserves plaintext password compatibility while decrypting encrypted passwords before the existing SQL Server ODBC connection path.
+- Windows one-time encryption setup using the bundled PHP/OpenSSL runtime, Windows User environment storage, in-place configuration migration, and connection validation without retaining a plaintext backup.
+- Database-independent encryption coverage for round trips, random nonces, Unicode and empty values, malformed data, wrong keys, tampering, backward-compatible resolution, and secret-safe logging.
 - Database-independent `tests/run.php` entry point and broader logic coverage for every public filter operator, public joins, representative function families, all window functions, pagination counts, set-operation assembly, and response formatting.
 - Ubuntu/PHP 8.2 GitHub Actions workflow for backend syntax checks and all standalone tests without SQL Server, ODBC, credentials, or database configuration.
 - Definitive backend capability matrix and detailed public JSON field reference.
@@ -19,6 +23,7 @@ All notable backend changes are recorded here. The project follows semantic vers
 
 ### Fixed
 
+- Credential configuration, decryption, and key failures now use safe messages and avoid logging credential exception traces or secret values.
 - Resolved internal positional ordering to validated logical fields for window functions and legacy pagination, preventing SQL Server from receiving `ROW_NUMBER() OVER (ORDER BY 1)`.
 - Added regression coverage that preserves top-level ordering while protecting window contexts.
 

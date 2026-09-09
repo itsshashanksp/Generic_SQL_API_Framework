@@ -8,6 +8,7 @@ set "OPCACHE=%ROOT%runtime\windows\php\opcache"
 set "LOGS=%ROOT%logs"
 set "API=%ROOT%api"
 set "DB_CHECK=%ROOT%scripts\check-database.php"
+set "DB_ENCRYPTION_CHECK=%ROOT%scripts\check-database-encryption-key.php"
 
 echo ========================================
 echo          Generic SQL API Framework
@@ -73,12 +74,66 @@ echo [OK] PHP ODBC
 echo.
 
 REM ============================================================
+REM PHP OpenSSL Extension
+REM ============================================================
+
+"%PHP%" -c "%PHP_INI%" -m | findstr /i "openssl" >nul
+
+if errorlevel 1 (
+    echo [FAILED] PHP OpenSSL extension not available.
+    echo.
+    echo OpenSSL is required for encrypted database credentials.
+    echo Please check the bundled PHP configuration.
+    echo.
+    echo API startup aborted.
+    pause
+    exit /b 1
+)
+
+echo [OK] PHP OpenSSL
+echo.
+
+REM ============================================================
 REM Database Connection
 REM ============================================================
 
 if not exist "%DB_CHECK%" (
     echo [FAILED] Database check script not found.
     echo Expected: %DB_CHECK%
+    echo.
+    echo API startup aborted.
+    pause
+    exit /b 1
+)
+
+if not exist "%DB_ENCRYPTION_CHECK%" (
+    echo [FAILED] Database encryption check script not found.
+    echo Expected: %DB_ENCRYPTION_CHECK%
+    echo.
+    echo API startup aborted.
+    pause
+    exit /b 1
+)
+
+"%PHP%" ^
+    -c "%PHP_INI%" ^
+    "%DB_ENCRYPTION_CHECK%"
+
+set "DB_ENCRYPTION_STATUS=%ERRORLEVEL%"
+
+if "%DB_ENCRYPTION_STATUS%"=="2" (
+    echo [FAILED] Database encryption key is not configured.
+    echo.
+    echo database.json contains an encrypted database password.
+    echo Set GENERIC_SQL_API_ENCRYPTION_KEY in the environment before startup.
+    echo.
+    echo API startup aborted.
+    pause
+    exit /b 1
+)
+
+if not "%DB_ENCRYPTION_STATUS%"=="0" (
+    echo [FAILED] Database encryption configuration check failed.
     echo.
     echo API startup aborted.
     pause

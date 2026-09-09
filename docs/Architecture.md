@@ -33,7 +33,7 @@ Validation and normalization occur in `api/index.php` before controller dispatch
 | `SqlRepository` | Loads a registered SELECT, wraps it, safely applies supported runtime state, and reuses pagination/execution infrastructure |
 | Query builders | Validate database objects and construct SQL fragments/parameters |
 | `QueryEngine` | ODBC execution, result collection, timing, row counts, execution logs |
-| Database layer | Reads local JSON configuration, chooses SQL Server driver, opens/closes ODBC connection |
+| Database layer | Reads local JSON configuration, resolves plain or encrypted credentials, chooses the SQL Server driver, and opens/closes the ODBC connection |
 | `Response` | Stable success and error payload construction |
 
 ## Modular query construction
@@ -79,6 +79,20 @@ Sorting remains restricted to returned columns.
 ## Database and metadata
 
 `DriverFactory` currently creates only `SqlServerDriver`. A `Database` construction immediately connects, which is why production repositories are connection-backed. `QueryRepository` passes its request-owned `QueryEngine` to `MetadataRepository`, so metadata and data use one connection in sequence instead of opening a second connection. Other requests construct different engines and connections. Statements are freed in `finally`, including after failures, and the engine closes its connection at the end of its lifetime. `MetadataRepository` queries `INFORMATION_SCHEMA` to validate tables and columns and to determine types used by integer-backed date-range handling.
+
+Database password protection is a configuration-layer concern:
+
+```text
+database/config/database.json
+  -> DatabaseCredentialResolver
+  -> plain string: use unchanged
+     OR encrypted object: authenticate and decrypt with AES-256-GCM
+        using GENERIC_SQL_API_ENCRYPTION_KEY
+  -> SqlServerDriver
+  -> odbc_connect
+```
+
+The resolver obtains a Base64-encoded 32-byte key from the process environment only for an encrypted password. It validates the versioned object and resolves the plaintext password in memory immediately before the existing SQL Server connection path. Credential failures use safe messages, and credential exception traces are omitted from logs so password objects and key material are not exposed. This layer does not add an endpoint, authentication, authorization, or any change to the public request/response contract.
 
 Pagination performs a count query when both page values are present, then asks SQL Server for its compatibility level. Compatibility level 110 or newer uses `OFFSET/FETCH`; older levels wrap the projection and use `ROW_NUMBER()`.
 

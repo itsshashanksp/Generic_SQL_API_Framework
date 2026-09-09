@@ -154,8 +154,26 @@ try {
         DatabaseCredentialResolver::resolve($password) === $password,
         'Plain-password backward compatibility failed.'
     );
+    credentialAssert(
+        !DatabaseCredentialResolver::usesEncryption($password),
+        'A plain password was identified as encrypted.'
+    );
+    credentialAssert(
+        DatabaseCredentialResolver::usesEncryption($encrypted),
+        'An encrypted password object was not detected.'
+    );
+
+    setCredentialEnvironment(null);
+    credentialAssert(
+        !DatabaseCredentialResolver::encryptionKeyIsAvailable(),
+        'A missing encryption key was reported as available.'
+    );
 
     setCredentialEnvironment($key);
+    credentialAssert(
+        DatabaseCredentialResolver::encryptionKeyIsAvailable(),
+        'A configured encryption key was reported as unavailable.'
+    );
     credentialAssert(
         DatabaseCredentialResolver::resolve($encrypted) === $password,
         'Encrypted-password resolution failed.'

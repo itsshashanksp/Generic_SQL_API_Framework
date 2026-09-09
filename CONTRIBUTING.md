@@ -32,7 +32,7 @@ These tests must run without SQL Server, an ODBC extension, credentials, or `dat
 
 ## Live database testing
 
-Real SQL Server testing is separate and currently manual. Create the ignored database JSON, install PHP ODBC and a supported SQL Server ODBC driver, then use `php scripts/check-database.php` before exercising `api/index.php`. Never add fake credentials to normal CI. If an optional integration workflow is introduced later, it must remain separate and explicitly secret-backed.
+Real SQL Server testing is separate and currently manual. Create the ignored database JSON, install PHP ODBC and a supported SQL Server ODBC driver, then use `php scripts/check-database.php` before exercising `api/index.php`. Encrypted passwords additionally require PHP OpenSSL and a matching `GENERIC_SQL_API_ENCRYPTION_KEY` supplied outside the repository. Never add fake credentials or encryption keys to normal CI. If an optional integration workflow is introduced later, it must remain separate and explicitly secret-backed.
 
 ## Change expectations
 
@@ -44,6 +44,6 @@ Real SQL Server testing is separate and currently manual. Create the ignored dat
 - Distinguish public JSON (`fields[].field`, `filters`, `limit`, nested `pagination`) from normalized builder keys.
 - Update README, API/reference/examples, roadmap, and changelog together when their claims change.
 - Do not claim that placeholder drivers are supported providers.
-- Keep credentials, `database/config/database.json`, logs, generated exports/uploads, and OPcache files out of commits.
+- Keep credentials, `database/config/database.json`, `GENERIC_SQL_API_ENCRYPTION_KEY`, logs, generated exports/uploads, and OPcache files out of commits. Encryption setup must not retain a plaintext configuration backup.
 
 Before opening a pull request, include a concise description, motivation, tests run, whether any live database test was performed, and any public-contract or deployment impact. Review `git diff` for unrelated changes.
