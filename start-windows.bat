@@ -86,6 +86,7 @@ if not exist "%DB_CHECK%" (
 )
 
 echo Checking database connection...
+echo.
 
 "%PHP%" ^
     -c "%PHP_INI%" ^
@@ -169,7 +170,6 @@ if %PORT% GTR %MAX_PORT% (
 
 goto CHECK_PORT
 
-
 REM ============================================================
 REM Start API
 REM ============================================================
@@ -182,10 +182,12 @@ echo ========================================
 echo.
 echo API: http://localhost:%PORT%/index.php
 echo.
-echo Starting API...
+echo [WARNING] PHP built-in server is intended for development.
+echo [WARNING] Concurrent request handling may be limited.
+echo [WARNING] Use Nginx/Apache/IIS/FastCGI or another multi-worker host for
+echo [WARNING] realistic concurrency testing and production use.
 echo.
-echo [WARNING] PHP's built-in Windows server handles one request at a time.
-echo [WARNING] Use IIS/FastCGI or another multi-worker host for concurrency.
+echo Starting API...
 echo.
 
 "%PHP%" ^

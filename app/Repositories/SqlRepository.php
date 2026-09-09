@@ -39,7 +39,10 @@ class SqlRepository
         }
         $allowedFilterColumns = [];
         foreach ($definition['filterColumns'] as $column) {
-            $allowedFilterColumns[strtolower($column)] = $column;
+            $allowedFilterColumns[strtolower($column)] = [
+                'column' => $column,
+                'valueType' => $definition['filterValueTypes'][strtolower($column)] ?? null,
+            ];
         }
         $filterPlacement = $definition['filterPlacement'];
         if ($filterPlacement === 'source') {
@@ -246,21 +249,24 @@ class SqlRepository
         $params = [];
 
         foreach ($filters as $filter) {
-            $field = $this->requireAllowedColumn($filter['field'], $allowedColumns, 'filter');
+            $filterField = $this->requireAllowedFilterColumn($filter['field'], $allowedColumns);
+            $field = $filterField['column'];
             $operator = strtoupper($filter['operator']);
             $column = ($qualifier === null ? '' : $qualifier . '.') . '[' . $field . ']';
             if (in_array($operator, ['IS NULL', 'IS NOT NULL'], true)) {
                 $conditions[] = "{$column} {$operator}";
             } elseif (in_array($operator, ['IN', 'NOT IN'], true)) {
+                $values = $this->normalizeFilterValues($filter['value'], $filterField['valueType']);
                 $conditions[] = "{$column} {$operator} ("
-                    . implode(', ', array_fill(0, count($filter['value']), '?')) . ')';
-                array_push($params, ...$filter['value']);
+                    . implode(', ', array_fill(0, count($values), '?')) . ')';
+                array_push($params, ...$values);
             } elseif (in_array($operator, ['BETWEEN', 'NOT BETWEEN'], true)) {
+                $values = $this->normalizeFilterValues($filter['value'], $filterField['valueType']);
                 $conditions[] = "{$column} {$operator} ? AND ?";
-                array_push($params, ...$filter['value']);
+                array_push($params, ...$values);
             } else {
                 $conditions[] = "{$column} {$operator} ?";
-                $params[] = $filter['value'];
+                $params[] = $this->normalizeFilterValue($filter['value'], $filterField['valueType']);
             }
         }
 
@@ -294,5 +300,55 @@ class SqlRepository
             );
         }
         return $canonicalField;
+    }
+
+    private function requireAllowedFilterColumn(string $field, array $allowedColumns): array
+    {
+        $definition = $allowedColumns[strtolower($field)] ?? null;
+        if ($definition === null) {
+            throw new ApiRequestException(
+                'Invalid SQL runtime field.',
+                'INVALID_SQL_RUNTIME_FIELD',
+                [['path' => 'filter', 'message' => "Field is not exposed by this SQL resource: {$field}"]]
+            );
+        }
+        return $definition;
+    }
+
+    private function normalizeFilterValues(array $values, ?string $valueType): array
+    {
+        return array_map(
+            fn ($value) => $this->normalizeFilterValue($value, $valueType),
+            $values
+        );
+    }
+
+    private function normalizeFilterValue($value, ?string $valueType)
+    {
+        if ($valueType !== 'integer-date' || $value === null) {
+            return $value;
+        }
+
+        $date = is_int($value) ? (string)$value : $value;
+        if (!is_string($date)) {
+            $this->rejectInvalidIntegerDate();
+        }
+        if (preg_match('/^(\d{4})-(\d{2})-(\d{2})$/', $date, $parts) === 1) {
+            $date = $parts[1] . $parts[2] . $parts[3];
+        }
+        if (preg_match('/^(\d{4})(\d{2})(\d{2})$/', $date, $parts) !== 1
+            || !checkdate((int)$parts[2], (int)$parts[3], (int)$parts[1])) {
+            $this->rejectInvalidIntegerDate();
+        }
+        return (int)$date;
+    }
+
+    private function rejectInvalidIntegerDate(): void
+    {
+        throw new ApiRequestException(
+            'Invalid SQL runtime value.',
+            'INVALID_SQL_RUNTIME_VALUE',
+            [['path' => 'filter.value', 'message' => 'Expected a valid YYYY-MM-DD or YYYYMMDD date.']]
+        );
     }
 }

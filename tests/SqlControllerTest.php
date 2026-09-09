@@ -79,6 +79,9 @@ sqlAssert($normalized['resource'] === 'item', 'SQL resource normalization failed
 expectSqlRequestInvalid($validator, ['action' => 'sql', 'resource' => '../../secret']);
 expectSqlRequestInvalid($validator, ['action' => 'sql', 'resource' => 'item', 'sql' => 'SELECT * FROM Users']);
 expectSqlRequestInvalid($validator, ['action' => 'sql', 'resource' => 'item', 'sort' => [['field' => 'Id', 'direction' => 'DROP']]]);
+expectSqlRequestInvalid($validator, ['action' => 'sql', 'resource' => 'item', 'filters' => [[
+    'field' => 'Item_Desc]; DROP TABLE Users;--', 'operator' => '=', 'value' => 'x'
+]]]);
 
 $registry = new SqlResourceRegistry();
 $statsDefinition = $registry->resolve('item-dashboard-stats');
@@ -90,6 +93,13 @@ sqlAssert(
     $statsDefinition['filterColumns'] === ['Item_Desc', 'Std_Vat']
         && $statsDefinition['filterPlacement'] === 'source',
     'Statistic source filter metadata was not loaded.'
+);
+$customerDefinition = $registry->resolve('customer');
+sqlAssert(
+    $customerDefinition['filterColumns'] === ['Cust_Name', 'StDate']
+        && $customerDefinition['filterValueTypes'] === ['stdate' => 'integer-date']
+        && $customerDefinition['filterPlacement'] === 'source',
+    'Report source filter metadata was not loaded.'
 );
 try {
     $registry->resolve('not-approved');
@@ -130,6 +140,41 @@ $countExecution = array_values(array_filter(
 ))[0];
 sqlAssert($countExecution['context']['queryPhase'] === 'pagination_count', 'Count query phase was not identified.');
 sqlAssert($countExecution['params'] === $execution['params'], 'Count and data query parameters diverged.');
+
+$sqlOperatorCases = [
+    ['=', 10, '[Item_MRP] = ?', [10]],
+    ['<>', 10, '[Item_MRP] <> ?', [10]],
+    ['>', 10, '[Item_MRP] > ?', [10]],
+    ['<', 10, '[Item_MRP] < ?', [10]],
+    ['>=', 10, '[Item_MRP] >= ?', [10]],
+    ['<=', 10, '[Item_MRP] <= ?', [10]],
+    ['LIKE', '%ABC%', '[Item_Desc] LIKE ?', ['%ABC%']],
+    ['NOT LIKE', '%ABC%', '[Item_Desc] NOT LIKE ?', ['%ABC%']],
+    ['IN', [10, 20], '[Item_MRP] IN (?, ?)', [10, 20]],
+    ['NOT IN', [10, 20], '[Item_MRP] NOT IN (?, ?)', [10, 20]],
+    ['BETWEEN', [10, 20], '[Item_MRP] BETWEEN ? AND ?', [10, 20]],
+    ['NOT BETWEEN', [10, 20], '[Item_MRP] NOT BETWEEN ? AND ?', [10, 20]],
+    ['IS NULL', null, '[Item_Desc] IS NULL', []],
+    ['IS NOT NULL', null, '[Item_Desc] IS NOT NULL', []],
+];
+foreach ($sqlOperatorCases as [$operator, $value, $fragment, $expectedParams]) {
+    $operatorEngine = new SqlTestEngine();
+    $filter = [
+        'field' => str_contains($fragment, 'Item_Desc') ? 'Item_Desc' : 'Item_MRP',
+        'operator' => $operator,
+    ];
+    if (!in_array($operator, ['IS NULL', 'IS NOT NULL'], true)) {
+        $filter['value'] = $value;
+    }
+    (new SqlRepository($operatorEngine, $registry))->execute($normalizer->normalize([
+        'action' => 'sql',
+        'resource' => 'item',
+        'filters' => [$filter],
+    ]));
+    $operatorExecution = end($operatorEngine->executions);
+    sqlAssert(str_contains($operatorExecution['sql'], $fragment), "SQL {$operator} filter was not rendered.");
+    sqlAssert($operatorExecution['params'] === $expectedParams, "SQL {$operator} parameters changed.");
+}
 
 $emptySortRequest = $normalizer->normalize([
     'action' => 'sql',
@@ -279,6 +324,71 @@ $customerExecution = end($customerEngine->executions);
 sqlAssert(str_contains($customerExecution['sql'], 'FROM CustomerTable'), 'Customer SQL resource stopped loading.');
 sqlAssert(str_contains($customerExecution['sql'], 'GROUP BY Cust_Name'), 'Customer SQL grouping was changed.');
 
+$dateFilterCases = [
+    'equals' => ['=', '2021-04-01', [20210401]],
+    'greater than or equal' => ['>=', '2021-04-01', [20210401]],
+    'less than or equal' => ['<=', 20220331, [20220331]],
+    'date range' => ['BETWEEN', ['2021-04-01', '2022-03-31'], [20210401, 20220331]],
+];
+foreach ($dateFilterCases as $label => [$operator, $value, $expectedParams]) {
+    $dateEngine = new SqlTestEngine();
+    (new SqlRepository($dateEngine, $registry))->execute($normalizer->normalize([
+        'action' => 'sql',
+        'resource' => 'customer',
+        'filters' => [['field' => 'StDate', 'operator' => $operator, 'value' => $value]],
+    ]));
+    $dateExecution = end($dateEngine->executions);
+    $expectedPredicate = $operator === 'BETWEEN'
+        ? '[StDate] BETWEEN ? AND ?'
+        : "[StDate] {$operator} ?";
+    sqlAssert(
+        str_contains($dateExecution['sql'], 'FROM CustomerTable')
+            && str_contains($dateExecution['sql'], $expectedPredicate)
+            && strpos($dateExecution['sql'], '[StDate]') < strpos($dateExecution['sql'], 'GROUP BY'),
+        "Report {$label} date filter was not applied before aggregation."
+    );
+    sqlAssert($dateExecution['params'] === $expectedParams, "Report {$label} date parameters changed.");
+    sqlAssert(
+        !str_contains($dateExecution['sql'], '2021-04-01')
+            && !str_contains($dateExecution['sql'], '20210401'),
+        "Report {$label} date value leaked into SQL text."
+    );
+}
+
+foreach (['AND', 'OR'] as $logic) {
+    $logicEngine = new SqlTestEngine();
+    (new SqlRepository($logicEngine, $registry))->execute($normalizer->normalize([
+        'action' => 'sql',
+        'resource' => 'customer',
+        'filterLogic' => $logic,
+        'filters' => [
+            ['field' => 'Cust_Name', 'operator' => 'LIKE', 'value' => "%O'Brien%"],
+            ['field' => 'StDate', 'operator' => '>=', 'value' => '2021-04-01'],
+        ],
+    ]));
+    $logicExecution = end($logicEngine->executions);
+    sqlAssert(
+        str_contains($logicExecution['sql'], "[Cust_Name] LIKE ? {$logic} [StDate] >= ?"),
+        "Report {$logic} filter logic changed."
+    );
+    sqlAssert(
+        $logicExecution['params'] === ["%O'Brien%", 20210401]
+            && !str_contains($logicExecution['sql'], "O'Brien"),
+        "Report {$logic} filters were not safely parameterized."
+    );
+}
+
+try {
+    (new SqlRepository(new SqlTestEngine(), $registry))->execute($normalizer->normalize([
+        'action' => 'sql',
+        'resource' => 'customer',
+        'filters' => [['field' => 'StDate', 'operator' => '=', 'value' => '2021-02-30']],
+    ]));
+    throw new RuntimeException('Invalid integer-backed report date was accepted.');
+} catch (ApiRequestException $exception) {
+    sqlAssert($exception->getErrorCode() === 'INVALID_SQL_RUNTIME_VALUE', 'Wrong runtime date error code.');
+}
+
 $statFilterCases = [
     'Item_Desc only' => [
         [['field' => 'Item_Desc', 'operator' => 'LIKE', 'value' => '%ABC%']],
@@ -391,6 +501,16 @@ try {
     throw new RuntimeException('Non-allowlisted runtime column was accepted.');
 } catch (ApiRequestException $exception) {
     sqlAssert($exception->getErrorCode() === 'INVALID_SQL_RUNTIME_FIELD', 'Wrong runtime field error code.');
+}
+
+try {
+    $repository->execute([
+        'resource' => 'item',
+        'sort' => [['field' => 'Password', 'direction' => 'ASC']],
+    ]);
+    throw new RuntimeException('Non-output runtime sort field was accepted.');
+} catch (ApiRequestException $exception) {
+    sqlAssert($exception->getErrorCode() === 'INVALID_SQL_RUNTIME_FIELD', 'Wrong runtime sort field error code.');
 }
 
 try {

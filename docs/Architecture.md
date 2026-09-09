@@ -49,6 +49,10 @@ same `QueryEngine`, database connection, exception handling, and `Response`
 envelope. Existing `QueryController` behavior is unchanged.
 
 SQL resources may define `filterColumns` separately from returned `columns`.
+For example, a grouped report can return `Cust_Name` and aggregate aliases
+while allowing source filters on `Cust_Name` and `StDate`. If that database
+date is stored as an integer, `filterValueTypes: ['StDate' => 'integer-date']`
+converts ISO UI dates to validated integer parameters.
 Normal resources filter the wrapped output. An aggregate resource that must
 filter source rows declares `filterPlacement: source` and contains exactly one
 controlled `/*__RUNTIME_FILTERS__*/` marker. The registry validates the field

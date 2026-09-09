@@ -29,8 +29,9 @@ The public actions are `select`, `sql`, `union`, `unionAll`, `procedure`, `funct
 `sql` is a controlled report-resource action, not a raw-SQL endpoint. A client
 sends an allowlisted resource ID plus optional runtime filters, sorting, and
 pagination. The server loads the registered file under `queries/`, validates
-runtime fields against that resource's exposed output columns, binds all user
-values as prepared parameters, and uses the existing SQL Server connection.
+runtime fields against that resource's output columns or its separate
+`filterColumns` allowlist, binds all user values as prepared parameters, and
+uses the existing SQL Server connection.
 
 Current query support includes SELECT, DISTINCT, SQL Server TOP through `limit`, aliases, CASE and arithmetic expressions, an allow-list of SQL functions, prepared WHERE values, INNER/LEFT/RIGHT equality joins, GROUP BY, aggregate HAVING, multi-field sorting, pagination, eight window functions, subqueries in selected filters, one CTE (including the recursive form), UNION/UNION ALL, routines, and database metadata reads. See the definitive [JSON request reference](docs/JSON-Request-Reference.md) and [capability matrix](docs/API.md#capability-matrix) for exact boundaries.
 

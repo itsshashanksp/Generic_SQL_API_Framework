@@ -51,10 +51,13 @@ Unknown properties are rejected. Raw SQL, arbitrary SELECT parameters, client-su
 `resource` must match the exact ID of an entry in `config/sql-resources.php`;
 paths, filenames, URLs, SQL text, connection settings, and unknown properties
 are rejected. Each entry maps an internal file to exposed output aliases and a
-default sort. SQL runtime filters support comparisons, LIKE, IN, BETWEEN, and
-NULL checks on those aliases. Filter values are prepared parameters. Runtime
-sort accepts exposed aliases and `ASC`/`DESC`; pagination uses the same count
-and SQL Server compatibility strategy as JSON SELECT mode.
+default sort. Runtime filters may use a separate `filterColumns` allowlist; an
+`integer-date` entry in `filterValueTypes` converts a validated `YYYY-MM-DD` UI
+value to its `YYYYMMDD` integer parameter. SQL runtime filters support
+comparisons, LIKE, IN, BETWEEN, and NULL checks. Filter values are prepared
+parameters. Runtime sort remains limited to exposed output aliases and
+`ASC`/`DESC`; pagination uses the same count and SQL Server compatibility
+strategy as JSON SELECT mode.
 
 The registered SQL owns static projections, joins, grouping, HAVING, and other
 business logic. Dynamic grouping and free-text search are not SQL action

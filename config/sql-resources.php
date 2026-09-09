@@ -9,6 +9,9 @@ return [
     'customer' => [
         'file' => QUERY_PATH . '/reports/customer.sql',
         'columns' => ['Cust_Name', 'TotalCustomers', 'MinimumBill', 'MaximumBill',],
+        'filterColumns' => ['Cust_Name', 'StDate'],
+        'filterValueTypes' => ['StDate' => 'integer-date'],
+        'filterPlacement' => 'source',
         'defaultSort' => [['field' => 'Cust_Name', 'direction' => 'ASC']],
     ],
     'item-dashboard-stats' => [

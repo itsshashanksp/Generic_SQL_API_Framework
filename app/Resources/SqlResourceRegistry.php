@@ -48,6 +48,17 @@ class SqlResourceRegistry
                 throw new RuntimeException("Invalid SQL resource filter column: {$resource}");
             }
         }
+        $filterValueTypes = [];
+        foreach ($definition['filterValueTypes'] ?? [] as $column => $type) {
+            $canonicalColumn = array_values(array_filter(
+                $filterColumns,
+                fn (string $filterColumn): bool => strcasecmp($filterColumn, (string)$column) === 0
+            ))[0] ?? null;
+            if ($canonicalColumn === null || $type !== 'integer-date') {
+                throw new RuntimeException("Invalid SQL resource filter value type: {$resource}");
+            }
+            $filterValueTypes[strtolower($canonicalColumn)] = $type;
+        }
         $filterPlacement = $definition['filterPlacement'] ?? 'output';
         if (!in_array($filterPlacement, ['output', 'source'], true)) {
             throw new RuntimeException("Invalid SQL resource filter placement: {$resource}");
@@ -81,6 +92,7 @@ class SqlResourceRegistry
             'file' => $realFile,
             'columns' => array_values($definition['columns']),
             'filterColumns' => array_values($filterColumns),
+            'filterValueTypes' => $filterValueTypes,
             'filterPlacement' => $filterPlacement,
             'defaultSort' => array_values($definition['defaultSort'] ?? []),
         ];
