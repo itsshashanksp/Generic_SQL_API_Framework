@@ -42,8 +42,8 @@ Validation and normalization occur in `api/index.php` before controller dispatch
 
 `SqlRepository` is deliberately separate from the Universal JSON builders. Its
 base SQL is trusted application code selected only through the registry. The
-client cannot supply SQL or a file path. Runtime output fields are checked
-against per-resource aliases, identifiers are quoted by the repository, and
+client cannot supply SQL or a file path. Runtime sort and filter fields are checked
+against per-resource allowlists, identifiers are quoted by the repository, and
 values are passed to `QueryEngine::executePrepared`. Both paths converge on the
 same `QueryEngine`, database connection, exception handling, and `Response`
 envelope. Existing `QueryController` behavior is unchanged.
@@ -94,7 +94,7 @@ database/config/database.json
 
 The resolver obtains a Base64-encoded 32-byte key from the process environment only for an encrypted password. It validates the versioned object and resolves the plaintext password in memory immediately before the existing SQL Server connection path. Credential failures use safe messages, and credential exception traces are omitted from logs so password objects and key material are not exposed. This layer does not add an endpoint, authentication, authorization, or any change to the public request/response contract.
 
-Pagination performs a count query when both page values are present, then asks SQL Server for its compatibility level. Compatibility level 110 or newer uses `OFFSET/FETCH`; older levels wrap the projection and use `ROW_NUMBER()`.
+Pagination normally performs a count query when both page values are present, then asks SQL Server for its compatibility level. Compatibility level 110 or newer uses `OFFSET/FETCH`; older levels wrap the projection and use `ROW_NUMBER()`. A complete first-page SQL resource whose authored `TOP` limit fits the requested page has a tested fast path that executes directly and infers the total from returned rows.
 
 ## Request isolation and cancellation
 
@@ -114,4 +114,7 @@ This timeout controls duration and failure behavior; it does not make an ineffic
 
 Database-independent tests instantiate builders with fake `QueryEngine` and `MetadataRepository` subclasses whose constructors do not connect. They test public validation -> normalization -> SQL/parameter generation and response formatting, count/data sequencing, independent executor state, parameter isolation, timeout conversion, cleanup, and recovery after failure. A live SQL Server remains necessary for execution-plan and real ODBC timeout integration, but not for normal CI.
 
-See [API](API.md), [JSON request reference](JSON-Request-Reference.md), and [Database configuration](Database-Configuration.md).
+See [API](API.md), [JSON request reference](JSON-Request-Reference.md),
+[SQL resource configuration](SQL-Resource-Configuration.md),
+[SQL resource files](SQL-Resource-Files.md), and
+[Database configuration](Database-Configuration.md).

@@ -56,8 +56,12 @@ default sort. Runtime filters may use a separate `filterColumns` allowlist; an
 value to its `YYYYMMDD` integer parameter. SQL runtime filters support
 comparisons, LIKE, IN, BETWEEN, and NULL checks. Filter values are prepared
 parameters. Runtime sort remains limited to exposed output aliases and
-`ASC`/`DESC`; pagination uses the same count and SQL Server compatibility
-strategy as JSON SELECT mode.
+`ASC`/`DESC`; pagination reuses the SQL Server compatibility-aware pagination
+builder. The resource-file guide documents the implemented `TOP` optimization.
+
+Backend registration and file-authoring details are documented separately in
+[SQL Resource Configuration](SQL-Resource-Configuration.md) and
+[SQL Resource Files](SQL-Resource-Files.md).
 
 The registered SQL owns static projections, joins, grouping, HAVING, and other
 business logic. Dynamic grouping and free-text search are not SQL action
@@ -84,7 +88,7 @@ All controllers use the same envelope:
 
 - `data` is always an array.
 - `page` and `pageSize` copy the public pagination request, or are `null`.
-- For paginated SELECT, `totalRows` is obtained with a separate count query. Otherwise it equals `rowsReturned`.
+- Paginated SELECT and SQL-resource requests normally obtain `totalRows` with a separate count query. A complete first-page `TOP` resource can infer it from `rowsReturned`; without pagination it also defaults to `rowsReturned`.
 - `executionTime` is elapsed database execution time in milliseconds, rounded to two decimals, or `null` if the underlying result did not supply it.
 - `rowsReturned` counts rows collected across the executed result.
 - Query results do not include a separate column-schema/column-metadata property. The `metadata.columns` action returns column rows as ordinary `data`.
@@ -145,7 +149,7 @@ Public sorting uses validated logical fields or a selected alias and `ASC`/`DESC
 | Feature | Backend support | Public JSON representation | Validation | Notes |
 |---|---|---|---|---|
 | SELECT | Supported | `action: "select"`, `source`, `fields` | Table/field identifier shape, then live metadata | Existing JSON query action |
-| Controlled SQL resource | Supported | `action: "sql"`, `resource` | Explicit resource registry and output-column allowlist | No raw SQL or client paths |
+| Controlled SQL resource | Supported | `action: "sql"`, `resource` | Explicit resource registry plus sort/filter field allowlists | No raw SQL or client paths |
 | DISTINCT | Supported | `distinct: true` | Boolean | Default `false` |
 | TOP | Supported | `limit: 10` | Positive integer | Normalizes to internal `top` |
 | Column/table aliases | Supported | field `alias`; `source.alias` | Identifier | Selected aliases may be used by top-level sort |

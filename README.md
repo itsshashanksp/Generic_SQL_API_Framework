@@ -48,6 +48,9 @@ Client -> api/index.php -> QueryRequestValidator -> QueryRequestNormalizer
 Results return through the same layers and `Response` creates the public envelope. `QueryRepository` is an execution/orchestration facade; SQL construction remains split across `SelectBuilder`, `WhereBuilder`, `JoinBuilder`, `GroupByBuilder`, `HavingBuilder`, `OrderByBuilder`, `PaginationBuilder`, `WindowFunctionBuilder`, `SqlExpressionBuilder`, `RoutineBuilder`, and `SetOperationBuilder`.
 
 See [Architecture.md](docs/Architecture.md) for responsibilities and request/response flow.
+Backend developers adding controlled SQL reports should also read
+[SQL resource configuration](docs/SQL-Resource-Configuration.md) and
+[SQL resource files](docs/SQL-Resource-Files.md).
 
 ## Configure SQL Server
 
@@ -129,6 +132,8 @@ The roadmap is backend-only. See [Roadmap.md](docs/Roadmap.md) and [CHANGELOG.md
 - [Architecture](docs/Architecture.md)
 - [HTTP API](docs/API.md)
 - [JSON request reference](docs/JSON-Request-Reference.md)
+- [SQL resource configuration](docs/SQL-Resource-Configuration.md)
+- [SQL resource files](docs/SQL-Resource-Files.md)
 - [Query examples](docs/Query-Examples.md)
 - [Database configuration](docs/Database-Configuration.md)
 - [Hosting](docs/Hosting.md)

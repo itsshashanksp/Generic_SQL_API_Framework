@@ -22,10 +22,13 @@ Unknown top-level properties are rejected for every action.
 
 Identifiers use `^[A-Za-z_][A-Za-z0-9_.]*$`: letters/underscore first, then letters, digits, underscores, or dot qualifiers. This is syntax validation; SELECT builders also check tables and columns against live metadata.
 
-The `sql` action is documented in [API](API.md#controlled-sql-resource-request).
+The `sql` action overview is documented in [API](API.md#controlled-sql-resource-request).
+Backend developers should use [SQL Resource Configuration](SQL-Resource-Configuration.md)
+and [SQL Resource Files](SQL-Resource-Files.md) for registry and file details.
 Its resource IDs use the stricter `^[A-Za-z0-9][A-Za-z0-9_-]*$` shape and must
-also exist in the server registry. Its filter/sort fields are unqualified output
-aliases exposed by that resource, not arbitrary database columns.
+also exist in the server registry. Its sort fields are unqualified output aliases;
+filter fields come from the resource's `filterColumns` allowlist, which defaults
+to its output columns. Neither accepts arbitrary database fields.
 
 ## SELECT fields
 
@@ -143,7 +146,7 @@ FULL/CROSS joins, non-equality join predicates, multiple ON predicates, HAVING O
 | `pagination.page` | integer | yes when object present | minimum 1 |
 | `pagination.pageSize` | integer | yes when object present | minimum 1 |
 
-There is no implicit page or page size. Pagination returns a total from a separate count. SQL strategy is selected from SQL Server compatibility level.
+There is no implicit page or page size. Pagination normally returns a total from a separate count, and its SQL strategy is selected from SQL Server compatibility level. SQL Resource Mode has a documented complete-first-page `TOP` optimization that can infer the total instead.
 
 ## Window fields
 
