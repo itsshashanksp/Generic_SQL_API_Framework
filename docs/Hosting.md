@@ -28,7 +28,7 @@ The displayed URL is `http://localhost:<port>/index.php`. The document root is `
 
 ## Required deployment configuration
 
-Create `database/config/database.json` as described in [Database Configuration](Database-Configuration.md). SQL Server must be reachable and the PHP process identity or SQL credentials must have the needed permissions. The `logs/` directory must be writable; `Logger` creates it if absent and writes dated `YYYY-MM-DD.log` files containing successful and failed SQL execution details.
+Create `database/config/database.json` as described in [Database Configuration](Database-Configuration.md). SQL Server must be reachable and the PHP process identity or SQL credentials must have the needed permissions. If its password uses the optional encrypted format, expose `GENERIC_SQL_API_ENCRYPTION_KEY` through the host's environment or secret manager to the PHP process; do not place the key in the JSON or launcher. The `logs/` directory must be writable; `Logger` creates it if absent and writes dated `YYYY-MM-DD.log` files containing successful and failed SQL execution details.
 
 ## Other PHP environments
 
@@ -51,6 +51,8 @@ Before production deployment, configure HTTPS at the web server or reverse proxy
 - `PHP runtime not found` or `php.ini not found`: restore the corresponding bundled files or use another PHP installation.
 - `PHP ODBC extension not available`: check `runtime/windows/php/php.ini` and required runtime DLL dependencies.
 - `database.json not found`: create the ignored file at the exact documented path.
+- database encryption key errors: configure a base64-encoded 32-byte `GENERIC_SQL_API_ENCRYPTION_KEY` for the PHP process, or keep the backward-compatible plain password format.
+- database credential decryption failure: verify that the encrypted password object and environment key are the matching pair and have not been altered.
 - `No compatible SQL Server ODBC driver`: install a supported driver or configure the exact available driver and verify server/authentication settings.
 - no port between 8000–8100: stop a conflicting service or host the backend manually on another port; the launcher has no flag to change its range.
 - query failures: inspect `logs/YYYY-MM-DD.log` by request ID and `queryPhase` to distinguish count, data, prepare, execute, and fetch time. Parameter values are intentionally omitted.

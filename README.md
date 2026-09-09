@@ -67,7 +67,7 @@ Create the ignored local file `database/config/database.json`:
 }
 ```
 
-For SQL authentication use `"authentication": "sql"` plus `username` and `password`. The host must have a compatible SQL Server ODBC driver. Details and actual defaults are in [Database-Configuration.md](docs/Database-Configuration.md).
+For SQL authentication use `"authentication": "sql"` plus `username` and `password`. The password may remain a plain string for compatibility or use the optional AES-256-GCM encrypted format with a separately managed `GENERIC_SQL_API_ENCRYPTION_KEY`. Encrypted passwords require PHP OpenSSL; all connections require a compatible SQL Server ODBC driver. Setup, migration, and actual defaults are in [Database-Configuration.md](docs/Database-Configuration.md).
 
 ## Start the backend
 

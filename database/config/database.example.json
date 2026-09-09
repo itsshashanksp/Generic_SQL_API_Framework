@@ -1,0 +1,14 @@
+{
+    "provider": "sqlserver",
+    "driver": "auto",
+    "server": "localhost\\SQLEXPRESS",
+    "database": "ApplicationDb",
+    "authentication": "sql",
+    "username": "api_user",
+    "password": "replace-with-a-local-password-or-encrypted-object",
+    "port": "1433",
+    "options": {
+        "encrypt": true,
+        "trustServerCertificate": false
+    }
+}

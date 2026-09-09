@@ -6,7 +6,8 @@ $tests = [
     __DIR__ . '/BackendLogicTest.php',
     __DIR__ . '/SqlControllerTest.php',
     __DIR__ . '/QueryExecutionIsolationTest.php',
-    __DIR__ . '/LoggerTest.php'
+    __DIR__ . '/LoggerTest.php',
+    __DIR__ . '/DatabaseCredentialEncryptionTest.php'
 ];
 
 foreach ($tests as $test) {

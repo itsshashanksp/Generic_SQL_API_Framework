@@ -1,6 +1,7 @@
 <?php
 
 require_once __DIR__ . "/DatabaseDriverInterface.php";
+require_once __DIR__ . "/../../app/Security/DatabaseCredentialResolver.php";
 
 class SqlServerDriver implements DatabaseDriverInterface
 {
@@ -250,7 +251,9 @@ class SqlServerDriver implements DatabaseDriverInterface
             $config["username"] ?? "";
 
         $password =
-            $config["password"] ?? "";
+            DatabaseCredentialResolver::resolve(
+                $config["password"] ?? ""
+            );
 
         $authentication =
             strtolower(

@@ -3,6 +3,7 @@
 require_once __DIR__ . '/Response.php';
 require_once __DIR__ . '/Logger.php';
 require_once __DIR__ . '/../app/Requests/ApiRequestException.php';
+require_once __DIR__ . '/../app/Security/DatabaseCredentialException.php';
 require_once __DIR__ . '/QueryTimeoutException.php';
 
 class ExceptionHandler
@@ -37,8 +38,7 @@ class ExceptionHandler
             $logger->error(
                 "Unhandled Exception",
                 [],
-                $exception->getMessage() . PHP_EOL .
-                $exception->getTraceAsString()
+                self::formatExceptionForLog($exception)
             );
 
             if ($exception instanceof ApiRequestException) {
@@ -57,5 +57,14 @@ class ExceptionHandler
             Response::error('Query execution failed.', 500, 'QUERY_ERROR');
 
         });
+    }
+
+    private static function formatExceptionForLog(Throwable $exception): string
+    {
+        if ($exception instanceof DatabaseCredentialException) {
+            return $exception->getMessage();
+        }
+
+        return $exception->getMessage() . PHP_EOL . $exception->getTraceAsString();
     }
 }
