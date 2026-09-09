@@ -22,7 +22,7 @@ locate php.exe and php.ini
   -> php -S localhost:<port> -t api
 ```
 
-The script explicitly loads `runtime/windows/php/php.ini`, configures OPcache's file cache, and writes PHP errors to `logs/php_errors.log`. If PHP/ODBC/database validation fails, startup aborts. It does not install an ODBC driver or create database configuration.
+The script explicitly loads `runtime/windows/php/php.ini`, configures OPcache's file cache, and writes PHP errors to `logs/php_errors.log`. If PHP/ODBC/database validation fails, startup aborts. It does not install an ODBC driver or create database configuration. The Windows built-in server is single-process/single-threaded: while one request is waiting on SQL Server, later requests queue. This is a development-server limitation, not application-level connection sharing.
 
 The displayed URL is `http://localhost:<port>/index.php`. The document root is `api/`, so this maps to `api/index.php` in the repository.
 
@@ -38,7 +38,7 @@ The backend can run under another PHP installation with the ODBC extension. For 
 php -S 127.0.0.1:8000 -t api
 ```
 
-Apache, IIS, or Nginx/FastCGI can serve the `api/` directory in a managed deployment, but this repository does not include production web-server configuration. PHP's built-in server and `start-windows.bat` are development/convenience launchers, not production process managers.
+Use IIS/FastCGI, Apache with multiple PHP workers, or Nginx with PHP-FPM for concurrent production requests. Size the worker pool and SQL Server connection capacity together. This repository does not include production web-server configuration. PHP's built-in server and `start-windows.bat` are development/convenience launchers, not production process managers.
 
 Before production deployment, configure HTTPS at the web server or reverse proxy, restrict the two hard-coded development CORS origins as needed, protect the ignored database JSON and logs, use a least-privilege SQL identity, and manage PHP/ODBC updates.
 
@@ -53,4 +53,4 @@ Before production deployment, configure HTTPS at the web server or reverse proxy
 - `database.json not found`: create the ignored file at the exact documented path.
 - `No compatible SQL Server ODBC driver`: install a supported driver or configure the exact available driver and verify server/authentication settings.
 - no port between 8000–8100: stop a conflicting service or host the backend manually on another port; the launcher has no flag to change its range.
-- query failures: inspect `logs/YYYY-MM-DD.log` and the PHP error log without exposing secrets.
+- query failures: inspect `logs/YYYY-MM-DD.log` by request ID and `queryPhase` to distinguish count, data, prepare, execute, and fetch time. Parameter values are intentionally omitted.

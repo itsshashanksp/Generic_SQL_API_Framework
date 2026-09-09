@@ -26,9 +26,9 @@ class SqlTestEngine extends QueryEngine
     public array $executions = [];
     public array $resultData = [['Item_Code' => 'A1']];
     public function __construct() {}
-    public function executePrepared($sql, array $params = [])
+    public function executePrepared($sql, array $params = [], array $context = [])
     {
-        $this->executions[] = ['sql' => $sql, 'params' => $params];
+        $this->executions[] = ['sql' => $sql, 'params' => $params, 'context' => $context];
         if (str_contains($sql, 'COUNT(*) AS TotalRows')) return ['data' => [['TotalRows' => 7]]];
         if (str_contains($sql, 'compatibility_level')) return ['data' => [['CompatibilityLevel' => 150]]];
         return ['executionTime' => 0.5, 'rowsReturned' => count($this->resultData), 'data' => $this->resultData];
@@ -123,6 +123,13 @@ sqlAssert(str_contains($execution['sql'], 'SqlResource.[Item_Code] DESC'), 'Runt
 sqlAssert(str_contains($execution['sql'], 'OFFSET 25 ROWS'), 'Runtime pagination was not applied.');
 sqlAssert($execution['params'] === ["%O'Brien%"], 'Runtime filter value was not parameterized.');
 sqlAssert(!str_contains($execution['sql'], "O'Brien"), 'Runtime value leaked into SQL text.');
+sqlAssert($execution['context']['queryPhase'] === 'data', 'Main query phase was not identified.');
+$countExecution = array_values(array_filter(
+    $engine->executions,
+    fn (array $entry): bool => str_contains($entry['sql'], 'COUNT(*) AS TotalRows')
+))[0];
+sqlAssert($countExecution['context']['queryPhase'] === 'pagination_count', 'Count query phase was not identified.');
+sqlAssert($countExecution['params'] === $execution['params'], 'Count and data query parameters diverged.');
 
 $emptySortRequest = $normalizer->normalize([
     'action' => 'sql',

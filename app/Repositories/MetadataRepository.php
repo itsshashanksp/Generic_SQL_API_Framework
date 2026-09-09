@@ -7,9 +7,9 @@ class MetadataRepository
 {
     private QueryEngine $queryEngine;
 
-    public function __construct()
+    public function __construct(?QueryEngine $queryEngine = null)
     {
-        $this->queryEngine = new QueryEngine();
+        $this->queryEngine = $queryEngine ?? new QueryEngine();
     }
 
     /**
@@ -33,7 +33,8 @@ class MetadataRepository
 
         return $this->queryEngine->executePrepared(
             $sql,
-            [$tableName]
+            [$tableName],
+            ['queryPhase' => 'metadata']
         );
     }
 
@@ -73,7 +74,8 @@ class MetadataRepository
 
         $result = $this->queryEngine->executePrepared(
             $sql,
-            [$table]
+            [$table],
+            ['queryPhase' => 'metadata']
         );
 
         return (
@@ -102,7 +104,8 @@ class MetadataRepository
             [
                 $table,
                 $column
-            ]
+            ],
+            ['queryPhase' => 'metadata']
         );
 
         return (
@@ -136,7 +139,8 @@ class MetadataRepository
             [
                 $table,
                 $column
-            ]
+            ],
+            ['queryPhase' => 'metadata']
         );
 
         return $result["data"][0]["DATA_TYPE"]

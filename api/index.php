@@ -1,5 +1,9 @@
 <?php
 
+define('API_REQUEST_STARTED', microtime(true));
+define('API_REQUEST_ID', bin2hex(random_bytes(8)));
+ob_start();
+
 // --------------------
 // CORS Headers
 // --------------------
@@ -55,12 +59,20 @@ if (!is_array($publicRequest)) {
 $middleware = new LoggingMiddleware();
 $middleware->handle($publicRequest);
 
+$phaseStarted = microtime(true);
 $validator = new QueryRequestValidator();
 $validator->validate($publicRequest);
+(new Logger())->timing('validation', (microtime(true) - $phaseStarted) * 1000, [
+    'action' => $publicRequest['action'] ?? null,
+]);
 
 Response::setRequestContext($publicRequest);
+$phaseStarted = microtime(true);
 $normalizer = new QueryRequestNormalizer();
 $request = $normalizer->normalize($publicRequest);
+(new Logger())->timing('normalization', (microtime(true) - $phaseStarted) * 1000, [
+    'action' => $publicRequest['action'] ?? null,
+]);
 
 // Validate Controller
 Validator::required($request, [

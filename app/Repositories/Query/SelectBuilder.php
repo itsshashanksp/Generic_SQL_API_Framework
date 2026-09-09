@@ -23,11 +23,13 @@ class SelectBuilder
     private GroupByBuilder $groupByBuilder;
     private HavingBuilder $havingBuilder;
     private SqlExpressionBuilder $expressionBuilder;
+    private ?Logger $logger;
 
-    public function __construct(QueryEngine $queryEngine, MetadataRepository $metadataRepository)
+    public function __construct(QueryEngine $queryEngine, MetadataRepository $metadataRepository, ?Logger $logger = null)
     {
         $this->queryEngine = $queryEngine;
         $this->metadataRepository = $metadataRepository;
+        $this->logger = $logger;
         $this->expressionBuilder = new SqlExpressionBuilder();
         $this->orderByBuilder = new OrderByBuilder(
             $metadataRepository,
@@ -54,7 +56,7 @@ class SelectBuilder
  */
     public function build($request, bool $isUnion = false)
     {
-
+    $generationStarted = microtime(true);
     $params = [];
     $totalRows = null;
 
@@ -2738,6 +2740,13 @@ if ($function == "STRING_AGG") {
     }
 
     }
+
+if ($this->logger !== null) {
+    $this->logger->timing('sql_generation', (microtime(true) - $generationStarted) * 1000, [
+        'action' => 'select',
+        'pagination' => isset($request['page'], $request['pageSize']),
+    ]);
+}
 
 $pagination = $this->paginationBuilder->apply(
             $sql,

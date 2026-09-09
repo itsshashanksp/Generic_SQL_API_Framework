@@ -9,7 +9,7 @@ require_once __DIR__ . '/../core/Response.php';
 class ContractTestEngine extends QueryEngine
 {
     public function __construct() {}
-    public function executePrepared($sql, array $params = [])
+    public function executePrepared($sql, array $params = [], array $context = [])
     {
         if (strpos($sql, 'compatibility_level') !== false) {
             return ['data' => [['CompatibilityLevel' => 100]]];

@@ -25,7 +25,11 @@ class PaginationBuilder
          FROM (
              {$sqlWithoutOrderBy}
          ) AS CountQuery";
-            $countResult = $this->queryEngine->executePrepared($countSql, $params);
+            $countResult = $this->queryEngine->executePrepared($countSql, $params, [
+                'queryPhase' => 'pagination_count',
+                'page' => (int)$request['page'],
+                'pageSize' => (int)$request['pageSize'],
+            ]);
             if (!empty($countResult['data']) && isset($countResult['data'][0]['TotalRows'])) {
                 $totalRows = (int)$countResult['data'][0]['TotalRows'];
             } else {
@@ -84,7 +88,8 @@ class PaginationBuilder
             FROM sys.databases
             WHERE name = DB_NAME()
             ",
-            []
+            [],
+            ['queryPhase' => 'metadata']
         );
         if (empty($result['data']) || !isset($result['data'][0]['CompatibilityLevel'])) {
             throw new Exception('Unable to determine SQL Server compatibility level.');

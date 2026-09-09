@@ -11,7 +11,7 @@ class OrderByTestQueryEngine extends QueryEngine
         $this->compatibilityLevel = $compatibilityLevel;
     }
 
-    public function executePrepared($sql, array $params = [])
+    public function executePrepared($sql, array $params = [], array $context = [])
     {
         if (strpos($sql, 'compatibility_level') !== false) {
             return ['data' => [['CompatibilityLevel' => $this->compatibilityLevel]]];

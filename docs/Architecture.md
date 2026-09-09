@@ -16,7 +16,7 @@ Client
   -> PHP ODBC -> SQL Server
 ```
 
-Validation and normalization occur in `api/index.php` before controller dispatch. The controller performs a final internal required-field check and delegates to the service. On return, `BaseController` calls `Response`, which converts engine results into the public JSON envelope. Exceptions reach the global `ExceptionHandler`: request exceptions become 400 responses and other failures become a generic 500 `QUERY_ERROR` while details are logged.
+Validation and normalization occur in `api/index.php` before controller dispatch. The controller performs a final internal required-field check and delegates to the service. On return, `BaseController` calls `Response`, which converts engine results into the public JSON envelope. Exceptions reach the global `ExceptionHandler`: request exceptions become 400 responses, database statement timeouts become a safe 504 `QUERY_ERROR`, and other failures become a generic 500 `QUERY_ERROR` while details are logged.
 
 ## Layer responsibilities
 
@@ -74,7 +74,7 @@ Sorting remains restricted to returned columns.
 
 ## Database and metadata
 
-`DriverFactory` currently creates only `SqlServerDriver`. A `Database` construction immediately connects, which is why production repositories are connection-backed. `MetadataRepository` queries `INFORMATION_SCHEMA` to validate tables and columns and to determine types used by integer-backed date-range handling.
+`DriverFactory` currently creates only `SqlServerDriver`. A `Database` construction immediately connects, which is why production repositories are connection-backed. `QueryRepository` passes its request-owned `QueryEngine` to `MetadataRepository`, so metadata and data use one connection in sequence instead of opening a second connection. Other requests construct different engines and connections. Statements are freed in `finally`, including after failures, and the engine closes its connection at the end of its lifetime. `MetadataRepository` queries `INFORMATION_SCHEMA` to validate tables and columns and to determine types used by integer-backed date-range handling.
 
 Pagination performs a count query when both page values are present, then asks SQL Server for its compatibility level. Compatibility level 110 or newer uses `OFFSET/FETCH`; older levels wrap the projection and use `ROW_NUMBER()`.
 
@@ -84,8 +84,16 @@ Controllers, services, repositories, `QueryEngine`, and the ODBC connection are 
 
 A browser abort stops waiting for the HTTP response, but this synchronous PHP ODBC execution path exposes no safe statement-cancellation hook while `odbc_execute` is blocked. Client disconnect therefore must not be described as guaranteed SQL Server cancellation. The PHP request and ODBC resources finish or time out normally; the frontend must discard any obsolete result. No speculative cross-request SQL cancellation is implemented.
 
+## Timing and timeout model
+
+Each request has a random correlation ID. Dated logs distinguish request receipt, validation, normalization, SQL generation, connection setup, statement preparation, execution, row fetching, response construction, and request total. Query entries label pagination counts, compatibility metadata, and main data queries separately. Logs include normalized SQL with literals redacted plus parameter count/types, never parameter values or credentials.
+
+The default database statement timeout is 45 seconds and can be set with `DB_QUERY_TIMEOUT_SECONDS`. `QueryEngine` applies it with ODBC `SQL_QUERY_TIMEOUT` before every execution. It is deliberately below the bundled PHP `max_execution_time` of 60 seconds so the exception handler normally has time to return a 504 `QUERY_ERROR`. The PHP limit remains a last-resort request guard; a shutdown handler converts that fatal timeout to the same safe payload. Neither setting controls the browser, reverse proxy, load balancer, or database connection/login timeout. Configure those deployment-specific HTTP timeouts slightly above the PHP request limit, and configure login behavior in the ODBC/host environment.
+
+This timeout controls duration and failure behavior; it does not make an inefficient query fast. The observed expensive grouped aggregates and derived-table counts still need SQL Server execution-plan, index, statistics, and blocking analysis using the new phase logs.
+
 ## Test boundary
 
-Database-independent tests instantiate builders with fake `QueryEngine` and `MetadataRepository` subclasses whose constructors do not connect. This tests public validation -> normalization -> SQL/parameter generation and response formatting without changing production behavior or requiring database configuration. A live SQL Server remains necessary for actual execution and metadata integration, but not for normal CI.
+Database-independent tests instantiate builders with fake `QueryEngine` and `MetadataRepository` subclasses whose constructors do not connect. They test public validation -> normalization -> SQL/parameter generation and response formatting, count/data sequencing, independent executor state, parameter isolation, timeout conversion, cleanup, and recovery after failure. A live SQL Server remains necessary for execution-plan and real ODBC timeout integration, but not for normal CI.
 
 See [API](API.md), [JSON request reference](JSON-Request-Reference.md), and [Database configuration](Database-Configuration.md).

@@ -1,5 +1,7 @@
 <?php
 
+require_once __DIR__ . '/Logger.php';
+
 class Response
 {
     private static array $requestContext = [];
@@ -52,9 +54,12 @@ class Response
 
     public static function success($data = [], $message = 'Success', $code = 200)
     {
+        $started = microtime(true);
+        $payload = self::successPayload($data, (string)$message);
+        self::logResponseTiming($started, true);
         http_response_code($code);
         header('Content-Type: application/json');
-        echo json_encode(self::successPayload($data, (string)$message), JSON_PRETTY_PRINT);
+        echo json_encode($payload, JSON_PRETTY_PRINT);
         exit;
     }
 
@@ -64,12 +69,26 @@ class Response
         string $errorCode = 'INTERNAL_ERROR',
         array $details = []
     ) {
+        $started = microtime(true);
+        $payload = self::errorPayload((string)$message, $errorCode, $details);
+        self::logResponseTiming($started, false, $errorCode);
         http_response_code($code);
         header('Content-Type: application/json');
-        echo json_encode(
-            self::errorPayload((string)$message, $errorCode, $details),
-            JSON_PRETTY_PRINT
-        );
+        echo json_encode($payload, JSON_PRETTY_PRINT);
         exit;
+    }
+
+    private static function logResponseTiming(float $started, bool $success, ?string $errorCode = null): void
+    {
+        if (!defined('API_REQUEST_STARTED')) return;
+        $logger = new Logger();
+        $logger->timing('response_construction', (microtime(true) - $started) * 1000, [
+            'success' => $success,
+            'errorCode' => $errorCode,
+        ]);
+        $logger->timing('request_total', (microtime(true) - API_REQUEST_STARTED) * 1000, [
+            'success' => $success,
+            'errorCode' => $errorCode,
+        ]);
     }
 }

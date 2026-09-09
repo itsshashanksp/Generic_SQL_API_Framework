@@ -54,7 +54,8 @@ public function __construct(
 
         return $this->queryEngine->executePrepared(
             $sql,
-            $params
+            $params,
+            ['action' => 'union', 'queryPhase' => 'data']
         );
     }
 }

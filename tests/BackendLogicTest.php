@@ -17,9 +17,9 @@ class LogicTestEngine extends QueryEngine
         $this->compatibilityLevel = $compatibilityLevel;
     }
 
-    public function executePrepared($sql, array $params = [])
+    public function executePrepared($sql, array $params = [], array $context = [])
     {
-        $this->executions[] = ['sql' => $sql, 'params' => $params];
+        $this->executions[] = ['sql' => $sql, 'params' => $params, 'context' => $context];
         if (strpos($sql, 'compatibility_level') !== false) {
             return ['data' => [['CompatibilityLevel' => $this->compatibilityLevel]]];
         }
@@ -179,6 +179,12 @@ $paged = $buildPublic([
 logicContains('OFFSET 20 ROWS', $paged['sql'], 'OFFSET pagination failed.');
 logicContains('FETCH NEXT 10 ROWS ONLY', $paged['sql'], 'FETCH pagination failed.');
 logicAssert($paged['totalRows'] === 37, 'Pagination total-row count failed.');
+$pagedExecutions = array_slice($engine->executions, -2);
+logicAssert(
+    $pagedExecutions[0]['context']['queryPhase'] === 'pagination_count'
+        && $pagedExecutions[1]['context']['queryPhase'] === 'metadata',
+    'Pagination count/metadata execution phases were not isolated.'
+);
 
 $setEngine = new LogicTestEngine();
 $setBuilder = new SetOperationBuilder(new LogicTestRepository(), $setEngine);

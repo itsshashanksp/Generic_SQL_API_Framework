@@ -10,18 +10,22 @@ class SqlRepository
     private QueryEngine $queryEngine;
     private SqlResourceRegistry $registry;
     private PaginationBuilder $paginationBuilder;
+    private Logger $logger;
 
     public function __construct(
         ?QueryEngine $queryEngine = null,
-        ?SqlResourceRegistry $registry = null
+        ?SqlResourceRegistry $registry = null,
+        ?Logger $logger = null
     ) {
-        $this->queryEngine = $queryEngine ?? new QueryEngine();
+        $this->logger = $logger ?? new Logger();
+        $this->queryEngine = $queryEngine ?? new QueryEngine(null, $this->logger);
         $this->registry = $registry ?? new SqlResourceRegistry();
         $this->paginationBuilder = new PaginationBuilder($this->queryEngine);
     }
 
     public function execute(array $request): array
     {
+        $generationStarted = microtime(true);
         $definition = $this->registry->resolve($request['resource']);
         $sql = trim($this->queryEngine->getQuery($definition['file']));
         $sql = rtrim($sql, "; \t\n\r\0\x0B");
@@ -98,6 +102,12 @@ class SqlRepository
                 'pageSize' => $request['pagination']['pageSize'],
             ];
         }
+        $this->logger->timing('sql_generation', (microtime(true) - $generationStarted) * 1000, [
+            'action' => 'sql',
+            'resource' => $request['resource'],
+            'page' => $request['pagination']['page'] ?? null,
+            'pageSize' => $request['pagination']['pageSize'] ?? null,
+        ]);
         $paged = $this->paginationBuilder->apply(
             $orderedSql,
             $countBaseSql,
@@ -106,7 +116,13 @@ class SqlRepository
             $paginationOrderSql !== '' ? trim($paginationOrderSql) : null,
             !($canPageAuthoredSqlDirectly && $topFitsRequestedPage)
         );
-        $result = $this->queryEngine->executePrepared($paged['sql'], $params);
+        $result = $this->queryEngine->executePrepared($paged['sql'], $params, [
+            'action' => 'sql',
+            'resource' => $request['resource'],
+            'queryPhase' => 'data',
+            'page' => $request['pagination']['page'] ?? null,
+            'pageSize' => $request['pagination']['pageSize'] ?? null,
+        ]);
         if ($paged['totalRows'] !== null) {
             $result['totalRows'] = $paged['totalRows'];
         } elseif ($canInferTotalRowsFromData) {

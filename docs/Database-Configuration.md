@@ -84,4 +84,6 @@ It prints `CONNECTED` and exits 0 after opening and closing a connection, or pri
 
 ## Security
 
-`database/config/database.json` is gitignored; do not commit credentials. Restrict filesystem access to the deployment account, use least-privilege database users, choose encryption/trust settings appropriate for the environment, and avoid publishing connection error output. Query logs can contain SQL and parameter values and should also be protected.
+`database/config/database.json` is gitignored; do not commit credentials. Restrict filesystem access to the deployment account, use least-privilege database users, choose encryption/trust settings appropriate for the environment, and avoid publishing connection error output. Query logs contain normalized SQL with literals redacted and parameter type/count metadata, but not parameter values or credentials; they should still be protected.
+
+The query execution timeout is application configuration rather than a database credential. It defaults to 45 seconds and may be overridden for a deployment with the `DB_QUERY_TIMEOUT_SECONDS` environment variable. Keep it below PHP's request execution limit. This setting is applied to ODBC statements and does not control ODBC login, HTTP proxy, or browser timeouts.

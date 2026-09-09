@@ -184,6 +184,9 @@ echo API: http://localhost:%PORT%/index.php
 echo.
 echo Starting API...
 echo.
+echo [WARNING] PHP's built-in Windows server handles one request at a time.
+echo [WARNING] Use IIS/FastCGI or another multi-worker host for concurrency.
+echo.
 
 "%PHP%" ^
     -c "%PHP_INI%" ^
