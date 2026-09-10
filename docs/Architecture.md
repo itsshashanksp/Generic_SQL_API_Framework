@@ -31,6 +31,7 @@ Validation and normalization occur in `api/index.php` before controller dispatch
 | `QueryRepository` | Execution/orchestration facade for SELECT, set operations, and routines |
 | `SqlResourceRegistry` | Maps exact approved IDs to backend files, exposed output aliases, and default sorting; enforces path containment |
 | `SqlRepository` | Loads a registered SELECT, wraps it, safely applies supported runtime state, and reuses pagination/execution infrastructure |
+| `ScopedMetadataRepository` | Adds request-local inferred CTE output metadata while delegating physical table/column checks to `MetadataRepository` |
 | Query builders | Validate database objects and construct SQL fragments/parameters |
 | `QueryEngine` | ODBC execution, result collection, timing, row counts, execution logs |
 | Database layer | Reads local JSON configuration, resolves plain or encrypted credentials, chooses the SQL Server driver, and opens/closes the ODBC connection |
@@ -75,6 +76,8 @@ Sorting remains restricted to returned columns.
 | `SetOperationBuilder` | Combines built SELECT statements and merges their parameters |
 
 `OrderByBuilder` deliberately distinguishes top-level positional ordering from a window `ORDER BY`. SQL Server permits top-level `ORDER BY 1`, but rejects integer indexes inside `ROW_NUMBER() OVER (...)`. Window and legacy-pagination paths resolve positions to actual validated projections. The public validator rejects numeric sort fields entirely, so public clients always send logical fields.
+
+Nested SELECT construction snapshots and restores the expression alias scope, so a filter subquery cannot replace the outer query's aliases before GROUP BY or ORDER BY is built. CTE projections are registered as request-local virtual metadata: recursive branches can resolve their self-reference, outer clauses validate against projected names, and paginated count SQL receives the same `WITH` prefix as the data query.
 
 ## Database and metadata
 

@@ -60,8 +60,17 @@ class QueryRequestValidator
                         $errors[] = ['path' => "queries.{$index}", 'message' => 'Query must be an object.'];
                         continue;
                     }
-                    $query['action'] = 'select';
-                    $this->validateSelect($query, "queries.{$index}.", $errors);
+                    $this->validateSelect($query, "queries.{$index}.", $errors, 'set-operation');
+                }
+                $counts = array_map(
+                    fn (array $query): ?int => in_array('*', $query['fields'] ?? [], true)
+                        ? null
+                        : (is_array($query['fields'] ?? null) ? count($query['fields']) : null),
+                    array_filter($request['queries'], 'is_array')
+                );
+                $knownCounts = array_values(array_filter($counts, fn ($count) => $count !== null));
+                if ($knownCounts !== [] && count(array_unique($knownCounts)) > 1) {
+                    $errors[] = ['path' => 'queries', 'message' => 'Set-operation branches must return the same number of fields.'];
                 }
             }
         } elseif (in_array($action, ['procedure', 'function', 'tableFunction'], true)) {
@@ -85,13 +94,28 @@ class QueryRequestValidator
         }
     }
 
-    private function validateSelect(array $request, string $prefix, array &$errors): void
+    private function validateSelect(
+        array $request,
+        string $prefix,
+        array &$errors,
+        string $context = 'top-level'
+    ): void
     {
         $this->rejectUnknown($request, [
             'action', 'source', 'fields', 'filters', 'joins', 'groupBy',
             'having', 'sort', 'pagination', 'distinct', 'limit',
             'filterLogic', 'with'
         ], $prefix, $errors);
+        if ($context !== 'top-level') {
+            foreach (['action', 'sort', 'pagination', 'with'] as $unsupported) {
+                if (array_key_exists($unsupported, $request)) {
+                    $errors[] = [
+                        'path' => $prefix . $unsupported,
+                        'message' => 'This property is not supported in a nested SELECT body.',
+                    ];
+                }
+            }
+        }
         $this->validateSourceName($request, 'table', $errors, $prefix);
         if (empty($request['fields']) || !is_array($request['fields'])) {
             $errors[] = ['path' => $prefix . 'fields', 'message' => 'Fields must be a non-empty array.'];
@@ -148,6 +172,10 @@ class QueryRequestValidator
                     }
                     if (isset($field['case'])) {
                         $this->validateCase($field['case'], $path . '.case', $errors);
+                    }
+                    if (isset($field['function']) && is_string($field['function'])
+                        && in_array(strtoupper($field['function']), self::FUNCTIONS, true)) {
+                        $this->validateFunctionField($field, $path, $errors);
                     }
                 }
             }
@@ -259,7 +287,7 @@ class QueryRequestValidator
                 if (!is_array($filter['query'] ?? null)) {
                     $errors[] = ['path' => $itemPath . '.query', 'message' => 'A subquery is required.'];
                 } else {
-                    $this->validateSelect($filter['query'], $itemPath . '.query.', $errors);
+                    $this->validateSelect($filter['query'], $itemPath . '.query.', $errors, 'subquery');
                 }
                 continue;
             }
@@ -274,7 +302,14 @@ class QueryRequestValidator
                     if (!is_array($filter['query'])) {
                         $errors[] = ['path' => $itemPath . '.query', 'message' => 'Subquery must be an object.'];
                     } else {
-                        $this->validateSelect($filter['query'], $itemPath . '.query.', $errors);
+                        $this->validateSelect($filter['query'], $itemPath . '.query.', $errors, 'subquery');
+                        if (count($filter['query']['fields'] ?? []) !== 1
+                            || in_array('*', $filter['query']['fields'] ?? [], true)) {
+                            $errors[] = [
+                                'path' => $itemPath . '.query.fields',
+                                'message' => 'IN subqueries must return exactly one explicit field.',
+                            ];
+                        }
                     }
                 } elseif (!isset($filter['value']) || !is_array($filter['value']) || $filter['value'] === []) {
                     $errors[] = ['path' => $itemPath . '.value', 'message' => 'IN requires a non-empty value array or query.'];
@@ -322,7 +357,241 @@ class QueryRequestValidator
                 $errors[] = ['path' => $path . '.' . $branch, 'message' => 'CTE branch must be a SELECT body.'];
                 continue;
             }
-            $this->validateSelect($with[$branch], $path . '.' . $branch . '.', $errors);
+            $this->validateSelect($with[$branch], $path . '.' . $branch . '.', $errors, 'cte');
+        }
+        if ($isRecursive
+            && is_array($with['anchor'] ?? null)
+            && is_array($with['recursive'] ?? null)
+            && !in_array('*', $with['anchor']['fields'] ?? [], true)
+            && !in_array('*', $with['recursive']['fields'] ?? [], true)
+            && count($with['anchor']['fields'] ?? []) !== count($with['recursive']['fields'] ?? [])) {
+            $errors[] = [
+                'path' => $path,
+                'message' => 'Recursive CTE branches must return the same number of fields.',
+            ];
+        }
+    }
+
+    private function validateFunctionField(array $field, string $path, array &$errors): void
+    {
+        $function = strtoupper($field['function']);
+        $columnFunctions = [
+            'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'STRING_AGG',
+            'UPPER', 'LOWER', 'LTRIM', 'RTRIM', 'TRIM', 'LEN', 'ISNULL',
+            'CAST', 'CONVERT', 'NULLIF', 'LEFT', 'RIGHT', 'SUBSTRING',
+            'REPLACE', 'CHARINDEX', 'PATINDEX', 'FORMAT', 'YEAR', 'MONTH',
+            'DAY', 'DATEPART', 'DATENAME', 'DATEADD', 'ISDATE', 'ABS', 'ROUND',
+            'CEILING', 'FLOOR', 'POWER', 'SQRT', 'EXP', 'LOG', 'LAG', 'LEAD',
+            'FIRST_VALUE', 'LAST_VALUE',
+        ];
+        if (in_array($function, $columnFunctions, true)
+            && !isset($field['field'])) {
+            $errors[] = ['path' => $path . '.field', 'message' => "{$function} requires a field."];
+        }
+        if ($function !== 'COUNT' && ($field['field'] ?? null) === '*') {
+            $errors[] = ['path' => $path . '.field', 'message' => "{$function} does not accept *."];
+        }
+
+        if ($function === 'STRING_AGG' && !is_string($field['separator'] ?? null)) {
+            $errors[] = ['path' => $path . '.separator', 'message' => 'STRING_AGG requires a string separator.'];
+        }
+        if ($function === 'COALESCE'
+            && (!is_array($field['fields'] ?? null) || $field['fields'] === [])) {
+            $errors[] = ['path' => $path . '.fields', 'message' => 'COALESCE requires at least one field.'];
+        }
+        if ($function === 'CONCAT'
+            && (!is_array($field['fields'] ?? null) || count($field['fields']) < 2)) {
+            $errors[] = ['path' => $path . '.fields', 'message' => 'CONCAT requires at least two fields.'];
+        }
+        foreach (['ISNULL' => 'default', 'NULLIF' => 'value'] as $name => $key) {
+            if ($function === $name && !array_key_exists($key, $field)) {
+                $errors[] = ['path' => $path . '.' . $key, 'message' => "{$name} requires {$key}."];
+            } elseif ($function === $name && !$this->isSafeFunctionExpression($field[$key])) {
+                $errors[] = ['path' => $path . '.' . $key, 'message' => "{$name} requires a safe {$key} expression."];
+            }
+        }
+        if ($function === 'COALESCE' && isset($field['default'])
+            && !$this->isSafeFunctionExpression($field['default'])) {
+            $errors[] = ['path' => $path . '.default', 'message' => 'COALESCE requires a safe default expression.'];
+        }
+        if ($function === 'REPLACE') {
+            foreach (['search', 'replace'] as $key) {
+                if (!is_string($field[$key] ?? null)) {
+                    $errors[] = ['path' => $path . '.' . $key, 'message' => "REPLACE requires a string {$key}."];
+                }
+            }
+        }
+        foreach (['CHARINDEX' => 'search', 'PATINDEX' => 'pattern', 'FORMAT' => 'format'] as $name => $key) {
+            if ($function === $name && !is_string($field[$key] ?? null)) {
+                $errors[] = ['path' => $path . '.' . $key, 'message' => "{$name} requires a string {$key}."];
+            }
+        }
+
+        if (in_array($function, ['LEFT', 'RIGHT'], true)) {
+            $this->requirePositiveInteger($field, 'length', $path, $errors, $function);
+        }
+        if ($function === 'SUBSTRING') {
+            $this->requirePositiveInteger($field, 'start', $path, $errors, $function);
+            $this->requirePositiveInteger($field, 'length', $path, $errors, $function, true);
+        }
+        if (in_array($function, ['CAST', 'CONVERT'], true) && empty($field['datatype'])) {
+            $errors[] = ['path' => $path . '.datatype', 'message' => "{$function} requires datatype."];
+        }
+        if (isset($field['style']) && !is_int($field['style'])) {
+            $errors[] = ['path' => $path . '.style', 'message' => 'Style must be an integer.'];
+        }
+
+        $dateParts = [
+            'YEAR', 'QUARTER', 'MONTH', 'DAYOFYEAR', 'DAY', 'WEEK', 'WEEKDAY',
+            'HOUR', 'MINUTE', 'SECOND', 'MILLISECOND',
+        ];
+        if (in_array($function, ['DATEPART', 'DATENAME'], true)
+            && (!is_string($field['part'] ?? null)
+                || !in_array(strtoupper($field['part']), $dateParts, true))) {
+            $errors[] = ['path' => $path . '.part', 'message' => "{$function} requires a supported date part."];
+        }
+        if ($function === 'DATEADD') {
+            if (!is_string($field['datepart'] ?? null)
+                || !in_array(strtoupper($field['datepart']), ['YEAR', 'MONTH', 'DAY', 'HOUR', 'MINUTE', 'SECOND'], true)) {
+                $errors[] = ['path' => $path . '.datepart', 'message' => 'DATEADD requires a supported date part.'];
+            }
+            if (!is_int($field['number'] ?? null)) {
+                $errors[] = ['path' => $path . '.number', 'message' => 'DATEADD number must be an integer.'];
+            }
+        }
+        if ($function === 'DATEDIFF') {
+            if (!is_string($field['datepart'] ?? null)
+                || !in_array(strtoupper($field['datepart']), $dateParts, true)) {
+                $errors[] = ['path' => $path . '.datepart', 'message' => 'DATEDIFF requires a supported date part.'];
+            }
+            foreach (['start', 'end'] as $endpoint) {
+                $this->validateDateEndpoint($field[$endpoint] ?? null, $path . '.' . $endpoint, $errors);
+            }
+        }
+        if ($function === 'EOMONTH') {
+            $this->validateDateEndpoint($field['start'] ?? null, $path . '.start', $errors);
+            if (isset($field['month']) && !is_int($field['month'])) {
+                $errors[] = ['path' => $path . '.month', 'message' => 'EOMONTH month must be an integer.'];
+            }
+        }
+
+        $partsFunctions = [
+            'DATEFROMPARTS' => ['year', 'month', 'day'],
+            'DATETIMEFROMPARTS' => ['year', 'month', 'day', 'hour', 'minute', 'second', 'millisecond'],
+        ];
+        foreach ($partsFunctions[$function] ?? [] as $part) {
+            if (!array_key_exists($part, $field)
+                || !$this->isSafeNumericFunctionExpression($field[$part])) {
+                $errors[] = ['path' => $path . '.' . $part, 'message' => "{$function} requires a safe {$part} expression."];
+            }
+        }
+
+        if ($function === 'IIF') {
+            $condition = $field['condition'] ?? null;
+            $operator = strtoupper((string)($condition['operator'] ?? ''));
+            $rightIsValid = in_array($operator, ['IN', 'NOT IN'], true)
+                ? is_array($condition['right'] ?? null)
+                    && $condition['right'] !== []
+                    && array_filter(
+                        $condition['right'],
+                        fn ($value) => !$this->isSafeFunctionExpression($value)
+                    ) === []
+                : $this->isSafeFunctionExpression($condition['right'] ?? null);
+            if (!is_array($condition)
+                || array_diff(array_keys($condition), ['left', 'operator', 'right']) !== []
+                || !in_array($operator, ['=', '!=', '<>', '>', '<', '>=', '<=', 'LIKE', 'NOT LIKE', 'IN', 'NOT IN'], true)
+                || !$this->isSafeFunctionExpression($condition['left'] ?? null)
+                || !$rightIsValid) {
+                $errors[] = ['path' => $path . '.condition', 'message' => 'IIF requires a valid condition.'];
+            }
+            foreach (['true', 'false'] as $branch) {
+                if (!array_key_exists($branch, $field)
+                    || !$this->isSafeFunctionExpression($field[$branch])) {
+                    $errors[] = ['path' => $path . '.' . $branch, 'message' => "IIF requires a safe {$branch} expression."];
+                }
+            }
+        }
+        if ($function === 'CHOOSE') {
+            $this->requirePositiveInteger($field, 'index', $path, $errors, $function);
+            if (!is_array($field['values'] ?? null) || count($field['values']) < 2
+                || array_filter($field['values'] ?? [], fn ($value) => !$this->isSafeFunctionExpression($value))) {
+                $errors[] = ['path' => $path . '.values', 'message' => 'CHOOSE requires at least two safe values.'];
+            }
+        }
+
+        if ($function === 'NTILE') {
+            $this->requirePositiveInteger($field, 'buckets', $path, $errors, $function);
+        }
+        if (in_array($function, ['LAG', 'LEAD'], true) && isset($field['offset'])) {
+            $this->requirePositiveInteger($field, 'offset', $path, $errors, $function);
+        }
+        if (in_array($function, ['LAG', 'LEAD'], true) && isset($field['default'])
+            && !$this->isSafeFunctionExpression($field['default'])) {
+            $errors[] = ['path' => $path . '.default', 'message' => "{$function} requires a safe default expression."];
+        }
+        if ($function === 'ROUND' && isset($field['precision']) && !is_int($field['precision'])) {
+            $errors[] = ['path' => $path . '.precision', 'message' => 'ROUND precision must be an integer.'];
+        }
+        if ($function === 'POWER' && !is_int($field['power'] ?? null) && !is_float($field['power'] ?? null)) {
+            $errors[] = ['path' => $path . '.power', 'message' => 'POWER requires a numeric power.'];
+        }
+    }
+
+    private function validateDateEndpoint($endpoint, string $path, array &$errors): void
+    {
+        $valid = false;
+        if (is_array($endpoint) && isset($endpoint['field'])) {
+            $valid = $this->isIdentifier($endpoint['field'])
+                && array_diff(array_keys($endpoint), ['field', 'style']) === []
+                && (!isset($endpoint['style']) || is_int($endpoint['style']));
+        } elseif (is_array($endpoint) && isset($endpoint['function'])) {
+            $valid = strtoupper((string)$endpoint['function']) === 'GETDATE'
+                && array_keys($endpoint) === ['function'];
+        }
+        if (!$valid) {
+            $errors[] = ['path' => $path, 'message' => 'Date endpoint must contain a field or GETDATE function.'];
+        }
+    }
+
+    private function isSafeFunctionExpression($value): bool
+    {
+        if (is_int($value) || is_float($value) || is_string($value)
+            || is_bool($value) || $value === null) {
+            return true;
+        }
+        if (!is_array($value)) {
+            return false;
+        }
+        if (isset($value['field'])) {
+            return count($value) === 1 && $this->isIdentifier($value['field']);
+        }
+        $expression = $value['expression'] ?? null;
+        return count($value) === 1 && is_array($expression)
+            && in_array($expression['operator'] ?? null, ['+', '-', '*', '/', '%'], true)
+            && $this->isSafeFunctionExpression($expression['left'] ?? null)
+            && $this->isSafeFunctionExpression($expression['right'] ?? null);
+    }
+
+    private function isSafeNumericFunctionExpression($value): bool
+    {
+        return is_int($value) || is_float($value)
+            || (is_array($value) && $this->isSafeFunctionExpression($value));
+    }
+
+    private function requirePositiveInteger(
+        array $field,
+        string $key,
+        string $path,
+        array &$errors,
+        string $function,
+        bool $allowZero = false
+    ): void {
+        $value = $field[$key] ?? null;
+        if (!is_int($value) || $value < ($allowZero ? 0 : 1)) {
+            $errors[] = [
+                'path' => $path . '.' . $key,
+                'message' => "{$function} {$key} must be " . ($allowZero ? 'a non-negative' : 'a positive') . ' integer.',
+            ];
         }
     }
 
@@ -385,10 +654,21 @@ class QueryRequestValidator
             if (!$this->isIdentifier($condition['field'] ?? null)
                 || !in_array(strtoupper((string)($condition['operator'] ?? '')), ['=', '!=', '<>', '>', '<', '>=', '<='], true)
                 || !array_key_exists('value', $condition)
-                || !array_key_exists('then', $when)) {
+                || !array_key_exists('then', $when)
+                || !$this->isLiteral($condition['value'] ?? null)
+                || !$this->isLiteral($when['then'] ?? null)) {
                 $errors[] = ['path' => $itemPath, 'message' => 'Invalid CASE WHEN clause.'];
             }
         }
+        if (array_key_exists('else', $case) && !$this->isLiteral($case['else'])) {
+            $errors[] = ['path' => $path . '.else', 'message' => 'CASE ELSE must be a literal value.'];
+        }
+    }
+
+    private function isLiteral($value): bool
+    {
+        return is_int($value) || is_float($value) || is_string($value)
+            || is_bool($value) || $value === null;
     }
 
     private function validateSourceName(array $request, string $key, array &$errors, string $prefix = ''): void

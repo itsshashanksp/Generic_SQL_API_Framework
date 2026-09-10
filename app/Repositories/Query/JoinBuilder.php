@@ -3,10 +3,12 @@
 class JoinBuilder
 {
     private MetadataRepository $metadataRepository;
+    private $columnResolver;
 
-    public function __construct(MetadataRepository $metadataRepository)
+    public function __construct(MetadataRepository $metadataRepository, callable $columnResolver)
     {
         $this->metadataRepository = $metadataRepository;
+        $this->columnResolver = $columnResolver;
     }
 
     public function build(array $request): string
@@ -22,6 +24,14 @@ class JoinBuilder
             }
             if (!$this->metadataRepository->tableExists($join['table'])) {
                 throw new Exception("Invalid JOIN table: {$join['table']}");
+            }
+            foreach (['left', 'right'] as $side) {
+                $resolved = ($this->columnResolver)($join[$side]);
+                $table = $resolved['table']
+                    ?? ($side === 'left' ? $request['table'] : $join['table']);
+                if (!$this->metadataRepository->columnExists($table, $resolved['column'])) {
+                    throw new Exception("Invalid JOIN column: {$join[$side]}");
+                }
             }
             $alias = !empty($join['alias']) ? ' ' . $join['alias'] : '';
             $sql .= "

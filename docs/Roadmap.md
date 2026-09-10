@@ -11,6 +11,9 @@ This roadmap covers only the Generic SQL API backend. Frontend dashboards, grids
 - IN/EXISTS filter subqueries, standard/recursive CTE, UNION/UNION ALL
 - stored procedure, scalar function, table-valued function, and metadata actions
 - stable success/error envelope, execution timing, row count, query/error logging
+- Phase 1 completion coverage for every public function family, JOIN columns,
+  nested filter subqueries, CTE/recursive-CTE output scope and pagination,
+  UNION/UNION ALL compatibility, routines, metadata, and SQL Resource Mode
 
 Current boundaries remain documented in the [capability matrix](API.md#capability-matrix). In particular, FULL/CROSS joins, window partitioning, public INTERSECT/EXCEPT, general subqueries, and write operations are not released features.
 

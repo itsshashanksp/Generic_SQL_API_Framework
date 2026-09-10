@@ -10,11 +10,12 @@ require_once __DIR__ . '/WhereBuilder.php';
 require_once __DIR__ . '/GroupByBuilder.php';
 require_once __DIR__ . '/HavingBuilder.php';
 require_once __DIR__ . '/SqlExpressionBuilder.php';
+require_once __DIR__ . '/ScopedMetadataRepository.php';
 
 class SelectBuilder
 {
     private QueryEngine $queryEngine;
-    private MetadataRepository $metadataRepository;
+    private ScopedMetadataRepository $metadataRepository;
     private OrderByBuilder $orderByBuilder;
     private PaginationBuilder $paginationBuilder;
     private WindowFunctionBuilder $windowFunctionBuilder;
@@ -28,11 +29,11 @@ class SelectBuilder
     public function __construct(QueryEngine $queryEngine, MetadataRepository $metadataRepository, ?Logger $logger = null)
     {
         $this->queryEngine = $queryEngine;
-        $this->metadataRepository = $metadataRepository;
+        $this->metadataRepository = new ScopedMetadataRepository($metadataRepository);
         $this->logger = $logger;
         $this->expressionBuilder = new SqlExpressionBuilder();
         $this->orderByBuilder = new OrderByBuilder(
-            $metadataRepository,
+            $this->metadataRepository,
             fn (string $column): array => $this->expressionBuilder->resolveColumn($column)
         );
         $this->paginationBuilder = new PaginationBuilder($queryEngine);
@@ -41,14 +42,14 @@ class SelectBuilder
             fn ($value): string => $this->expressionBuilder->buildValue($value)
         );
         $resolver = fn (string $column): array => $this->expressionBuilder->resolveColumn($column);
-        $this->joinBuilder = new JoinBuilder($metadataRepository);
+        $this->joinBuilder = new JoinBuilder($this->metadataRepository, $resolver);
         $this->whereBuilder = new WhereBuilder(
-            $metadataRepository,
+            $this->metadataRepository,
             $resolver,
-            fn (array $request, bool $isUnion): array => $this->build($request, $isUnion)
+            fn (array $request, bool $isUnion): array => $this->buildNested($request, $isUnion)
         );
-        $this->groupByBuilder = new GroupByBuilder($metadataRepository, $resolver);
-        $this->havingBuilder = new HavingBuilder($metadataRepository, $resolver);
+        $this->groupByBuilder = new GroupByBuilder($this->metadataRepository, $resolver);
+        $this->havingBuilder = new HavingBuilder($this->metadataRepository, $resolver);
     }
 
 /*
@@ -56,6 +57,7 @@ class SelectBuilder
  */
     public function build($request, bool $isUnion = false)
     {
+    $this->metadataRepository->setVirtualTables($request['_virtualTables'] ?? []);
     $generationStarted = microtime(true);
     $params = [];
     $totalRows = null;
@@ -86,16 +88,26 @@ if (isset($request["recursiveCte"])) {
     }
 
     $anchor =
-        $this->build(
+        $this->buildNested(
             $cte["anchor"],
             true
         );
 
+    $cteColumns = $this->getOutputColumns($cte['anchor']);
+    $recursiveRequest = $cte['recursive'];
+    $recursiveRequest['_virtualTables'] = [$cte['name'] => $cteColumns];
+    $this->metadataRepository->setVirtualTables($recursiveRequest['_virtualTables']);
+    if (count($this->getOutputColumns($recursiveRequest)) !== count($cteColumns)) {
+        throw new Exception('Recursive CTE branches must return the same number of columns.');
+    }
+
     $recursive =
-        $this->build(
-            $cte["recursive"],
+        $this->buildNested(
+            $recursiveRequest,
             true
         );
+
+    $this->metadataRepository->setVirtualTables([$cte['name'] => $cteColumns]);
 
     $cteSql =
         "WITH "
@@ -130,10 +142,14 @@ if (isset($request['cte'])) {
         );
     }
 
-    $subQuery = $this->build(
+    $subQuery = $this->buildNested(
         $cte['query'],
         true
     );
+
+    $this->metadataRepository->setVirtualTables([
+        $cte['name'] => $this->getOutputColumns($cte['query']),
+    ]);
 
     $cteSql =
         "WITH {$cte['name']} AS ({$subQuery['sql']}) ";
@@ -330,6 +346,8 @@ if (isset($column['expression'])) {
  * Aggregate Column
  */
 if (isset($column['function'])) {
+
+$this->validateExpressionColumns($column, $request);
 
 $functionsWithoutColumn = [
     "GETDATE",
@@ -1269,7 +1287,7 @@ if (
         /*
          * Normal Column With Alias
          */
-        else {
+        if (!isset($column['function'])) {
 
             $resolved = $this->expressionBuilder->resolveColumn($column['column']);
 
@@ -2753,7 +2771,9 @@ $pagination = $this->paginationBuilder->apply(
             $sqlWithoutOrderBy,
             $params,
             $request,
-            $paginationOrderBy
+            $paginationOrderBy,
+            true,
+            $cteSql
         );
         $sql = $cteSql . $pagination['sql'];
         $totalRows = $pagination['totalRows'];
@@ -2761,7 +2781,85 @@ $pagination = $this->paginationBuilder->apply(
         return [
             'sql' => $sql,
             'params' => $params,
-            'totalRows' => $totalRows
+            'totalRows' => $totalRows,
+            'columnCount' => count($this->getOutputColumns($request)),
         ];
+    }
+
+    private function buildNested(array $request, bool $isUnion): array
+    {
+        $tables = $this->expressionBuilder->getTables();
+        $virtualTables = $this->metadataRepository->getVirtualTables();
+        if (!isset($request['_virtualTables']) && $virtualTables !== []) {
+            $request['_virtualTables'] = $virtualTables;
+        }
+        try {
+            return $this->build($request, $isUnion);
+        } finally {
+            $this->expressionBuilder->setTables($tables);
+            $this->metadataRepository->setVirtualTables($virtualTables);
+        }
+    }
+
+    private function getOutputColumns(array $request): array
+    {
+        $columns = [];
+        foreach ($request['columns'] as $column) {
+            if ($column === '*') {
+                $metadata = $this->metadataRepository->getColumns($request['table']);
+                foreach ($metadata['data'] ?? [] as $entry) {
+                    if (!empty($entry['COLUMN_NAME'])) {
+                        $columns[] = $entry['COLUMN_NAME'];
+                    }
+                }
+                continue;
+            }
+            if (is_string($column)) {
+                $parts = explode('.', $column);
+                $columns[] = end($parts);
+                continue;
+            }
+            if (!empty($column['alias'])) {
+                $columns[] = $column['alias'];
+            } elseif (isset($column['case'])) {
+                $columns[] = $column['case']['alias'] ?? 'CaseValue';
+            } elseif (isset($column['expression'])) {
+                $columns[] = 'Expression';
+            } elseif (isset($column['function'])) {
+                $columns[] = strtolower($column['function']);
+            } elseif (!empty($column['column'])) {
+                $parts = explode('.', $column['column']);
+                $columns[] = end($parts);
+            }
+        }
+        return $columns;
+    }
+
+    private function validateExpressionColumns($value, array $request): void
+    {
+        if (!is_array($value)) {
+            return;
+        }
+        if (array_is_list($value)) {
+            foreach ($value as $item) {
+                $this->validateExpressionColumns($item, $request);
+            }
+            return;
+        }
+        if (isset($value['column']) && $value['column'] !== '*') {
+            $resolved = $this->expressionBuilder->resolveColumn($value['column']);
+            $table = $resolved['table'] ?? $request['table'];
+            if (!$this->metadataRepository->columnExists($table, $resolved['column'])) {
+                throw new Exception("Invalid expression column: {$value['column']}");
+            }
+        }
+        foreach ($value as $key => $item) {
+            if ($key === 'orderBy') {
+                continue;
+            }
+            if (is_array($item)) {
+                $this->validateExpressionColumns($item, $request);
+            }
+        }
     }
 }

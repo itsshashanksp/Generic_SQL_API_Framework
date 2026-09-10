@@ -4,6 +4,7 @@ $tests = [
     __DIR__ . '/UniversalApiContractTest.php',
     __DIR__ . '/OrderByWindowRegressionTest.php',
     __DIR__ . '/BackendLogicTest.php',
+    __DIR__ . '/Phase1CapabilityTest.php',
     __DIR__ . '/SqlControllerTest.php',
     __DIR__ . '/QueryExecutionIsolationTest.php',
     __DIR__ . '/LoggerTest.php',

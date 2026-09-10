@@ -34,10 +34,19 @@ public function __construct(
 
         $sqlParts = [];
         $params = [];
+        $columnCount = null;
 
         foreach ($request['queries'] as $query) {
 
             $result = $this->queryRepository->buildSelect($query, true);
+
+            $branchColumnCount = $result['columnCount'] ?? null;
+            if ($branchColumnCount !== null) {
+                if ($columnCount !== null && $branchColumnCount !== $columnCount) {
+                    throw new Exception('Set-operation branches must return the same number of columns.');
+                }
+                $columnCount = $branchColumnCount;
+            }
 
             $sqlParts[] = trim($result['sql']);
 

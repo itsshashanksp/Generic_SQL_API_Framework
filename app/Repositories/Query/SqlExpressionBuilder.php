@@ -9,6 +9,16 @@ class SqlExpressionBuilder
         $this->tableMap = [];
     }
 
+    public function getTables(): array
+    {
+        return $this->tableMap;
+    }
+
+    public function setTables(array $tables): void
+    {
+        $this->tableMap = $tables;
+    }
+
     public function registerTable(string $name, string $table): void
     {
         $this->tableMap[$name] = $table;
@@ -56,9 +66,15 @@ class SqlExpressionBuilder
                 : $resolved['column'];
         }
         if (isset($expression['expression'])) {
-            return '(' . $this->buildExpression($expression['expression']['left'])
-                . ' ' . $expression['expression']['operator'] . ' '
-                . $this->buildExpression($expression['expression']['right']) . ')';
+            $binary = $expression['expression'];
+            if (!array_key_exists('left', $binary)
+                || !array_key_exists('right', $binary)
+                || !in_array($binary['operator'] ?? null, ['+', '-', '*', '/', '%'], true)) {
+                throw new Exception('Invalid arithmetic expression.');
+            }
+            return '(' . $this->buildExpression($binary['left'])
+                . ' ' . $binary['operator'] . ' '
+                . $this->buildExpression($binary['right']) . ')';
         }
         throw new Exception('Unsupported expression.');
     }

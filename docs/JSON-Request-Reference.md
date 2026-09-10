@@ -88,7 +88,7 @@ Every function object uses `function` and normally an `alias`. Requirements belo
 | `PATINDEX` | `field`, `pattern` |
 | `FORMAT` | `field`, `format`; optional `style` |
 | `YEAR`, `MONTH`, `DAY` | `field`; builder treats it as integer `YYYYMMDD` via style 112 |
-| `DATEPART`, `DATENAME` | `field`, `part`; same integer-date conversion |
+| `DATEPART`, `DATENAME` | `field`, `part`; same integer-date conversion. Parts: YEAR, QUARTER, MONTH, DAYOFYEAR, DAY, WEEK, WEEKDAY, HOUR, MINUTE, SECOND, MILLISECOND |
 | `GETDATE`, `SYSDATETIME`, `CURRENT_TIMESTAMP` | no field |
 | `DATEADD` | `field`, `datepart`, `number`; optional `style` |
 | `DATEDIFF` | `datepart`, `start`, `end`; each endpoint is `{"field":"DateField"}` or `{"function":"GETDATE"}`, with optional `style` on field endpoints |
@@ -101,6 +101,8 @@ Every function object uses `function` and normally an `alias`. Requirements belo
 | `ABS`, `CEILING`, `FLOOR`, `SQRT`, `EXP`, `LOG` | `field` |
 | `ROUND` | `field`; optional `precision` default 0 |
 | `POWER` | `field`, `power` |
+
+Function-specific required options are validated before normalization. Lengths, window offsets/buckets, and `CHOOSE.index` are positive integers (`SUBSTRING.length` may be zero); styles and numeric precisions use JSON integers. Date endpoints are either `{"field":"DateField"}` with an optional integer `style`, or `{"function":"GETDATE"}`. Nested field/arithmetic expressions used by conditional and date-part constructors are shape-checked and their referenced columns are validated through metadata.
 
 `datatype` must match a simple type name optionally followed by numeric size/precision, such as `date`, `varchar(50)`, or `decimal(10,2)`. `TIMEFROMPARTS` cannot currently be expressed publicly because the validator rejects its builder-required `fractions` property.
 
@@ -161,9 +163,9 @@ All window functions require `sort`, whose entries have the same public shape as
 
 ## CTE and subquery bodies
 
-A standard CTE is `"with":{"name":"ActiveItems","query":{...select body...}}`. A recursive CTE is `"with":{"name":"Tree","anchor":{...},"recursive":{...}}`. Only one `with` object is accepted. Each branch uses SELECT fields such as `source` and `fields`; an `action` is not required.
+A standard CTE is `"with":{"name":"ActiveItems","query":{...select body...}}`. A recursive CTE is `"with":{"name":"Tree","anchor":{...},"recursive":{...}}`. Only one `with` object is accepted. Each branch uses SELECT fields such as `source` and `fields`; `action` is not accepted. The backend infers the CTE output names from its projection so outer fields, filters, grouping, and ordering are validated without querying `INFORMATION_SCHEMA` for a nonexistent physical table. Recursive branches must return the same number of fields. Top-level pagination is supported and keeps the CTE prefix on both count and data queries.
 
-Subqueries are accepted only as filter `query` values for IN, NOT IN, EXISTS, and NOT EXISTS. General FROM/SELECT-expression subqueries are not exposed.
+Subqueries are accepted only as filter `query` values for IN, NOT IN, EXISTS, and NOT EXISTS. IN/NOT IN subqueries must select exactly one explicit field; `*` is rejected. Nested SELECT bodies do not accept `action`, `sort`, `pagination`, or another `with`. General FROM/SELECT-expression and nested-CTE subqueries are not exposed.
 
 ## Set operations
 
@@ -177,7 +179,7 @@ Subqueries are accepted only as filter `query` values for IN, NOT IN, EXISTS, an
 }
 ```
 
-`queries` is a non-empty array of SELECT bodies without nested actions. Public actions are only `union` and `unionAll`; internal support for INTERSECT/EXCEPT is not public.
+`queries` is a non-empty array of SELECT bodies without nested actions, sorting, pagination, or CTEs. Explicit branch projections must have the same field count during public validation; wildcard counts are resolved from metadata before execution. SQL Server remains responsible for checking data-type compatibility between corresponding expressions. The current set-operation contract has no top-level sorting or pagination. Public actions are only `union` and `unionAll`; internal support for INTERSECT/EXCEPT is not public.
 
 ## Routines and metadata
 

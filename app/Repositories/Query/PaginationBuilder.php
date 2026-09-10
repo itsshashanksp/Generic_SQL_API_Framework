@@ -16,12 +16,13 @@ class PaginationBuilder
         array $params,
         array $request,
         ?string $paginationOrderBy,
-        bool $paginateData = true
+        bool $paginateData = true,
+        string $queryPrefix = ''
     ): array {
         $totalRows = null;
 
         if (isset($request['page']) && isset($request['pageSize'])) {
-            $countSql = "SELECT COUNT(*) AS TotalRows
+            $countSql = $queryPrefix . "SELECT COUNT(*) AS TotalRows
          FROM (
              {$sqlWithoutOrderBy}
          ) AS CountQuery";
