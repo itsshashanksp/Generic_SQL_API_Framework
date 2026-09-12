@@ -40,7 +40,7 @@ class DatabaseCredentialEncryption
         }
 
         if (!function_exists('openssl_encrypt') || !function_exists('openssl_decrypt')) {
-            throw new DatabaseCredentialException('The PHP OpenSSL extension is required for encrypted database credentials.');
+            throw new DatabaseCredentialException('The PHP OpenSSL extension is required for encrypted database configuration.');
         }
 
         $this->key = $key;
@@ -48,11 +48,52 @@ class DatabaseCredentialEncryption
 
     public function encryptPassword(string $password): array
     {
+        return $this->encryptPayload($password);
+    }
+
+    public function decryptPassword(array $encryptedPassword): string
+    {
+        return $this->decryptPayload($encryptedPassword);
+    }
+
+    public function encryptConfiguration(array $configuration): array
+    {
+        try {
+            $serialized = json_encode(
+                $configuration,
+                JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR
+            );
+        } catch (Throwable $exception) {
+            throw new DatabaseCredentialException('Database configuration encryption failed.');
+        }
+
+        return $this->encryptPayload($serialized);
+    }
+
+    public function decryptConfiguration(array $encryptedConfiguration): array
+    {
+        $serialized = $this->decryptPayload($encryptedConfiguration);
+
+        try {
+            $configuration = json_decode($serialized, true, 512, JSON_THROW_ON_ERROR);
+        } catch (Throwable $exception) {
+            throw new DatabaseCredentialException('Database configuration decryption failed.');
+        }
+
+        if (!is_array($configuration) || array_is_list($configuration)) {
+            throw new DatabaseCredentialException('Database configuration decryption failed.');
+        }
+
+        return $configuration;
+    }
+
+    private function encryptPayload(string $plaintext): array
+    {
         try {
             $nonce = random_bytes(self::NONCE_LENGTH);
             $tag = '';
             $ciphertext = openssl_encrypt(
-                $password,
+                $plaintext,
                 self::ALGORITHM,
                 $this->key,
                 OPENSSL_RAW_DATA,
@@ -79,20 +120,20 @@ class DatabaseCredentialEncryption
         ];
     }
 
-    public function decryptPassword(array $encryptedPassword): string
+    private function decryptPayload(array $encryptedConfiguration): string
     {
-        $this->validateFormat($encryptedPassword);
+        $this->validateFormat($encryptedConfiguration);
 
-        $nonce = $this->decodeComponent($encryptedPassword['nonce']);
-        $ciphertext = $this->decodeComponent($encryptedPassword['ciphertext']);
-        $tag = $this->decodeComponent($encryptedPassword['tag']);
+        $nonce = $this->decodeComponent($encryptedConfiguration['nonce']);
+        $ciphertext = $this->decodeComponent($encryptedConfiguration['ciphertext']);
+        $tag = $this->decodeComponent($encryptedConfiguration['tag']);
 
         if (strlen($nonce) !== self::NONCE_LENGTH || strlen($tag) !== self::TAG_LENGTH) {
             throw new DatabaseCredentialException('Database credential decryption failed.');
         }
 
         try {
-            $password = openssl_decrypt(
+            $plaintext = openssl_decrypt(
                 $ciphertext,
                 self::ALGORITHM,
                 $this->key,
@@ -104,11 +145,11 @@ class DatabaseCredentialEncryption
             throw new DatabaseCredentialException('Database credential decryption failed.');
         }
 
-        if ($password === false) {
+        if ($plaintext === false) {
             throw new DatabaseCredentialException('Database credential decryption failed.');
         }
 
-        return $password;
+        return $plaintext;
     }
 
     private function validateFormat(array $encryptedPassword): void

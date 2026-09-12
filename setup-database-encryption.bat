@@ -1,11 +1,11 @@
 @echo off
 setlocal EnableExtensions EnableDelayedExpansion
 
-title Generic SQL API - Database Password Encryption Setup
+title Generic SQL API - Database Configuration Encryption Setup
 
 echo.
 echo ============================================================
-echo   Generic SQL API - Database Password Encryption Setup
+echo   Generic SQL API - Database Configuration Encryption Setup
 echo ============================================================
 echo.
 
@@ -105,6 +105,22 @@ echo [OK] OpenSSL extension is enabled.
 echo.
 
 REM ------------------------------------------------------------
+REM Confirm plaintext state before generating a new key
+REM ------------------------------------------------------------
+
+echo [INFO] Checking database configuration encryption state...
+
+"%PHP%" -c "%PHP_INI%" "%SETUP_ENCRYPTION%" --check-plaintext
+
+if errorlevel 1 (
+    echo [FAILED] Database configuration is not eligible for encryption.
+    goto :fail
+)
+
+echo [OK] Plaintext database configuration found.
+echo.
+
+REM ------------------------------------------------------------
 REM Create temporary directory
 REM ------------------------------------------------------------
 
@@ -187,28 +203,28 @@ echo [OK] Encryption key saved.
 echo.
 
 REM ------------------------------------------------------------
-REM Encrypt existing database password
+REM Encrypt complete database configuration
 REM ------------------------------------------------------------
 
 echo ============================================================
-echo   Encrypting Database Password
+echo   Encrypting Database Configuration
 echo ============================================================
 echo.
 
-echo [INFO] Reading password from database.json...
-echo [INFO] Encrypting password using AES-256-GCM...
+echo [INFO] Reading database.json...
+echo [INFO] Encrypting complete configuration using AES-256-GCM...
 echo.
 
 "%PHP%" -c "%PHP_INI%" "%SETUP_ENCRYPTION%"
 
 if errorlevel 1 (
     echo.
-    echo [FAILED] Unable to encrypt database password.
+    echo [FAILED] Unable to encrypt database configuration.
     goto :cleanup_fail
 )
 
 echo.
-echo [OK] Database password encrypted successfully.
+echo [OK] Complete database configuration encrypted successfully.
 echo [OK] database.json updated successfully.
 echo.
 
@@ -235,7 +251,7 @@ if errorlevel 1 (
     echo   DATABASE CONNECTION TEST FAILED
     echo ============================================================
     echo.
-    echo The password was encrypted, but the database connection
+    echo The configuration was encrypted, but the database connection
     echo test failed.
     echo.
     goto :cleanup_fail
@@ -246,7 +262,7 @@ echo ============================================================
 echo   SUCCESS
 echo ============================================================
 echo.
-echo Database password encryption is configured successfully.
+echo Complete database configuration encryption is configured successfully.
 echo.
 echo Encrypted configuration:
 echo     %DB_CONFIG%

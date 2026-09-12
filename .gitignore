@@ -26,4 +26,6 @@ Thumbs.db
 
 # DB Config
 database/config/database.json
+database/config/database.json.backup*
+database/config/database.json.tmp*
 !database/config/database.example.json

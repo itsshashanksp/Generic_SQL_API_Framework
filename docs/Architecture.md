@@ -109,19 +109,19 @@ Nested SELECT construction snapshots and restores the expression alias scope, so
 
 `DriverFactory` currently creates only `SqlServerDriver`. A `Database` construction immediately connects, which is why production repositories are connection-backed. Query and write repositories pass their request-owned `QueryEngine` to `MetadataRepository`, so metadata and data use one connection in sequence instead of opening a second connection. Other requests construct different engines and connections. Statements are freed in `finally`, including after failures, and the engine closes its connection at the end of its lifetime. `MetadataRepository` queries `INFORMATION_SCHEMA` for query validation and integer-backed date handling. CRUD additionally queries `sys.columns`, `sys.tables`, `sys.schemas`, and `sys.types` for length, precision/scale, nullability, identity, computed, generated/hidden, and default flags.
 
-Database password protection is a configuration-layer concern:
+Database configuration protection is a configuration-layer concern:
 
 ```text
 database/config/database.json
-  -> DatabaseCredentialResolver
-  -> plain string: use unchanged
-     OR encrypted object: authenticate and decrypt with AES-256-GCM
+  -> DatabaseConfigurationResolver
+  -> plaintext object: use unchanged
+     OR encrypted envelope: authenticate and decrypt the complete configuration with AES-256-GCM
         using GENERIC_SQL_API_ENCRYPTION_KEY
   -> SqlServerDriver
   -> odbc_connect
 ```
 
-The resolver obtains a Base64-encoded 32-byte key from the process environment only for an encrypted password. It validates the versioned object and resolves the plaintext password in memory immediately before the existing SQL Server connection path. Credential failures use safe messages, and credential exception traces are omitted from logs so password objects and key material are not exposed. This layer does not add an endpoint, authentication, authorization, or any change to the public request/response contract.
+The centralized resolver obtains a Base64-encoded 32-byte key from the process environment only for an encrypted configuration. It validates and authenticates the versioned envelope, decodes the complete configuration in memory, and passes that structure to the existing SQL Server connection path. Plaintext and legacy password-only configurations remain readable for compatibility. Failures use safe messages, and credential exception traces are omitted from logs so configuration and key material are not exposed. This layer does not add an endpoint or change the public request/response contract.
 
 Pagination normally performs a count query when both page values are present, then asks SQL Server for its compatibility level. Compatibility level 110 or newer uses `OFFSET/FETCH`; older levels wrap the projection and use `ROW_NUMBER()`. A complete first-page SQL resource whose authored `TOP` limit fits the requested page has a tested fast path that executes directly and infers the total from returned rows.
 

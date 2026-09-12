@@ -20,7 +20,7 @@ Current boundaries remain documented in the [capability matrix](API.md#capabilit
 - `start-windows.bat` checks PHP, configuration, ODBC, OpenSSL, encrypted-credential readiness, database connectivity, API path, and ports
 - automatic OPcache/log directory creation and port selection from 8000 through 8100
 - SQL Server/Windows authentication modes and automatic/specific ODBC driver configuration
-- cross-platform AES-256-GCM database password protection, environment-managed keys, and one-time Windows setup
+- cross-platform AES-256-GCM protection for the complete database configuration, environment-managed keys, and backup-first one-time setup
 - modular `QueryRepository` facade with specialized query builders
 - public validation/normalization plus API-contract and ORDER BY/window regression coverage
 - database-independent backend test runner and GitHub Actions syntax/logic workflow

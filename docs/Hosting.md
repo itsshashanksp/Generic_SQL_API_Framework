@@ -36,7 +36,7 @@ To convert an existing non-empty plaintext SQL password, run:
 setup-database-encryption.bat
 ```
 
-The setup uses the bundled PHP and `php.ini`, checks OpenSSL, generates a Base64-encoded 32-byte key, and persists it as the Windows User environment variable `GENERIC_SQL_API_ENCRYPTION_KEY`. It then runs `scripts/setup-database-encryption.php`, which reads the existing password from `database.json` without prompting, writes the AES-256-GCM password object without retaining a plaintext backup, and validates the connection through `scripts/check-database.php`.
+The setup uses the bundled PHP and `php.ini`, checks OpenSSL, verifies that `database.json` is plaintext before generating a Base64-encoded 32-byte key, and persists the key as the Windows User environment variable `GENERIC_SQL_API_ENCRYPTION_KEY`. It then encrypts the complete configuration as one AES-256-GCM payload, retains an ignored plaintext backup for recovery, and validates the connection through `scripts/check-database.php`.
 
 Open a new terminal—or restart IIS/FastCGI or the relevant service—after setup so the new process inherits the persisted variable. Run the setup only for a plaintext password; do not rerun it against an already encrypted configuration.
 
@@ -68,8 +68,8 @@ Before production deployment, configure HTTPS at the web server or reverse proxy
 - `PHP ODBC extension not available`: check `runtime/windows/php/php.ini` and required runtime DLL dependencies.
 - `PHP OpenSSL extension not available`: verify that the bundled `php_openssl.dll` is present and enabled in `runtime/windows/php/php.ini`.
 - `database.json not found`: create the ignored file at the exact documented path.
-- database encryption key errors: configure a base64-encoded 32-byte `GENERIC_SQL_API_ENCRYPTION_KEY` for the PHP process, or keep the backward-compatible plain password format.
-- database credential decryption failure: verify that the encrypted password object and environment key are the matching pair and have not been altered.
+- database encryption key errors: configure a Base64-encoded 32-byte `GENERIC_SQL_API_ENCRYPTION_KEY` for the PHP process, or keep the backward-compatible plaintext configuration format.
+- database configuration decryption failure: verify that the encrypted configuration envelope and environment key are the matching pair and have not been altered.
 - encryption setup says the password is already encrypted: do not rerun it; restore the matching persisted key if it was replaced.
 - `No compatible SQL Server ODBC driver`: install a supported driver or configure the exact available driver and verify server/authentication settings.
 - no port between 8000–8100: stop a conflicting service or host the backend manually on another port; the launcher has no flag to change its range.

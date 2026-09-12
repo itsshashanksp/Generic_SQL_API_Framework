@@ -81,15 +81,15 @@ Create the ignored local file `database/config/database.json`:
 }
 ```
 
-For SQL authentication use `"authentication": "sql"` plus `username` and `password`. The password may remain a plain string for compatibility or use the optional AES-256-GCM encrypted format. Encrypted passwords require PHP OpenSSL and `GENERIC_SQL_API_ENCRYPTION_KEY`, which must contain a Base64-encoded 32-byte key and must be kept separately from `database.json`.
+For SQL authentication use `"authentication": "sql"` plus `username` and `password`. Plaintext configuration remains supported for compatibility, but deployments can seal the complete configuration—including server, database, username, password, driver, and connection options—as one AES-256-GCM authenticated payload. The Base64-encoded 32-byte key comes from `GENERIC_SQL_API_ENCRYPTION_KEY` and must remain separate from `database.json`.
 
-Windows users can perform the one-time migration of an existing plaintext password with:
+Windows users can perform the one-time migration of an existing plaintext configuration with:
 
 ```bat
 setup-database-encryption.bat
 ```
 
-The setup saves the key in the Windows User environment, encrypts the existing password in `database.json`, and validates the connection. It does not retain a plaintext configuration backup. Open a new terminal before later startup so it inherits the saved variable. Do not commit the key or `database.json` containing real credentials. See [Database Configuration](docs/Database-Configuration.md) for the encrypted format, cross-platform manual setup, failure behavior, and security limitations.
+The setup saves the key in the Windows User environment, encrypts the complete `database.json`, creates an ignored plaintext recovery backup, and validates the connection. Protect or remove the backup after verification. Open a new terminal before later startup so it inherits the saved variable. Do not commit the key, configuration, or backups. See [Database Configuration](docs/Database-Configuration.md) for the encrypted format, cross-platform manual setup, failure behavior, and security limitations.
 
 ## Start the backend
 
@@ -99,7 +99,7 @@ On Windows, run:
 start-windows.bat
 ```
 
-The repository includes `runtime/windows/php/`, so XAMPP or a separate PHP installation is not required. The launcher validates PHP, `php.ini`, PHP ODBC, PHP OpenSSL, any required encrypted-credential environment key, the database connection, and the API directory; creates OPcache/log directories; chooses the first free port from 8000 through 8100; then starts PHP's development server. A working database is required to start through this launcher because it deliberately runs `scripts/check-database.php` first.
+The repository includes `runtime/windows/php/`, so XAMPP or a separate PHP installation is not required. The launcher validates PHP, `php.ini`, PHP ODBC, PHP OpenSSL, any required encrypted-configuration environment key, the database connection, and the API directory; creates OPcache/log directories; chooses the first free port from 8000 through 8100; then starts PHP's development server. A working database is required to start through this launcher because it deliberately runs `scripts/check-database.php` first.
 
 With another PHP installation, after configuring the database:
 

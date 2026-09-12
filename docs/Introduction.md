@@ -14,7 +14,7 @@ The implemented backend provides:
 - SQL Server metadata actions
 - standard success/error response envelopes, execution timing, row counts, and logs
 - SQL Server connectivity through PHP ODBC
-- optional AES-256-GCM protection for the password stored in `database.json`
+- optional AES-256-GCM protection for the complete `database.json` configuration
 - a bundled Windows PHP runtime and validated startup script
 - database-independent PHP tests and GitHub Actions CI
 
@@ -35,6 +35,6 @@ The request crosses a strict boundary: public JSON uses `source`, `fields`, and 
 
 ## Runtime and testing
 
-`start-windows.bat` uses the bundled `runtime/windows/php/`, checks ODBC, OpenSSL, any required encrypted-password key, and the database, selects a port, and starts the API. The separate `setup-database-encryption.bat` performs the optional one-time password migration. Normal tests are different: `php tests/run.php` uses fakes and needs neither ODBC nor a database configuration file.
+`start-windows.bat` uses the bundled `runtime/windows/php/`, checks ODBC, OpenSSL, any required encrypted-configuration key, and the database, selects a port, and starts the API. The separate `setup-database-encryption.bat` performs the optional one-time complete-configuration migration. Normal tests are different: `php tests/run.php` uses fakes and needs neither ODBC nor a database configuration file.
 
 Continue with [Architecture](Architecture.md), [API](API.md), [Query examples](Query-Examples.md), or [Database configuration](Database-Configuration.md).

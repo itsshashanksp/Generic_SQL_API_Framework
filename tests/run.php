@@ -9,7 +9,8 @@ $tests = [
     __DIR__ . '/SqlControllerTest.php',
     __DIR__ . '/QueryExecutionIsolationTest.php',
     __DIR__ . '/LoggerTest.php',
-    __DIR__ . '/DatabaseCredentialEncryptionTest.php'
+    __DIR__ . '/DatabaseCredentialEncryptionTest.php',
+    __DIR__ . '/DatabaseConfigurationEncryptionTest.php'
 ];
 
 foreach ($tests as $test) {

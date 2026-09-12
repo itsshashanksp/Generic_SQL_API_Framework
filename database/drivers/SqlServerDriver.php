@@ -2,10 +2,17 @@
 
 require_once __DIR__ . "/DatabaseDriverInterface.php";
 require_once __DIR__ . "/../../app/Security/DatabaseCredentialResolver.php";
+require_once __DIR__ . "/../../app/Security/DatabaseConfigurationResolver.php";
 
 class SqlServerDriver implements DatabaseDriverInterface
 {
     private $connection = null;
+    private ?array $configuration;
+
+    public function __construct(?array $configuration = null)
+    {
+        $this->configuration = $configuration;
+    }
 
     /**
      * SQL Server ODBC drivers.
@@ -148,8 +155,6 @@ class SqlServerDriver implements DatabaseDriverInterface
                 $port
             );
 
-        $errors = [];
-
         foreach ($drivers as $driver) {
 
             $dsn =
@@ -183,28 +188,9 @@ class SqlServerDriver implements DatabaseDriverInterface
                 ];
             }
 
-            $error =
-                odbc_errormsg();
-
-            $errors[] =
-                $driver . ": " . $error;
         }
 
-        throw new Exception(
-            "No compatible SQL Server ODBC driver "
-            . "could establish a connection."
-            . "\n\nServer: "
-            . $serverAddress
-            . "\nDatabase: "
-            . $database
-            . "\nAuthentication: "
-            . $authentication
-            . "\n\nDriver errors:\n"
-            . implode(
-                "\n",
-                $errors
-            )
-        );
+        throw new Exception('No compatible SQL Server ODBC driver could establish a connection.');
     }
 
     /**
@@ -215,25 +201,8 @@ class SqlServerDriver implements DatabaseDriverInterface
         $configPath =
             __DIR__ . '/../config/database.json';
 
-        if (!file_exists($configPath)) {
-
-            throw new Exception(
-                "database.json not found."
-            );
-        }
-
-        $config =
-            json_decode(
-                file_get_contents($configPath),
-                true
-            );
-
-        if (!is_array($config)) {
-
-            throw new Exception(
-                "Invalid database.json"
-            );
-        }
+        $config = $this->configuration
+            ?? DatabaseConfigurationResolver::load($configPath);
 
         /*
          * Database configuration.
@@ -255,13 +224,7 @@ class SqlServerDriver implements DatabaseDriverInterface
                 $config["password"] ?? ""
             );
 
-        $authentication =
-            strtolower(
-                trim(
-                    $config["authentication"]
-                    ?? "sql"
-                )
-            );
+        $authentication = strtolower(trim((string)($config["authentication"] ?? "sql")));
 
         /*
          * Validate authentication mode.
@@ -279,10 +242,7 @@ class SqlServerDriver implements DatabaseDriverInterface
             )
         ) {
 
-            throw new Exception(
-                "Unsupported authentication type: "
-                . $authentication
-            );
+            throw new Exception('Unsupported database authentication type.');
         }
 
         if (empty($server)) {
@@ -320,11 +280,7 @@ class SqlServerDriver implements DatabaseDriverInterface
         /*
          * Driver configuration.
          */
-        $configuredDriver =
-            trim(
-                $config["driver"]
-                ?? "auto"
-            );
+        $configuredDriver = trim((string)($config["driver"] ?? "auto"));
 
         /*
          * AUTO DRIVER
@@ -388,11 +344,7 @@ class SqlServerDriver implements DatabaseDriverInterface
 
         if (!$this->connection) {
 
-            throw new Exception(
-                "SQL Server connection failed using "
-                . "ODBC driver '{$driver}': "
-                . odbc_errormsg()
-            );
+            throw new Exception('SQL Server connection failed.');
         }
 
         return $this->connection;

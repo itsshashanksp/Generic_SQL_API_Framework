@@ -14,10 +14,11 @@ All notable backend changes are recorded here. The project follows semantic vers
   prepared DML values, affected-row/identity responses, unique-key verification,
   safe constraint error classification, and database-independent CRUD/security tests.
 
-- Cross-platform AES-256-GCM database password encryption with a versioned nonce/ciphertext/authentication-tag format and a Base64-encoded 32-byte key supplied through `GENERIC_SQL_API_ENCRYPTION_KEY`.
-- Database credential resolution that preserves plaintext password compatibility while decrypting encrypted passwords before the existing SQL Server ODBC connection path.
-- Windows one-time encryption setup using the bundled PHP/OpenSSL runtime, Windows User environment storage, in-place configuration migration, and connection validation without retaining a plaintext backup.
-- Database-independent encryption coverage for round trips, random nonces, Unicode and empty values, malformed data, wrong keys, tampering, backward-compatible resolution, and secret-safe logging.
+- Cross-platform AES-256-GCM encryption of the complete database configuration as one versioned authenticated payload, with a Base64-encoded 32-byte key supplied through `GENERIC_SQL_API_ENCRYPTION_KEY`.
+- Centralized database configuration resolution that preserves plaintext and legacy password-only compatibility while passing the same decrypted structure into the existing SQL Server ODBC connection path.
+- A backup-first, cross-platform migration utility for converting plaintext `database.json` without exposing configuration or key material.
+- Windows one-time encryption setup using the bundled PHP/OpenSSL runtime, Windows User environment storage, backup-first complete-configuration migration, and connection validation.
+- Database-independent encryption coverage for complete-configuration round trips, field confidentiality, random nonces, malformed data, wrong keys, tampering, migration backups, backward-compatible resolution, and secret-safe logging.
 - Database-independent `tests/run.php` entry point and broader logic coverage for every public filter operator, public joins, representative function families, all window functions, pagination counts, set-operation assembly, and response formatting.
 - Ubuntu/PHP 8.2 GitHub Actions workflow for backend syntax checks and all standalone tests without SQL Server, ODBC, credentials, or database configuration.
 - Definitive backend capability matrix and detailed public JSON field reference.

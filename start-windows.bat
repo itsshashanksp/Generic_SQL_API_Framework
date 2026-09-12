@@ -82,7 +82,7 @@ REM ============================================================
 if errorlevel 1 (
     echo [FAILED] PHP OpenSSL extension not available.
     echo.
-    echo OpenSSL is required for encrypted database credentials.
+    echo OpenSSL is required for encrypted database configuration.
     echo Please check the bundled PHP configuration.
     echo.
     echo API startup aborted.
@@ -124,7 +124,7 @@ set "DB_ENCRYPTION_STATUS=%ERRORLEVEL%"
 if "%DB_ENCRYPTION_STATUS%"=="2" (
     echo [FAILED] Database encryption key is not configured.
     echo.
-    echo database.json contains an encrypted database password.
+    echo database.json contains encrypted database configuration.
     echo Set GENERIC_SQL_API_ENCRYPTION_KEY in the environment before startup.
     echo.
     echo API startup aborted.
