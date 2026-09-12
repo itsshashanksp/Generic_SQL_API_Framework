@@ -10,6 +10,8 @@ The implemented backend provides:
 
 - SELECT queries with aliases, expressions, supported functions, filtering, joins, grouping, sorting, and pagination
 - window functions, filter subqueries, CTEs, and UNION/UNION ALL within documented limits
+- registered, server-owned read-only SQL Resources with approved runtime filtering, sorting, and pagination
+- deny-by-default single-object INSERT, UPDATE, DELETE, and UPSERT resources
 - stored procedure, scalar function, and table-valued function execution with positional parameters
 - SQL Server metadata actions
 - standard success/error response envelopes, execution timing, row counts, and logs
@@ -37,4 +39,5 @@ The request crosses a strict boundary: public JSON uses `source`, `fields`, and 
 
 `start-windows.bat` uses the bundled `runtime/windows/php/`, checks ODBC, OpenSSL, any required encrypted-configuration key, and the database, selects a port, and starts the API. The separate `setup-database-encryption.bat` performs the optional one-time complete-configuration migration. Normal tests are different: `php tests/run.php` uses fakes and needs neither ODBC nor a database configuration file.
 
-Continue with [Architecture](Architecture.md), [API](API.md), [Query examples](Query-Examples.md), or [Database configuration](Database-Configuration.md).
+Continue with the [documentation map](README.md), [HTTP API](API.md),
+[frontend integration](Frontend-Integration.md), or [capability matrix](Capability-Matrix.md).

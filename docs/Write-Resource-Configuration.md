@@ -52,8 +52,8 @@ key. A request's `keys` list must match the configured set exactly and every key
 value must be non-null.
 
 UPSERT is a single `MERGE ... WITH (HOLDLOCK)` statement. This avoids the unlocked
-gap between separate UPDATE and INSERT statements without introducing the
-transactions deferred to Phase 3. SQL Server MERGE behavior still warrants live
+gap between separate UPDATE and INSERT statements without introducing a public
+multi-action transaction contract. SQL Server MERGE behavior still warrants live
 concurrency testing for each target, particularly when triggers, replication, or
 other database-side automation is involved.
 
@@ -75,5 +75,8 @@ action.
    triggers, affected-row output, and concurrent UPSERT behavior.
 
 There is no resource cache, bulk-write format, authentication/authorization, or
-application-managed transaction in Phase 2. Each CRUD request executes as an
+application-managed transaction contract. Each CRUD request executes as an
 independent statement through the existing ODBC connection abstraction.
+
+See [CRUD / Write API](CRUD.md) for every request, response, operator, validation
+rule, and public error code.

@@ -12,7 +12,10 @@ This roadmap covers only the Generic SQL API backend. Frontend dashboards, grids
 - stored procedure, scalar function, table-valued function, and metadata actions
 - stable success/error envelope, execution timing, row count, query/error logging
 
-Current boundaries remain documented in the [capability matrix](API.md#capability-matrix). In particular, FULL/CROSS joins, window partitioning, public INTERSECT/EXCEPT, and general subqueries are not released features.
+Current boundaries remain documented in the [capability matrix](Capability-Matrix.md)
+and [limitations](Limitations.md). In particular, FULL/CROSS joins, window
+partitioning, public INTERSECT/EXCEPT, and general subqueries are not released
+JSON Query features.
 
 ## v1.1.0 — Windows Runtime & Deployment — Released
 

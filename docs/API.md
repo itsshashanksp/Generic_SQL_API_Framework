@@ -2,12 +2,17 @@
 
 ## Endpoint and transport
 
-The entry point is `api/index.php`. Use:
+The filesystem entry point is `api/index.php`. When the repository root is the
+web document root, use:
 
 ```http
 POST /api/index.php
 Content-Type: application/json
 ```
+
+The bundled/local command uses `-t api`, making that same file available as
+`POST /index.php`. The deployed URL therefore depends on web-server document-root
+mapping; it is one entry script, not two API routes.
 
 The script advertises `GET, POST, OPTIONS` for CORS and returns 200 immediately for `OPTIONS`. It does not otherwise enforce the HTTP method, but `POST` is the supported client convention because every operation requires a JSON request body. Allowed browser origins are currently hard-coded to `http://127.0.0.1:5173` and `http://localhost:5173`.
 
@@ -21,6 +26,10 @@ The body must be one JSON object. The required `action` is one of:
 - `union`, `unionAll`
 - `procedure`, `function`, `tableFunction`
 - `metadata.tables`, `metadata.columns`, `metadata.views`, `metadata.procedures`, `metadata.schema`
+
+These 16 actions, including minimal/full requests, validation, responses, and
+errors, are documented in [Action reference](Action-Reference.md). The exact
+accepted field schema is [JSON request reference](JSON-Request-Reference.md).
 
 For SELECT, `source.table` and a non-empty `fields` array are also required. Refer to [JSON-Request-Reference.md](JSON-Request-Reference.md) for every field and default.
 
@@ -153,6 +162,9 @@ All controllers use the same envelope:
 }
 ```
 
+See [Response reference](Response-Reference.md) for exact per-action messages and
+write response presence rules.
+
 - `data` is always an array.
 - `page` and `pageSize` copy the public pagination request, or are `null`.
 - Paginated SELECT and SQL-resource requests normally obtain `totalRows` with a separate count query. A complete first-page `TOP` resource can infer it from `rowsReturned`; without pagination it also defaults to `rowsReturned`.
@@ -185,6 +197,9 @@ A successful INSERT with a configured identity is represented as:
 ```
 
 ## Error responses
+
+The complete code/status/handling table and current security boundary are in
+[Validation, errors, and security](Validation-and-Errors.md).
 
 Malformed JSON is HTTP 400:
 
@@ -239,60 +254,13 @@ generic HTTP 500 `QUERY_ERROR`; no SQL Server message is returned.
 
 Public sorting uses validated logical fields or a selected alias and `ASC`/`DESC`; numeric positions such as `"1"` are rejected. Window functions likewise require a logical sort field. This prevents invalid SQL Server output such as `ROW_NUMBER() OVER (ORDER BY 1)`. If top-level `sort` is omitted, the builder supplies an order based on the first usable projection (or table metadata when needed); grouped requests default to the first group field.
 
-## Capability matrix
+## Capability and limitation references
 
-`Supported` means the feature passes the public validator/normalizer and has a current builder/execution path. SQL Server capabilities that are not exposed remain unsupported by this API.
+The authoritative cross-mode comparison is [Capability matrix](Capability-Matrix.md).
+Use [Current limitations](Limitations.md) for intentional public boundaries and
+[Query function reference](Query-Functions.md) for the exact usable function set,
+including the internal-only `TIMEFROMPARTS` mismatch.
 
-| Feature | Backend support | Public JSON representation | Validation | Notes |
-|---|---|---|---|---|
-| SELECT | Supported | `action: "select"`, `source`, `fields` | Table/field identifier shape, then live metadata | Existing JSON query action |
-| Controlled SQL resource | Supported | `action: "sql"`, `resource` | Explicit resource registry plus sort/filter field allowlists | Complex server-owned SQL/CTEs allowed; no raw SQL or client paths |
-| INSERT | Supported | `action: "insert"`, `resource`, `data` | Write registry plus live column metadata | Single object; prepared values; safe identity output |
-| UPDATE | Supported | `action: "update"`, `resource`, `data`, non-empty `filters` | Writable/filterable allowlists plus live types | Full-table UPDATE rejected |
-| DELETE | Supported | `action: "delete"`, `resource`, non-empty `filters` | Filter allowlist plus live types | Full-table DELETE rejected |
-| UPSERT | Supported | `action: "upsert"`, `resource`, `data`, `keys` | Exact configured key set plus live types | SQL Server MERGE/HOLDLOCK; database unique constraint required |
-| DISTINCT | Supported | `distinct: true` | Boolean | Default `false` |
-| TOP | Supported | `limit: 10` | Positive integer | Normalizes to internal `top` |
-| Column/table aliases | Supported | field `alias`; `source.alias` | Identifier | Selected aliases may be used by top-level sort |
-| CASE | Supported | field object with `case.when`, optional `else`, `alias` | Comparison conditions only | CASE values are rendered as controlled literals |
-| Arithmetic expressions | Supported | `expression: {left, operator, right}` | Operands are numbers/identifiers; `+ - * / %` | One binary expression level in public shape |
-| COUNT/SUM/AVG/MIN/MAX | Supported | field `function`, `field`, optional `alias` | Function allow-list and metadata | `COUNT` accepts `*` |
-| STRING_AGG | Supported | plus `separator`, optional `sort` | Separator and ordering validated publicly; field checked through metadata | SQL Server syntax |
-| String functions | Supported | function field object | Allow-list plus function-specific required-option validation | UPPER, LOWER, LTRIM, RTRIM, TRIM, LEN, CONCAT, LEFT, RIGHT, SUBSTRING, REPLACE, CHARINDEX, PATINDEX, FORMAT |
-| Date/time functions | Supported, except TIMEFROMPARTS | function field object | Allow-list, date-part, endpoint, numeric-part, and style validation | YEAR, MONTH, DAY convert integer `YYYYMMDD` values using style 112; see JSON reference |
-| Math functions | Supported | function field object | Allow-list | ABS, ROUND, CEILING, FLOOR, POWER, SQRT, EXP, LOG |
-| Conditional functions | Supported | `IIF`, `CHOOSE` field objects | Public validation covers condition/value expression shapes and required options | CASE is also supported |
-| CAST/CONVERT | Supported | `datatype`, optional CONVERT `style` | Datatype pattern allow-list | No free-form SQL datatype expression |
-| NULL functions | Supported | COALESCE/ISNULL/NULLIF field objects | Function allow-list plus public required-option/expression validation | COALESCE public `fields` are identifiers |
-| WHERE comparisons | Supported | `filters[]` | `= != <> > < >= <=` | Values use prepared placeholders |
-| LIKE/NOT LIKE | Supported | `filters[]` | Operator allow-list | Pattern is a prepared value |
-| IN/NOT IN | Supported | array `value` or `query` | Non-empty array or valid nested SELECT | Prepared list values |
-| BETWEEN/NOT BETWEEN | Supported | two-element `value` | Exactly two values | Integer date columns convert `YYYY-MM-DD` to `YYYYMMDD` |
-| IS NULL/IS NOT NULL | Supported | filter without value | Operator allow-list | No placeholder |
-| EXISTS/NOT EXISTS | Supported | filter `query`, no `field` required | Nested SELECT required | Filter subquery only |
-| INNER/LEFT/RIGHT JOIN | Supported | `joins[]` | Valid source plus live metadata checks for both logical columns; equality only | One `on` equality per join |
-| FULL/CROSS JOIN | Not supported | None | Rejected join type | Not exposed |
-| GROUP BY | Supported | `groupBy[]` | Identifier plus metadata | Array of fields |
-| HAVING | Supported | `having[]` | Aggregate + comparison + value | Conditions are combined with AND |
-| ORDER BY | Supported | `sort[]` | Logical field/alias and ASC/DESC | Multiple fields supported; direction defaults ASC |
-| Positional ORDER BY | Internal compatibility only | None | Numeric public sort fields rejected | Internal positions are resolved to real fields in window contexts |
-| Pagination | Supported | `pagination.page/pageSize` | Both positive integers | Count + OFFSET/FETCH or ROW_NUMBER fallback |
-| Window functions | Supported | field `function` plus `sort` | Function allow-list and mandatory sort | ROW_NUMBER, RANK, DENSE_RANK, NTILE, LAG, LEAD, FIRST_VALUE, LAST_VALUE |
-| Window PARTITION BY | Not supported | None | `partitionBy` rejected | Only window ORDER BY is exposed |
-| Filter subqueries | Supported | IN/NOT IN/EXISTS/NOT EXISTS `query` | Nested SELECT validation; IN forms require one explicit field | Nested action/sort/pagination/CTE are rejected; no general subqueries |
-| CTE | Supported | `with: {name, query}` | One named SELECT body; inferred output fields are validated | Count pagination keeps the CTE in scope |
-| Recursive CTE | Supported | `with: {name, anchor, recursive}` | Both SELECT bodies and compatible field counts required | Recursive self-reference uses the anchor projection and UNION ALL |
-| UNION/UNION ALL | Supported | top-level `action` plus `queries` | At least one SELECT body; branch field counts must match | Branch actions/sort/pagination/CTEs are rejected; SQL Server validates type compatibility |
-| INTERSECT/EXCEPT | Internal builder only | None | Public action rejected | Not a public API feature |
-| Stored procedure | Supported | `procedure` action, `source.procedure`, `parameters` | Identifier and array parameters | Positional prepared parameters |
-| Scalar function | Supported | `function` action, `source.function`, `parameters` | Identifier and array parameters | Returns `Result` column |
-| Table-valued function | Supported | `tableFunction` action | Identifier and array parameters | Executes `SELECT * FROM function(...)` |
-| SELECT parameters | Values only | filter/HAVING values | Prepared by builders | No arbitrary public `parameters` on SELECT |
-| Metadata | Supported | five `metadata.*` actions | Action allow-list; columns requires source table | Database-backed |
-| Column description metadata | Not supported in query envelope | None | N/A | Use `metadata.columns` separately |
-| Validation/error envelope | Supported | N/A | Unknown properties and invalid shapes rejected | 400 contract errors; generic 500 query errors |
-| Transactions | Not supported | None | N/A | Planned for Phase 3; CRUD actions execute independently |
-
-Known contract boundary: `TIMEFROMPARTS` is named in the function allow-list and exists in the internal builder, but its required `fractions` property is not accepted by the public field-property allow-list. It is therefore not a usable public feature and is not shown as a supported example.
-
-The source validator technically accepts `source.alias` for routines and `metadata.columns`; normalization ignores that alias, so it has no public effect. Routine `parameters` should be a JSON list because placeholders are positional.
+The shared source validator accepts `source.alias` for routines and
+`metadata.columns`, but normalization ignores it; clients should omit it.
+Routine `parameters` should be a JSON list because placeholders are positional.

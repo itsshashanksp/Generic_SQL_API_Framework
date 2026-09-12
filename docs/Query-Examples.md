@@ -191,4 +191,6 @@ Use `union` for duplicate-removing UNION. INTERSECT and EXCEPT are not public ac
 { "action": "metadata.columns", "source": { "table": "Items" } }
 ```
 
-See [JSON Request Reference](JSON-Request-Reference.md) for all accepted properties and [API](API.md#capability-matrix) for unsupported boundaries.
+See [JSON Request Reference](JSON-Request-Reference.md) for all accepted properties,
+[Query function reference](Query-Functions.md) for every usable function, and
+[Capability matrix](Capability-Matrix.md) for mode boundaries.

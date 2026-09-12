@@ -72,12 +72,12 @@ Only a configured, metadata-verified identity can be returned. UPDATE and DELETE
 cannot be built through the public path without at least one valid filter.
 
 UPSERT uses one `MERGE ... WITH (HOLDLOCK)` statement. A two-statement
-UPDATE-then-INSERT sequence was rejected because Phase 2 has no transaction in
+UPDATE-then-INSERT sequence is not used because there is no API transaction in
 which to preserve its key-range lock. The configured keys must have a matching
 database unfiltered UNIQUE/PRIMARY KEY index, which is verified through live
 metadata. HOLDLOCK reduces the absent-row race,
 but does not remove SQL Server MERGE caveats or replace deployment-specific
-concurrency testing. Transactions remain a Phase 3 boundary.
+concurrency testing. Transactions remain unsupported by the public contract.
 
 SQL resources may define `filterColumns` separately from returned `columns`.
 For example, a grouped report can return `Cust_Name` and aggregate aliases

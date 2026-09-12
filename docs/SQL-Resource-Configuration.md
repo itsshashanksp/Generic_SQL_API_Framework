@@ -291,7 +291,11 @@ The SQL file itself is trusted backend code. Statement analysis rejects non-SELE
 2. Add an exact resource ID key to `config/sql-resources.php` and map `file` with `QUERY_PATH`.
 3. Add every stable returned field/alias needed for sorting to `columns`. Ensure the SQL itself returns no sensitive fields.
 4. Add a non-empty, deterministic `defaultSort` using fields from `columns`.
-5. If filters are allowed, either rely on `columns` or add `filterColumns`. Use `filterPlacement: source` plus exactly one marker only when filtering must occur before aggregation. Add `integer-date` metadata only for integer-backed dates.
+5. If filters are allowed, choose one model: rely on legacy `columns`/
+   `filterColumns` with optional source placement, or add a mapped `filters`
+   definition for explicit output/WHERE/HAVING expressions. Use the legacy
+   source marker only with `filterPlacement: source`. Add `integer-date` only for
+   integer-backed dates.
 6. Run `php tests/run.php`. Add a repository test for the resource's resolution, generated SQL, parameters, and important response aliases. A live database check is still needed for the real schema and SQL Server execution plan.
 7. Call `POST /api/index.php` with `{"action":"sql","resource":"<resource-id>"}` and only the runtime properties the resource allows.
 

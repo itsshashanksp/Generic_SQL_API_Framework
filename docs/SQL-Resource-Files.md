@@ -178,11 +178,15 @@ The repository keeps the `WITH` prefix ahead of output-filter, count, modern OFF
 The public shape is:
 
 ```json
-"filters": [
-  { "field": "Cust_Name", "operator": "LIKE", "value": "A%" },
-  { "field": "StDate", "operator": "BETWEEN", "value": ["2021-04-01", "2022-03-31"] }
-],
-"filterLogic": "AND"
+{
+  "action": "sql",
+  "resource": "customer",
+  "filters": [
+    { "field": "Cust_Name", "operator": "LIKE", "value": "A%" },
+    { "field": "StDate", "operator": "BETWEEN", "value": ["2021-04-01", "2022-03-31"] }
+  ],
+  "filterLogic": "AND"
+}
 ```
 
 Supported operators are `=`, `!=`, `<>`, `>`, `<`, `>=`, `<=`, `LIKE`, `NOT LIKE`, `IN`, `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `IS NULL`, and `IS NOT NULL`. All filters in one request are joined by the single `filterLogic`, which defaults to `AND`; nested filter groups are not part of this contract.
@@ -243,10 +247,14 @@ There is no general per-field type declaration or custom conversion system.
 Clients send:
 
 ```json
-"sort": [
-  { "field": "MaximumBill", "direction": "DESC" },
-  { "field": "Cust_Name", "direction": "ASC" }
-]
+{
+  "action": "sql",
+  "resource": "customer",
+  "sort": [
+    { "field": "MaximumBill", "direction": "DESC" },
+    { "field": "Cust_Name", "direction": "ASC" }
+  ]
+}
 ```
 
 Sort fields must match `columns`; source-only `filterColumns` cannot be used for sorting. The request validator restricts fields to simple unqualified identifiers and directions to `ASC` or `DESC`. The repository resolves fields case-insensitively to the configured spelling and bracket-quotes them, preventing a client from supplying an arbitrary sort expression.
@@ -260,7 +268,11 @@ Authored top-level `ORDER BY` has special handling. With no runtime filters or n
 Clients opt in explicitly:
 
 ```json
-"pagination": { "page": 2, "pageSize": 25 }
+{
+  "action": "sql",
+  "resource": "customer",
+  "pagination": { "page": 2, "pageSize": 25 }
+}
 ```
 
 Both values must be positive integers. Developers should not manually add `OFFSET/FETCH` or `ROW_NUMBER()` for normal resource pagination.

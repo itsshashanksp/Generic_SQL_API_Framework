@@ -30,6 +30,10 @@ All notable backend changes are recorded here. The project follows semantic vers
 
 ### Changed
 
+- Restructured backend documentation into a self-contained frontend/API reference
+  covering every public action, exact request/response contracts, JSON Query and
+  SQL Resource modes, CRUD, metadata/routines, security, capabilities, and
+  explicit limitations.
 - Reconciled README, architecture, API, examples, database configuration, hosting, roadmap, and contribution guidance with the current implementation.
 - Replaced the prior Windows/ODBC environment-validation workflow with logic-focused normal CI. Windows runtime and live database validation remain runtime/manual concerns.
 

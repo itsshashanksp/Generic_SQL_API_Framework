@@ -31,8 +31,9 @@ Backend developers should use [SQL Resource Configuration](SQL-Resource-Configur
 and [SQL Resource Files](SQL-Resource-Files.md) for registry and file details.
 Its resource IDs use the stricter `^[A-Za-z0-9][A-Za-z0-9_-]*$` shape and must
 also exist in the server registry. Its sort fields are unqualified output aliases;
-filter fields come from the resource's `filterColumns` allowlist, which defaults
-to its output columns. Neither accepts arbitrary database fields.
+filter fields come from either the legacy `filterColumns` allowlist (defaulting
+to output columns) or the resource's mapped `filters` keys. Neither accepts
+arbitrary database fields or client-supplied SQL expressions.
 
 These restrictions describe client-composed JSON. A registered SQL Resource is
 backend-owned SQL and may use SQL Server functions, CTEs, joins, windows,
@@ -236,7 +237,13 @@ Routine `parameters` is an optional positional array and defaults to `[]`:
 
 ```json
 { "action": "procedure", "source": { "procedure": "dbo.RunReport" }, "parameters": [2026, true] }
+```
+
+```json
 { "action": "function", "source": { "function": "dbo.Score" }, "parameters": [42] }
+```
+
+```json
 { "action": "tableFunction", "source": { "function": "dbo.RowsForYear" }, "parameters": [2026] }
 ```
 

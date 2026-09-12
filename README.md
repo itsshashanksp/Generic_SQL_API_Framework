@@ -10,7 +10,10 @@ The existing PHP implementation is the source of truth. Microsoft SQL Server thr
 
 ## Public API
 
-Send JSON to `api/index.php` (normally with `POST` and `Content-Type: application/json`):
+Send JSON to the `api/index.php` entry script, normally with `POST` and
+`Content-Type: application/json`. It is `/api/index.php` when the repository root
+is served, or `/index.php` when `api/` is the document root used by the bundled
+launcher:
 
 ```json
 {
@@ -43,7 +46,7 @@ windows, JSON/XML expressions, and set operations, without using JSON Query
 Mode's client-facing function and expression allowlists. Clients still cannot
 submit SQL text, tables, paths, credentials, or connection settings.
 
-Current query support includes SELECT, DISTINCT, SQL Server TOP through `limit`, aliases, CASE and arithmetic expressions, an allow-list of SQL functions, prepared WHERE values, INNER/LEFT/RIGHT equality joins, GROUP BY, aggregate HAVING, multi-field sorting, pagination, eight window functions, subqueries in selected filters, one CTE (including the recursive form), UNION/UNION ALL, routines, and database metadata reads. See the definitive [JSON request reference](docs/JSON-Request-Reference.md) and [capability matrix](docs/API.md#capability-matrix) for exact boundaries.
+Current query support includes SELECT, DISTINCT, SQL Server TOP through `limit`, aliases, CASE and arithmetic expressions, an allow-list of SQL functions, prepared WHERE values, INNER/LEFT/RIGHT equality joins, GROUP BY, aggregate HAVING, multi-field sorting, pagination, eight window functions, subqueries in selected filters, one CTE (including the recursive form), UNION/UNION ALL, routines, and database metadata reads. See the definitive [JSON request reference](docs/JSON-Request-Reference.md) and [capability matrix](docs/Capability-Matrix.md) for exact boundaries.
 
 CRUD uses a separate deny-by-default write-resource registry. It supports
 single-object INSERT, targeted UPDATE/DELETE, and SQL Server UPSERT with live
@@ -146,18 +149,38 @@ The roadmap is backend-only. See [Roadmap.md](docs/Roadmap.md) and [CHANGELOG.md
 
 ## Documentation
 
+Start at the [backend documentation map](docs/README.md).
+
+Getting started:
+
 - [Introduction](docs/Introduction.md)
-- [Architecture](docs/Architecture.md)
-- [HTTP API](docs/API.md)
+- [HTTP API and Universal JSON Contract](docs/API.md)
+- [All public actions](docs/Action-Reference.md)
 - [JSON request reference](docs/JSON-Request-Reference.md)
-- [SQL resource configuration](docs/SQL-Resource-Configuration.md)
-- [SQL resource files](docs/SQL-Resource-Files.md)
+- [Response reference](docs/Response-Reference.md)
+- [Frontend integration](docs/Frontend-Integration.md)
+
+Querying and resources:
+
+- [JSON Query Mode](docs/Query-Mode.md)
+- [Query functions](docs/Query-Functions.md)
+- [Filtering, sorting, and pagination](docs/Filtering-Sorting-Pagination.md)
+- [Set operations](docs/Set-Operations.md)
+- [SQL Resource Mode](docs/SQL-Resource-Mode.md)
+- [SQL Resource configuration](docs/SQL-Resource-Configuration.md)
+- [SQL Resource files](docs/SQL-Resource-Files.md)
+
+Writes, metadata, boundaries, and operations:
+
+- [CRUD / Write API](docs/CRUD.md)
 - [Write resource configuration](docs/Write-Resource-Configuration.md)
-- [Query examples](docs/Query-Examples.md)
+- [Metadata and routines](docs/Metadata-and-Routines.md)
+- [Validation, errors, and security](docs/Validation-and-Errors.md)
+- [Capability matrix](docs/Capability-Matrix.md)
+- [Current limitations](docs/Limitations.md)
+- [Architecture](docs/Architecture.md)
 - [Database configuration](docs/Database-Configuration.md)
 - [Hosting](docs/Hosting.md)
-- [Roadmap](docs/Roadmap.md)
-- [Contributing](CONTRIBUTING.md)
-- [Changelog](CHANGELOG.md)
+- [Roadmap](docs/Roadmap.md), [contributing](CONTRIBUTING.md), and [changelog](CHANGELOG.md)
 
 Do not commit database credentials, `GENERIC_SQL_API_ENCRYPTION_KEY`, or logs. The project scope is the backend API; dashboards, charts, report widgets, and other frontend features belong to consumers, not this repository's backend roadmap.
