@@ -148,11 +148,10 @@ try {
         'Plaintext database configuration loading failed.'
     );
 
-    $backupPath = (new DatabaseConfigurationMigrator())->migrate($configPath);
-    configurationAssert(is_file($backupPath), 'Migration did not create a plaintext backup.');
+    (new DatabaseConfigurationMigrator())->migrate($configPath);
     configurationAssert(
-        json_decode((string)file_get_contents($backupPath), true, 512, JSON_THROW_ON_ERROR) === $configuration,
-        'Migration backup does not match the original configuration.'
+        !is_file($configPath . '.backup') && glob($configPath . '.backup.*') === [],
+        'Migration retained an automatic plaintext backup.'
     );
     $migratedContents = (string)file_get_contents($configPath);
     foreach (['private-db.internal', '15433', 'SensitiveApplicationDatabase', 'sensitive_api_user',

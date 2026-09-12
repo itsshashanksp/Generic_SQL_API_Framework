@@ -22,9 +22,9 @@ All notable backend changes are recorded here. The project follows semantic vers
 
 - Cross-platform AES-256-GCM encryption of the complete database configuration as one versioned authenticated payload, with a Base64-encoded 32-byte key supplied through `GENERIC_SQL_API_ENCRYPTION_KEY`.
 - Centralized database configuration resolution that preserves plaintext and legacy password-only compatibility while passing the same decrypted structure into the existing SQL Server ODBC connection path.
-- A backup-first, cross-platform migration utility for converting plaintext `database.json` without exposing configuration or key material.
-- Windows one-time encryption setup using the bundled PHP/OpenSSL runtime, Windows User environment storage, backup-first complete-configuration migration, and connection validation.
-- Database-independent encryption coverage for complete-configuration round trips, field confidentiality, random nonces, malformed data, wrong keys, tampering, migration backups, backward-compatible resolution, and secret-safe logging.
+- A verified, cross-platform migration utility for converting plaintext `database.json` without retaining a plaintext backup or exposing configuration/key material.
+- Windows one-time encryption setup using the bundled PHP/OpenSSL runtime, Windows User environment storage, complete-configuration migration, and connection validation.
+- Database-independent encryption coverage for complete-configuration round trips, field confidentiality, random nonces, malformed data, wrong keys, tampering, no-backup migration, backward-compatible resolution, and secret-safe logging.
 - Complex server-owned SQL Resource queries, including standard/recursive CTEs, subqueries, complex joins/APPLY, windows, SQL Server functions, JSON/XML expressions, and set operations, without expanding JSON Query Mode allowlists.
 - CTE-aware SQL Resource filtering/count/pagination generation and explicit protection against combining request controls with authored OFFSET/FETCH.
 - Database-independent SQL Resource capability and security regression coverage.
@@ -36,6 +36,11 @@ All notable backend changes are recorded here. The project follows semantic vers
 
 ### Changed
 
+- Reduced SQL Resource configuration to global discovery settings, removed the
+  obsolete per-resource registry and runtime-filter marker path, and moved all
+  runtime execution metadata to the validated SQL request contract.
+- Database configuration migration now verifies encrypted temporary/final files
+  without automatically retaining a plaintext backup.
 - Restructured backend documentation into a self-contained frontend/API reference
   covering every public action, exact request/response contracts, JSON Query and
   SQL Resource modes, CRUD, metadata/routines, security, capabilities, and

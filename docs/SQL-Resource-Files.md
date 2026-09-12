@@ -70,7 +70,7 @@ order:
 
 `execution.columns` is a control-field allowlist, not response projection or
 redaction. The backend wraps the authored query when applying output filters,
-sorting, and pagination. Pagination requires a runtime or default approved sort.
+sorting, and pagination. Pagination requires runtime/default or authored ordering.
 
 Filter mappings support three placements:
 
@@ -82,8 +82,7 @@ Filter mappings support three placements:
 These expressions use a narrow public grammar. Arbitrary SQL fragments,
 comments, clauses, function nesting, aliases, literals, and parameters are not
 accepted. Filter operators are separately allowlisted and every value is bound
-as a prepared parameter. `valueType: "integer-date"` is available for legacy
-integer dates.
+as a prepared parameter. `valueType: "integer-date"` is available for integer-backed dates.
 
 ## Authored SQL rules
 
@@ -103,18 +102,11 @@ SQL Server remains responsible for validating objects, types, syntax, version
 support, and permissions. Test every enabled runtime path against the deployment
 database in addition to the database-independent suite.
 
-## Legacy files and the marker
+## Filter insertion
 
-Existing entries in `config/sql-resources.php` continue to work. They may keep
-trusted server-side `columns`, `filterColumns`, `filterValueTypes`, `filters`,
-`filterPlacement`, and `defaultSort` mappings. The legacy
-`/*__RUNTIME_FILTERS__*/` marker remains supported for entries configured with
-source placement.
-
-New discovered resources do not need the marker. Public source metadata is
-inserted into the top-level WHERE stage by the repository. Retain a marker in an
-existing file until its legacy ID and mapping have been migrated; removing it
-prematurely can change compatibility behavior.
+SQL files do not use runtime-filter placeholders. Public source metadata is
+inserted into the top-level WHERE stage; HAVING metadata is inserted into the
+top-level HAVING stage. Output filters use the generated outer wrapper.
 
 ## Review checklist
 
@@ -126,5 +118,4 @@ prematurely can change compatibility behavior.
 - Use least-privilege database credentials and review query plans.
 
 See [SQL Resource Mode](SQL-Resource-Mode.md) for the public contract and
-[SQL Resource configuration](SQL-Resource-Configuration.md) for discovery,
-legacy configuration, and migration details.
+[SQL Resource configuration](SQL-Resource-Configuration.md) for discovery and migration details.

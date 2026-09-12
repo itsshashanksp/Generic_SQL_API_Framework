@@ -25,7 +25,7 @@ try {
     (new DatabaseConfigurationMigrator())->migrate($configFile);
 
     echo "Complete database configuration encrypted successfully." . PHP_EOL;
-    echo "A plaintext backup was created and must be protected or removed after verification." . PHP_EOL;
+    echo "No plaintext backup was retained." . PHP_EOL;
     exit(0);
 } catch (Throwable $exception) {
     // Exceptions in this path use fixed messages and never include configuration,

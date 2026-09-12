@@ -44,8 +44,7 @@ class SqlResourceCapabilityEngine extends QueryEngine
     }
 }
 
-$testDirectory = QUERY_PATH . DIRECTORY_SEPARATOR . '.sql-resource-capability-test-' . bin2hex(random_bytes(6));
-$resources = [];
+$testDirectory = QUERY_PATH . DIRECTORY_SEPARATOR . 'sql-resource-capability-test-' . bin2hex(random_bytes(6));
 $files = [];
 $capabilities = [
     'cte' => "WITH Recent AS (SELECT Id, CreatedAt FROM dbo.Events WHERE Active = 1)\nSELECT Id AS ResultValue FROM Recent",
@@ -71,15 +70,13 @@ try {
         $file = $testDirectory . DIRECTORY_SEPARATOR . $id . '.sql';
         file_put_contents($file, $sql . ';' . PHP_EOL);
         $files[] = $file;
-        $resources[$id] = [
-            'file' => $file,
-            'columns' => ['ResultValue'],
-            'filterColumns' => ['ResultValue'],
-            'defaultSort' => [['field' => 'ResultValue', 'direction' => 'ASC']],
-        ];
     }
 
-    $registry = new SqlResourceRegistry($resources);
+    $registry = new SqlResourceRegistry([], $testDirectory);
+    $resultExecution = ['execution' => [
+        'columns' => ['ResultValue'],
+        'defaultSort' => [['field' => 'ResultValue', 'direction' => 'ASC']],
+    ]];
     foreach ($capabilities as $id => $authoredSql) {
         $engine = new SqlResourceCapabilityEngine();
         (new SqlRepository($engine, $registry))->execute(['resource' => $id]);
@@ -117,6 +114,7 @@ try {
     $injectionValue = "' OR 1=1 --";
     (new SqlRepository($cteEngine, $registry))->execute([
         'resource' => 'cte',
+        ...$resultExecution,
         'filters' => [['field' => 'ResultValue', 'operator' => '=', 'value' => $injectionValue]],
         'pagination' => ['page' => 2, 'pageSize' => 10],
     ]);
@@ -138,6 +136,7 @@ try {
     $legacyCteEngine = new SqlResourceCapabilityEngine(100);
     (new SqlRepository($legacyCteEngine, $registry))->execute([
         'resource' => 'cte',
+        ...$resultExecution,
         'pagination' => ['page' => 1, 'pageSize' => 10],
     ]);
     $legacyCteData = end($legacyCteEngine->executions);
@@ -165,11 +164,7 @@ try {
     $commentFile = $testDirectory . DIRECTORY_SEPARATOR . 'comment.sql';
     file_put_contents($commentFile, "-- reviewed resource\nSELECT 1 AS ResultValue;");
     $files[] = $commentFile;
-    $commentRegistry = new SqlResourceRegistry(['comment' => [
-        'file' => $commentFile,
-        'columns' => ['ResultValue'],
-        'defaultSort' => [['field' => 'ResultValue', 'direction' => 'ASC']],
-    ]]);
+    $commentRegistry = new SqlResourceRegistry([], $testDirectory);
     $commentEngine = new SqlResourceCapabilityEngine();
     (new SqlRepository($commentEngine, $commentRegistry))->execute(['resource' => 'comment']);
     resourceCapabilityAssert(
@@ -180,11 +175,7 @@ try {
     $offsetFile = $testDirectory . DIRECTORY_SEPARATOR . 'offset.sql';
     file_put_contents($offsetFile, 'SELECT Id AS ResultValue FROM dbo.Events ORDER BY Id OFFSET 5 ROWS FETCH NEXT 10 ROWS ONLY;');
     $files[] = $offsetFile;
-    $offsetRegistry = new SqlResourceRegistry(['offset' => [
-        'file' => $offsetFile,
-        'columns' => ['ResultValue'],
-        'defaultSort' => [['field' => 'ResultValue', 'direction' => 'ASC']],
-    ]]);
+    $offsetRegistry = new SqlResourceRegistry([], $testDirectory);
     $offsetEngine = new SqlResourceCapabilityEngine();
     (new SqlRepository($offsetEngine, $offsetRegistry))->execute(['resource' => 'offset']);
     resourceCapabilityAssert(
@@ -210,13 +201,9 @@ try {
         $file = $testDirectory . DIRECTORY_SEPARATOR . 'unsafe-' . $index . '.sql';
         file_put_contents($file, $unsafeSql);
         $files[] = $file;
-        $unsafeRegistry = new SqlResourceRegistry(['unsafe' => [
-            'file' => $file,
-            'columns' => ['ResultValue'],
-            'defaultSort' => [['field' => 'ResultValue', 'direction' => 'ASC']],
-        ]]);
+        $unsafeRegistry = new SqlResourceRegistry([], $testDirectory);
         resourceCapabilityFailure(
-            fn () => (new SqlRepository(new SqlResourceCapabilityEngine(), $unsafeRegistry))->execute(['resource' => 'unsafe']),
+            fn () => (new SqlRepository(new SqlResourceCapabilityEngine(), $unsafeRegistry))->execute(['resource' => 'unsafe-' . $index]),
             'A write-capable or multi-statement SQL resource was accepted.'
         );
     }

@@ -6,16 +6,12 @@ per-file PHP registry entry.
 
 ## Global discovery settings
 
-`config/sql-resources.php` may contain the reserved `__settings` entry:
+`config/sql-resources.php` contains global discovery settings only:
 
 ```php
 return [
-    '__settings' => [
-        'root' => QUERY_PATH,
-        'exclude' => ['system'],
-    ],
-
-    // Optional legacy resource entries may follow.
+    'root' => QUERY_PATH,
+    'exclude' => ['system'],
 ];
 ```
 
@@ -29,8 +25,7 @@ segments, not globs or client input. Internal metadata queries under
 `queries/system` are therefore not exposed as public SQL Resources.
 
 If `config/sql-resources.php` is absent, discovery still defaults to `QUERY_PATH`
-with `system` excluded. The file remains useful for explicit global settings and
-legacy compatibility.
+with `system` excluded. Individual resources are never registered in this file.
 
 ## Adding a resource
 
@@ -125,8 +120,8 @@ entire `execution` object.
 
 A non-empty list of `{field, direction}` entries. `field` must be in
 `execution.columns`; direction is ASC or DESC. Runtime `sort` replaces it.
-Pagination requires either a runtime sort or a resolved default because every
-pagination path needs deterministic, non-positional ordering.
+Pagination requires a runtime/default sort or authored top-level ORDER BY because
+every pagination path needs deterministic, non-positional ordering.
 
 ### `execution.filters`
 
@@ -173,8 +168,7 @@ frontend report definition. It is never concatenated as arbitrary SQL:
 
 The validator rejects comments, semicolons, placeholders, Boolean expressions,
 operators, nested functions, and other SQL fragments. Authors needing a more
-complex mapping must use a reviewed legacy server entry or create a dedicated
-SQL file whose output supports safe outer filtering.
+complex mapping must use a dedicated SQL file whose output supports safe outer filtering.
 
 `source` maps internally to depth-aware top-level WHERE insertion. It creates a
 WHERE clause or appends with AND before GROUP BY/HAVING/ORDER BY. `having` does
@@ -222,47 +216,9 @@ value becomes a positional prepared parameter. The SQL file, resource root,
 placement enum, expression grammar, identifier syntax, operator list, sort
 direction, and value conversion remain backend-controlled.
 
-## Legacy registry entries
-
-Existing entries are still accepted beneath `__settings`:
-
-```php
-'customer' => [
-    'file' => QUERY_PATH . '/reports/customer.sql',
-    'columns' => ['Cust_Name', 'TotalCustomers', 'MinimumBill', 'MaximumBill'],
-    'filterColumns' => ['Cust_Name', 'StDate'],
-    'filterValueTypes' => ['StDate' => 'integer-date'],
-    'filterPlacement' => 'source',
-    'defaultSort' => [
-        ['field' => 'Cust_Name', 'direction' => 'ASC'],
-    ],
-],
-```
-
-Legacy fields retain their previous rules:
-
-| Field | Required | Meaning |
-|---|---:|---|
-| `file` | yes | Existing `.sql` file contained by the resource root. |
-| `columns` | yes | Output allowlist. |
-| `defaultSort` | yes | Non-empty sort using `columns`. |
-| `filterColumns` | no | Output/source fields; defaults to columns. |
-| `filterValueTypes` | no | Optional `integer-date` map. |
-| `filterPlacement` | no | `output` default or marker-based `source`. |
-| `filters` | alternative | Trusted server mappings with `output`, `where`, or `having` location. |
-
-A legacy exact ID wins over basename fallback. If a legacy ID exactly duplicates
-a discovered relative ID, resolution fails rather than choosing one definition.
-Legacy file containment, extension, marker, columns, filters, and defaults remain
-validated.
-
-The old `item` and `customer` requests therefore continue working. Preferred new
-requests use `reports/item` and `reports/customer`. If a short basename has no
-legacy entry, it resolves only when unique across discovery.
-
 ## Migration
 
-For each legacy resource:
+For each former registered resource:
 
 1. Keep the SQL file beneath the configured root.
 2. Change frontend `resource` to its relative ID without `.sql`.
@@ -270,15 +226,15 @@ For each legacy resource:
    runtime controls require them.
 4. Represent simple source identifiers or supported aggregate HAVING mappings in
    `execution.filters`.
-5. Keep the legacy entry temporarily if it needs the marker or a more complex
-   trusted expression than the public execution grammar accepts.
-6. Remove the legacy entry after all callers use the discovered ID and no legacy-
-   only mapping remains.
+5. Remove runtime-filter markers; source/HAVING placement is now inserted by the
+   statement transformer.
+6. Remove the per-resource PHP entry. Short IDs remain usable only when their
+   discovered basename is unique.
 
 ## Security checklist
 
 - Treat every discovered SQL file as reviewed backend code.
-- Keep internal/non-public directories in `__settings.exclude`.
+- Keep internal/non-public directories in the global `exclude` list.
 - Use stable, explicit aliases for output controls.
 - Never accept report SQL, paths, credentials, or raw clauses from a frontend.
 - Keep public source/HAVING mappings within the validator grammar.

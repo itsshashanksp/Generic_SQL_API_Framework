@@ -64,9 +64,33 @@ class SqlTestController extends SQLController
 
 $validator = new QueryRequestValidator();
 $normalizer = new QueryRequestNormalizer();
+$itemExecution = ['execution' => [
+    'columns' => ['Item_Code', 'Item_Desc', 'Item_MRP'],
+    'defaultSort' => [['field' => 'Item_Code', 'direction' => 'ASC']],
+]];
+$customerExecutionMetadata = ['execution' => [
+    'columns' => ['Cust_Name', 'TotalCustomers', 'MinimumBill', 'MaximumBill'],
+    'filters' => [
+        'Cust_Name' => ['expression' => 'Cust_Name', 'placement' => 'source'],
+        'StDate' => ['expression' => 'StDate', 'placement' => 'source', 'valueType' => 'integer-date'],
+    ],
+    'defaultSort' => [['field' => 'Cust_Name', 'direction' => 'ASC']],
+]];
+$statsExecutionMetadata = ['execution' => [
+    'columns' => ['TotalItems', 'MinimumSP', 'MaximumSP', 'StockValue'],
+    'filters' => [
+        'Item_Desc' => ['expression' => 'Item_Desc', 'placement' => 'source'],
+        'Std_Vat' => ['expression' => 'Std_Vat', 'placement' => 'source'],
+    ],
+]];
+$tableExecution = ['execution' => [
+    'columns' => ['Item_Code', 'Item_Desc', 'Sale_Rate', 'Item_MRP', 'Std_Vat', 'cl_stock', 'stock_value'],
+    'defaultSort' => [['field' => 'Item_Code', 'direction' => 'ASC']],
+]];
 $publicRequest = [
     'action' => 'sql',
-    'resource' => 'item',
+    'resource' => 'reports/item',
+    ...$itemExecution,
     'filters' => [['field' => 'Item_Desc', 'operator' => 'LIKE', 'value' => "%O'Brien%"]],
     'sort' => [['field' => 'Item_Code', 'direction' => 'DESC']],
     'pagination' => ['page' => 2, 'pageSize' => 25],
@@ -74,7 +98,8 @@ $publicRequest = [
 $validator->validate($publicRequest);
 $normalized = $normalizer->normalize($publicRequest);
 sqlAssert($normalized['controller'] === 'SQL' && $normalized['action'] === 'execute', 'SQLController dispatch failed.');
-sqlAssert($normalized['resource'] === 'item', 'SQL resource normalization failed.');
+sqlAssert($normalized['resource'] === 'reports/item', 'SQL resource normalization failed.');
+sqlAssert($normalized['execution'] === $publicRequest['execution'], 'SQL execution metadata normalization failed.');
 
 expectSqlRequestInvalid($validator, ['action' => 'sql', 'resource' => '../../secret']);
 expectSqlRequestInvalid($validator, ['action' => 'sql', 'resource' => 'item', 'sql' => 'SELECT * FROM Users']);
@@ -84,42 +109,15 @@ expectSqlRequestInvalid($validator, ['action' => 'sql', 'resource' => 'item', 'f
 ]]]);
 
 $registry = new SqlResourceRegistry();
-$statsDefinition = $registry->resolve('item-dashboard-stats');
 sqlAssert(
-    $statsDefinition['columns'] === ['TotalItems', 'MinimumSP', 'MaximumSP', 'TotalValue'],
-    'Statistic output columns changed.'
-);
-sqlAssert(
-    $statsDefinition['filterColumns'] === ['Item_Desc', 'Std_Vat']
-        && $statsDefinition['filterPlacement'] === 'source',
-    'Statistic source filter metadata was not loaded.'
-);
-$customerDefinition = $registry->resolve('customer');
-sqlAssert(
-    $customerDefinition['filterColumns'] === ['Cust_Name', 'StDate']
-        && $customerDefinition['filterValueTypes'] === ['stdate' => 'integer-date']
-        && $customerDefinition['filterPlacement'] === 'source',
-    'Report source filter metadata was not loaded.'
+    $registry->resolve('reports/item')['file'] === realpath(QUERY_PATH . '/reports/item.sql'),
+    'Discovered Item resource was not resolved.'
 );
 try {
     $registry->resolve('not-approved');
     throw new RuntimeException('Unknown SQL resource was accepted.');
 } catch (ApiRequestException $exception) {
     sqlAssert($exception->getErrorCode() === 'INVALID_SQL_RESOURCE', 'Wrong resource error code.');
-}
-
-try {
-    (new SqlResourceRegistry(['escaped' => [
-        'file' => __FILE__,
-        'columns' => ['Item_Code'],
-        'defaultSort' => [['field' => 'Item_Code', 'direction' => 'ASC']],
-    ]]))->resolve('escaped');
-    throw new RuntimeException('A registered path outside the query root was accepted.');
-} catch (RuntimeException $exception) {
-    sqlAssert(
-        str_contains($exception->getMessage(), 'unavailable'),
-        'Registry path containment did not reject the external file.'
-    );
 }
 
 $engine = new SqlTestEngine();
@@ -169,6 +167,7 @@ foreach ($sqlOperatorCases as [$operator, $value, $fragment, $expectedParams]) {
     (new SqlRepository($operatorEngine, $registry))->execute($normalizer->normalize([
         'action' => 'sql',
         'resource' => 'item',
+        ...$itemExecution,
         'filters' => [$filter],
     ]));
     $operatorExecution = end($operatorEngine->executions);
@@ -179,6 +178,7 @@ foreach ($sqlOperatorCases as [$operator, $value, $fragment, $expectedParams]) {
 $emptySortRequest = $normalizer->normalize([
     'action' => 'sql',
     'resource' => 'item',
+    ...$itemExecution,
     'filters' => [],
     'sort' => [],
     'pagination' => ['page' => 1, 'pageSize' => 25],
@@ -316,6 +316,7 @@ $customerEngine = new SqlTestEngine();
 (new SqlRepository($customerEngine, $registry))->execute($normalizer->normalize([
     'action' => 'sql',
     'resource' => 'customer',
+    ...$customerExecutionMetadata,
     'filters' => [],
     'sort' => [],
     'pagination' => ['page' => 1, 'pageSize' => 25],
@@ -335,16 +336,17 @@ foreach ($dateFilterCases as $label => [$operator, $value, $expectedParams]) {
     (new SqlRepository($dateEngine, $registry))->execute($normalizer->normalize([
         'action' => 'sql',
         'resource' => 'customer',
+        ...$customerExecutionMetadata,
         'filters' => [['field' => 'StDate', 'operator' => $operator, 'value' => $value]],
     ]));
     $dateExecution = end($dateEngine->executions);
     $expectedPredicate = $operator === 'BETWEEN'
-        ? '[StDate] BETWEEN ? AND ?'
-        : "[StDate] {$operator} ?";
+        ? '(StDate) BETWEEN ? AND ?'
+        : "(StDate) {$operator} ?";
     sqlAssert(
         str_contains($dateExecution['sql'], 'FROM CustomerTable')
             && str_contains($dateExecution['sql'], $expectedPredicate)
-            && strpos($dateExecution['sql'], '[StDate]') < strpos($dateExecution['sql'], 'GROUP BY'),
+            && strpos($dateExecution['sql'], '(StDate)') < strpos($dateExecution['sql'], 'GROUP BY'),
         "Report {$label} date filter was not applied before aggregation."
     );
     sqlAssert($dateExecution['params'] === $expectedParams, "Report {$label} date parameters changed.");
@@ -360,6 +362,7 @@ foreach (['AND', 'OR'] as $logic) {
     (new SqlRepository($logicEngine, $registry))->execute($normalizer->normalize([
         'action' => 'sql',
         'resource' => 'customer',
+        ...$customerExecutionMetadata,
         'filterLogic' => $logic,
         'filters' => [
             ['field' => 'Cust_Name', 'operator' => 'LIKE', 'value' => "%O'Brien%"],
@@ -368,7 +371,7 @@ foreach (['AND', 'OR'] as $logic) {
     ]));
     $logicExecution = end($logicEngine->executions);
     sqlAssert(
-        str_contains($logicExecution['sql'], "[Cust_Name] LIKE ? {$logic} [StDate] >= ?"),
+        str_contains($logicExecution['sql'], "(Cust_Name) LIKE ? {$logic} (StDate) >= ?"),
         "Report {$logic} filter logic changed."
     );
     sqlAssert(
@@ -382,6 +385,7 @@ try {
     (new SqlRepository(new SqlTestEngine(), $registry))->execute($normalizer->normalize([
         'action' => 'sql',
         'resource' => 'customer',
+        ...$customerExecutionMetadata,
         'filters' => [['field' => 'StDate', 'operator' => '=', 'value' => '2021-02-30']],
     ]));
     throw new RuntimeException('Invalid integer-backed report date was accepted.');
@@ -418,21 +422,21 @@ foreach ($statFilterCases as $label => [$filters, $expectedParams]) {
         $normalizer->normalize([
             'action' => 'sql',
             'resource' => 'item-dashboard-stats',
+            ...$statsExecutionMetadata,
             'filters' => $filters,
         ])
     );
     $statsExecution = end($statsEngine->executions);
     sqlAssert(
         str_contains($statsExecution['sql'], 'FROM ItemMasterTable')
-            && str_contains($statsExecution['sql'], '[Item_Desc]') === ($label !== 'Std_Vat only')
-            && str_contains($statsExecution['sql'], '[Std_Vat]') === ($label !== 'Item_Desc only'),
+            && str_contains($statsExecution['sql'], '(Item_Desc)') === ($label !== 'Std_Vat only')
+            && str_contains($statsExecution['sql'], '(Std_Vat)') === ($label !== 'Item_Desc only'),
         "{$label} was not applied to the statistic source."
     );
     sqlAssert(
         !str_contains($statsExecution['sql'], 'SqlResource.[Item_Desc]')
-            && !str_contains($statsExecution['sql'], 'SqlResource.[Std_Vat]')
-            && !str_contains($statsExecution['sql'], SqlResourceRegistry::RUNTIME_FILTER_MARKER),
-        "{$label} was applied after aggregation or left an unresolved marker."
+            && !str_contains($statsExecution['sql'], 'SqlResource.[Std_Vat]'),
+        "{$label} was applied after aggregation."
     );
     sqlAssert($statsExecution['params'] === $expectedParams, "{$label} parameters changed.");
     sqlAssert(
@@ -457,13 +461,13 @@ $unfilteredStatsResult = (new SqlRepository($unfilteredStatsEngine, $registry))-
     $normalizer->normalize([
         'action' => 'sql',
         'resource' => 'item-dashboard-stats',
+        ...$statsExecutionMetadata,
         'filters' => [],
     ])
 );
 $unfilteredStatsExecution = end($unfilteredStatsEngine->executions);
 sqlAssert(
-    !str_contains($unfilteredStatsExecution['sql'], SqlResourceRegistry::RUNTIME_FILTER_MARKER)
-        && !str_contains($unfilteredStatsExecution['sql'], ' WHERE '),
+    !str_contains($unfilteredStatsExecution['sql'], ' WHERE '),
     'An empty statistic filter produced a predicate or unresolved marker.'
 );
 sqlAssert(
@@ -478,6 +482,7 @@ $tableFilterEngine = new SqlTestEngine();
 (new SqlRepository($tableFilterEngine, $registry))->execute($normalizer->normalize([
     'action' => 'sql',
     'resource' => 'item-dashboard-table',
+    ...$tableExecution,
     'filters' => [
         ['field' => 'Item_Desc', 'operator' => 'LIKE', 'value' => '%ABC%'],
         ['field' => 'Std_Vat', 'operator' => 'LIKE', 'value' => '%5%'],
@@ -495,7 +500,7 @@ sqlAssert(
 );
 
 try {
-    $repository->execute(['resource' => 'item', 'filters' => [[
+    $repository->execute(['resource' => 'item', ...$itemExecution, 'filters' => [[
         'field' => 'Password', 'operator' => '=', 'value' => 'secret'
     ]]]);
     throw new RuntimeException('Non-allowlisted runtime column was accepted.');
@@ -506,6 +511,7 @@ try {
 try {
     $repository->execute([
         'resource' => 'item',
+        ...$itemExecution,
         'sort' => [['field' => 'Password', 'direction' => 'ASC']],
     ]);
     throw new RuntimeException('Non-output runtime sort field was accepted.');
@@ -516,6 +522,7 @@ try {
 try {
     (new SqlRepository(new SqlTestEngine(), $registry))->execute([
         'resource' => 'item-dashboard-stats',
+        ...$statsExecutionMetadata,
         'filters' => [['field' => 'Item_Code', 'operator' => '=', 'value' => 'A1']],
     ]);
     throw new RuntimeException('Unallowlisted statistic source field was accepted.');

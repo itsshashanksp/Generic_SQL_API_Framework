@@ -43,7 +43,7 @@ database details.
 | `INVALID_JSON` | 400 | Request body is malformed JSON. | Fix serialization; do not retry unchanged. |
 | `INVALID_REQUEST` | 400 | Unknown action/property or invalid required field/shape/value. | Show validation details and correct input. |
 | `INVALID_SQL_RESOURCE` | 400 | SQL Resource ID is invalid, missing, excluded, ambiguous, or unsafe. | Use a discovered backend-published resource ID. |
-| `INVALID_SQL_RUNTIME_FIELD` | 400 | Filter/sort field is not exposed by execution or legacy metadata. | Remove it or update the reviewed report definition. |
+| `INVALID_SQL_RUNTIME_FIELD` | 400 | Filter/sort field is not exposed by execution metadata. | Remove it or update the reviewed report definition. |
 | `INVALID_SQL_RUNTIME_VALUE` | 400 | Runtime mapped value failed conversion, currently integer-date. | Correct the field value. |
 | `INVALID_SQL_RUNTIME_FILTER` | 400 | Runtime placement is semantically unsafe/ambiguous. | Change filter logic/resource design. |
 | `INVALID_SQL_PAGINATION` | 400 | Pagination lacks an approved sort or conflicts with authored OFFSET/FETCH. | Supply approved sorting or use the resource's fixed behavior. |
@@ -75,13 +75,12 @@ valid public request from reaching them. They are not normal public action error
 
 ### SQL Resource Mode
 
-- Clients select a safe path-derived or legacy ID, never SQL or a file path.
+- Clients select a safe path-derived ID or unique basename, never SQL or a file path.
 - Resolved files must remain inside the configured root; internal directories
   are excluded and discovery collisions fail closed.
 - Resources must analyze as one read-only SELECT/CTE statement; SELECT INTO and
   multiple statements are rejected.
-- Output, runtime filter, and sort fields come from strictly validated execution
-  metadata or trusted legacy allowlists.
+- Output, runtime filter, and sort fields come from strictly validated execution metadata.
 - Public expressions accept only output/source identifiers or a narrow aggregate
   grammar with fixed output/source/HAVING placement values.
 - Runtime values use prepared parameters.

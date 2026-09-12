@@ -98,7 +98,7 @@ Windows users can perform the one-time migration of an existing plaintext config
 setup-database-encryption.bat
 ```
 
-The setup saves the key in the Windows User environment, encrypts the complete `database.json`, creates an ignored plaintext recovery backup, and validates the connection. Protect or remove the backup after verification. Open a new terminal before later startup so it inherits the saved variable. Do not commit the key, configuration, or backups. See [Database Configuration](docs/Database-Configuration.md) for the encrypted format, cross-platform manual setup, failure behavior, and security limitations.
+The setup saves the key in the Windows User environment, encrypts the complete `database.json` without retaining a plaintext backup, and validates the connection. Open a new terminal before later startup so it inherits the saved variable. Do not commit the key or configuration. See [Database Configuration](docs/Database-Configuration.md) for the encrypted format, cross-platform manual setup, failure behavior, and security limitations.
 
 ## Start the backend
 

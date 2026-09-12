@@ -87,7 +87,8 @@ client never supplies a filesystem path or SQL text.
 filters and sorting. It is unnecessary when a simple resource is executed without
 runtime controls. The backend deliberately does not parse arbitrary SQL Server
 projections. `execution.defaultSort` requires columns and is used when runtime
-`sort` is absent. Pagination requires an approved runtime or default sort.
+`sort` is absent. Pagination requires an approved runtime/default sort or an
+authored top-level ORDER BY.
 
 `execution.filters` adds logical mappings. Output mappings must resolve to an
 execution column. `source` expressions are limited to identifiers such as
@@ -96,10 +97,9 @@ over one identifier or `*`. The only custom value type is `integer-date`.
 Placement, expressions, field names, types, operators, and directions are
 validated; values remain prepared parameters.
 
-Legacy entries in `config/sql-resources.php` remain available for existing
-short IDs such as `item` and `customer`. New resources need no per-file PHP
-entry. A unique basename can also preserve a short-ID fallback, but the relative
-ID is preferred and required when basenames are ambiguous.
+`config/sql-resources.php` contains only global discovery settings. A unique
+basename preserves short IDs such as `item` and `customer`, but the relative ID
+is preferred and required when basenames are ambiguous.
 
 See [SQL Resource Mode](SQL-Resource-Mode.md),
 [SQL Resource Configuration](SQL-Resource-Configuration.md), and

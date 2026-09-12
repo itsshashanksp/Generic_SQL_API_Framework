@@ -5,7 +5,7 @@ require_once __DIR__ . '/DatabaseCredentialResolver.php';
 
 class DatabaseConfigurationMigrator
 {
-    public function migrate(string $configPath): string
+    public function migrate(string $configPath): void
     {
         $storedConfiguration = DatabaseConfigurationResolver::readStored($configPath);
         if (DatabaseConfigurationResolver::usesEncryption($storedConfiguration)) {
@@ -32,17 +32,6 @@ class DatabaseConfigurationMigrator
             throw new DatabaseCredentialException('Unable to encode encrypted database configuration.');
         }
 
-        $original = @file_get_contents($configPath);
-        if ($original === false) {
-            throw new DatabaseCredentialException('Unable to read database configuration.');
-        }
-
-        $backupPath = $this->availableBackupPath($configPath);
-        if (@file_put_contents($backupPath, $original) === false) {
-            throw new DatabaseCredentialException('Unable to back up database configuration.');
-        }
-        @chmod($backupPath, 0600);
-
         $temporaryPath = $configPath . '.tmp.' . bin2hex(random_bytes(6));
         try {
             if (@file_put_contents($temporaryPath, $output) === false) {
@@ -52,34 +41,24 @@ class DatabaseConfigurationMigrator
             if ($permissions !== false) {
                 @chmod($temporaryPath, $permissions & 0777);
             }
+            if (DatabaseConfigurationResolver::load($temporaryPath) !== $storedConfiguration) {
+                throw new DatabaseCredentialException('Unable to verify encrypted database configuration.');
+            }
             if (!@rename($temporaryPath, $configPath)) {
-                // Windows may not allow rename() to replace an existing file.
-                // The verified backup makes this overwrite recoverable.
-                if (!@copy($temporaryPath, $configPath)) {
+                // Windows cannot atomically rename over an existing file. The
+                // ciphertext has already been decrypted and verified above.
+                if (@file_put_contents($configPath, $output, LOCK_EX) === false) {
                     throw new DatabaseCredentialException('Unable to replace database configuration.');
                 }
                 @unlink($temporaryPath);
+            }
+            if (DatabaseConfigurationResolver::load($configPath) !== $storedConfiguration) {
+                throw new DatabaseCredentialException('Unable to verify encrypted database configuration.');
             }
         } finally {
             if (is_file($temporaryPath)) {
                 @unlink($temporaryPath);
             }
         }
-
-        return $backupPath;
-    }
-
-    private function availableBackupPath(string $configPath): string
-    {
-        $backupPath = $configPath . '.backup';
-        if (!file_exists($backupPath)) {
-            return $backupPath;
-        }
-
-        do {
-            $backupPath = $configPath . '.backup.' . gmdate('YmdHis') . '.' . bin2hex(random_bytes(4));
-        } while (file_exists($backupPath));
-
-        return $backupPath;
     }
 }

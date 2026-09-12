@@ -52,50 +52,32 @@ class SqlRepository
                 [['path' => 'filterLogic', 'message' => 'OR cannot span output, WHERE, and HAVING locations.']]
             );
         }
-        $filterPlacement = $definition['filterPlacement'];
-        if ($filterPlacement === 'source') {
-            [$sourceWhereSql, $params] = $this->buildWhere(
-                $filtersByLocation['source'],
-                $request['filterLogic'] ?? 'AND',
-                $allowedFilters,
-                null
-            );
-            $sql = str_replace(
-                SqlResourceRegistry::RUNTIME_FILTER_MARKER,
-                $sourceWhereSql,
-                $sql
-            );
-            $whereSql = '';
-        } else {
-            [$mappedWhereSql, $whereParams] = $this->buildWhere(
-                $filtersByLocation['where'],
-                $request['filterLogic'] ?? 'AND',
-                $allowedFilters,
-                null,
-                false
-            );
-            [$mappedHavingSql, $havingParams] = $this->buildWhere(
-                $filtersByLocation['having'],
-                $request['filterLogic'] ?? 'AND',
-                $allowedFilters,
-                null,
-                false
-            );
-            [$whereSql, $outputParams] = $this->buildWhere(
-                $filtersByLocation['output'],
-                $request['filterLogic'] ?? 'AND',
-                $allowedFilters
-            );
-            $params = array_merge($whereParams, $havingParams, $outputParams);
-        }
+        [$mappedWhereSql, $whereParams] = $this->buildWhere(
+            $filtersByLocation['where'],
+            $request['filterLogic'] ?? 'AND',
+            $allowedFilters,
+            null,
+            false
+        );
+        [$mappedHavingSql, $havingParams] = $this->buildWhere(
+            $filtersByLocation['having'],
+            $request['filterLogic'] ?? 'AND',
+            $allowedFilters,
+            null,
+            false
+        );
+        [$whereSql, $outputParams] = $this->buildWhere(
+            $filtersByLocation['output'],
+            $request['filterLogic'] ?? 'AND',
+            $allowedFilters
+        );
+        $params = array_merge($whereParams, $havingParams, $outputParams);
         $statement = SqlResourceStatement::analyze($sql);
         $queryPrefix = $statement->prefix();
-        $sql = $filterPlacement === 'mapped'
-            ? $statement->injectMappedFilters(
-                $mappedWhereSql === '' ? null : $mappedWhereSql,
-                $mappedHavingSql === '' ? null : $mappedHavingSql
-            )
-            : $statement->body();
+        $sql = $statement->injectMappedFilters(
+            $mappedWhereSql === '' ? null : $mappedWhereSql,
+            $mappedHavingSql === '' ? null : $mappedHavingSql
+        );
         $querySuffix = $statement->suffix();
         if ($statement->hasAuthoredPagination()
             && (!empty($request['filters']) || !empty($request['sort']) || isset($request['pagination']))) {
@@ -108,18 +90,15 @@ class SqlRepository
         $sort = !empty($request['sort'])
             ? $request['sort']
             : $definition['defaultSort'];
-        if (isset($request['pagination']) && $sort === []) {
+        $orderSql = $this->buildOrderBy($sort, $allowedColumns);
+        $topLevelOrderBy = $this->findTopLevelOrderBy($sql);
+        if (isset($request['pagination']) && $sort === [] && $topLevelOrderBy === null) {
             throw new ApiRequestException(
                 'SQL resource pagination requires an approved sort.',
                 'INVALID_SQL_PAGINATION',
-                [[
-                    'path' => 'execution.defaultSort',
-                    'message' => 'Supply execution columns with defaultSort, or send an approved runtime sort.',
-                ]]
+                [['path' => 'execution.defaultSort', 'message' => 'Supply an approved runtime or default sort.']]
             );
         }
-        $orderSql = $this->buildOrderBy($sort, $allowedColumns);
-        $topLevelOrderBy = $this->findTopLevelOrderBy($sql);
         $countResourceSql = $topLevelOrderBy === null
             ? $sql
             : rtrim(substr($sql, 0, $topLevelOrderBy));

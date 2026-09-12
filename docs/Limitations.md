@@ -42,7 +42,7 @@ Use SQL Resource Mode for approved complex read-only SQL beyond these boundaries
 - Clients cannot send SQL or paths. Execution expressions and placement are
   accepted only through the narrow documented grammar; they are not arbitrary SQL.
 - Discovery does not parse output projections. Runtime output controls require
-  explicit `execution.columns` or legacy metadata.
+  explicit `execution.columns`.
 - A resource is one read-only SELECT/CTE statement; SELECT INTO and multiple
   statements are rejected.
 - Runtime fields must be preconfigured. Mapped WHERE/HAVING insertion on a
@@ -50,8 +50,8 @@ Use SQL Resource Mode for approved complex read-only SQL beyond these boundaries
   dedicated resource.
 - OR cannot combine filters assigned to different output/WHERE/HAVING locations.
 - Only the `integer-date` custom runtime value type is implemented.
-- Pagination requires an approved runtime or default sort; metadata-free
-  resources can execute normally but cannot be paginated.
+- Pagination requires an approved runtime/default sort or an authored top-level
+  ORDER BY; otherwise metadata-free resources cannot be paginated.
 - An authored OFFSET/FETCH resource rejects all request filters, sorting, and
   pagination. Resource authors must choose fixed pagination or runtime controls.
 - Server-owned specialized SQL is still constrained by actual SQL Server version,

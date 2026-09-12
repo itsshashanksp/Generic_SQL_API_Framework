@@ -32,7 +32,8 @@ Validation and normalization occur in `api/index.php` before controller dispatch
 | Controllers | Query, SQL-resource, or write operation and shared response message; no SQL construction |
 | Services | Thin delegation to query or metadata repositories |
 | `QueryRepository` | Execution/orchestration facade for SELECT, set operations, and routines |
-| `SqlResourceRegistry` | Recursively discovers safe path-derived IDs, applies validated execution metadata, retains legacy mappings, and enforces exclusions/collisions/path containment |
+| `SqlResourceDiscovery` | Recursively discovers safe path-derived IDs and enforces exclusions, collisions, and path containment |
+| `SqlResourceRegistry` | Resolves discovered IDs and converts validated execution metadata to the repository's internal filter/sort definition |
 | `SqlRepository` | Loads a discovered server-owned SELECT/CTE, preserves CTE scope around wrappers, safely applies runtime state, and reuses pagination/execution infrastructure |
 | `WriteResourceRegistry` | Maps exact approved write IDs to fixed schema/table and column/key allowlists; defaults to deny-all |
 | `WriteRepository` | Loads write metadata, validates payloads, chooses a write builder, executes prepared SQL, and formats operation results |
@@ -47,8 +48,8 @@ Validation and normalization occur in `api/index.php` before controller dispatch
 `QueryRepository` is not a monolithic SQL builder. It owns a `SelectBuilder`, `RoutineBuilder`, and `SetOperationBuilder`, executes their output through `QueryEngine`, and attaches pagination totals.
 
 `SqlRepository` is deliberately separate from the Universal JSON builders. Its
-base SQL is trusted application code selected through recursive discovery or a
-legacy registry entry. The client cannot supply SQL or a file path. Optional
+base SQL is trusted application code selected through recursive discovery. The
+client cannot supply SQL or a file path. Optional
 execution metadata uses strict identifier/aggregate/placement grammar and forms
 the runtime allowlists; values are passed to `QueryEngine::executePrepared`.
 Both paths converge on the
@@ -88,10 +89,9 @@ output identifier, source identifier, or simple aggregate HAVING expression.
 nested queries and window expressions. Ambiguous set-operation placement and OR
 logic spanning query stages are rejected.
 
-Legacy entries may still define `columns`, `filterColumns`, value types, trusted
-filter mappings, default sorting, and source marker placement. Their controlled
-`/*__RUNTIME_FILTERS__*/` behavior remains intact while callers migrate to full
-discovered IDs and public execution metadata.
+The SQL resource configuration owns only the discovery root and excluded
+directories. Per-resource columns, filters, value types, placement, and default
+sorting come from validated execution metadata.
 
 | Builder | Role |
 |---|---|

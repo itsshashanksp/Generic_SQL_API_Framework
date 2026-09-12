@@ -38,20 +38,19 @@ class SqlResourceFilteringEngine extends QueryEngine
     }
 }
 
-function filteringDefinition(string $file, ?array $filters = null): array
+function filteringExecution(?array $filters = null): array
 {
-    $definition = [
-        'file' => $file,
+    $execution = [
         'columns' => ['Category', 'Sales'],
         'defaultSort' => [['field' => 'Sales', 'direction' => 'DESC']],
     ];
     if ($filters !== null) {
-        $definition['filters'] = $filters;
+        $execution['filters'] = $filters;
     }
-    return $definition;
+    return ['execution' => $execution];
 }
 
-$testDirectory = QUERY_PATH . DIRECTORY_SEPARATOR . '.sql-resource-filter-test-' . bin2hex(random_bytes(6));
+$testDirectory = QUERY_PATH . DIRECTORY_SEPARATOR . 'sql-resource-filter-test-' . bin2hex(random_bytes(6));
 $files = [];
 
 try {
@@ -61,6 +60,7 @@ try {
     $itemEngine = new SqlResourceFilteringEngine();
     (new SqlRepository($itemEngine, new SqlResourceRegistry()))->execute([
         'resource' => 'item',
+        'execution' => ['columns' => ['Item_Code', 'Item_Desc', 'Item_MRP']],
         'filters' => [['field' => 'Item_Desc', 'operator' => 'LIKE', 'value' => "%pen%' OR 1=1 --"]],
     ]);
     $itemData = end($itemEngine->executions);
@@ -88,6 +88,13 @@ try {
     $customerEngine = new SqlResourceFilteringEngine();
     (new SqlRepository($customerEngine, new SqlResourceRegistry()))->execute([
         'resource' => 'customer',
+        'execution' => [
+            'columns' => ['Cust_Name', 'TotalCustomers'],
+            'filters' => [
+                'Cust_Name' => ['expression' => 'Cust_Name', 'placement' => 'source'],
+                'StDate' => ['expression' => 'StDate', 'placement' => 'source', 'valueType' => 'integer-date'],
+            ],
+        ],
         'filters' => [
             ['field' => 'Cust_Name', 'operator' => 'LIKE', 'value' => 'A%'],
             ['field' => 'StDate', 'operator' => 'BETWEEN', 'value' => ['2021-04-01', '2022-03-31']],
@@ -95,11 +102,10 @@ try {
     ]);
     $customerData = end($customerEngine->executions);
     filteringAssert(
-        str_contains($customerData['sql'], '[Cust_Name] LIKE ?')
-            && str_contains($customerData['sql'], '[StDate] BETWEEN ? AND ?')
-            && !str_contains($customerData['sql'], SqlResourceRegistry::RUNTIME_FILTER_MARKER)
+        str_contains($customerData['sql'], '(Cust_Name) LIKE ?')
+            && str_contains($customerData['sql'], '(StDate) BETWEEN ? AND ?')
             && $customerData['params'] === ['A%', 20210401, 20220331],
-        'Customer legacy marker filtering changed.'
+        'Customer execution-metadata filtering changed.'
     );
 
     $complexSql = <<<'SQL'
@@ -118,36 +124,35 @@ SQL;
     $mappedFilters = [
         'BillDate' => [
             'expression' => 'BIL.Bill_Date',
-            'location' => 'where',
+            'placement' => 'source',
             'valueType' => 'integer-date',
         ],
         'CategorySearch' => [
             'expression' => 'CAT.Cat_Desc',
-            'location' => 'where',
+            'placement' => 'source',
         ],
         'DeletedAt' => [
             'expression' => 'BIL.DeletedAt',
-            'location' => 'where',
+            'placement' => 'source',
         ],
         'MinimumSales' => [
             'expression' => 'SUM(BIL.Item_Rate)',
-            'location' => 'having',
+            'placement' => 'having',
         ],
     ];
-    $complexRegistry = new SqlResourceRegistry([
-        'complex' => filteringDefinition($complexFile, $mappedFilters),
-    ]);
-    $resolved = $complexRegistry->resolve('complex');
+    $complexRegistry = new SqlResourceRegistry([], $testDirectory);
+    $complexExecution = filteringExecution($mappedFilters);
+    $resolved = $complexRegistry->resolve('complex', $complexExecution['execution']);
     filteringAssert(
-        $resolved['filterColumns'] === ['BillDate', 'CategorySearch', 'DeletedAt', 'MinimumSales']
-            && $resolved['filterValueTypes'] === ['billdate' => 'integer-date']
-            && $resolved['filterPlacement'] === 'mapped',
+        array_keys($resolved['filters']) === ['category', 'sales', 'billdate', 'categorysearch', 'deletedat', 'minimumsales']
+            && $resolved['filters']['billdate']['valueType'] === 'integer-date',
         'Explicit filter mapping was not normalized correctly.'
     );
 
     $complexEngine = new SqlResourceFilteringEngine();
     (new SqlRepository($complexEngine, $complexRegistry))->execute([
         'resource' => 'complex',
+        ...$complexExecution,
         'filters' => [
             ['field' => 'BillDate', 'operator' => 'BETWEEN', 'value' => ['20210401', '20220331']],
             ['field' => 'CategorySearch', 'operator' => 'LIKE', 'value' => '%food%'],
@@ -185,13 +190,14 @@ SQL;
     filteringFailure(
         fn () => (new SqlRepository(new SqlResourceFilteringEngine(), $complexRegistry))->execute([
             'resource' => 'complex',
+            ...$complexExecution,
             'filters' => [['field' => 'NotApproved', 'operator' => '=', 'value' => 1]],
         ]),
         'An unauthorized logical filter field was accepted.'
     );
 
     $complexNoFilterEngine = new SqlResourceFilteringEngine();
-    (new SqlRepository($complexNoFilterEngine, $complexRegistry))->execute(['resource' => 'complex']);
+    (new SqlRepository($complexNoFilterEngine, $complexRegistry))->execute(['resource' => 'complex', ...$complexExecution]);
     $complexNoFilterData = end($complexNoFilterEngine->executions);
     filteringAssert(
         $complexNoFilterData['sql'] === $complexSql
@@ -202,6 +208,7 @@ SQL;
     $topEngine = new SqlResourceFilteringEngine();
     $topResult = (new SqlRepository($topEngine, $complexRegistry))->execute([
         'resource' => 'complex',
+        ...$complexExecution,
         'pagination' => ['page' => 1, 'pageSize' => 10],
     ]);
     filteringAssert(
@@ -213,12 +220,14 @@ SQL;
     $havingFile = $testDirectory . DIRECTORY_SEPARATOR . 'having.sql';
     file_put_contents($havingFile, 'SELECT Category AS Category, SUM(Amount) AS Sales FROM Sales GROUP BY Category HAVING COUNT(*) > 1 ORDER BY Sales DESC');
     $files[] = $havingFile;
-    $havingRegistry = new SqlResourceRegistry(['having' => filteringDefinition($havingFile, [
-        'MinimumSales' => ['expression' => 'SUM(Amount)', 'location' => 'having'],
-    ])]);
+    $havingRegistry = new SqlResourceRegistry([], $testDirectory);
+    $havingExecution = filteringExecution([
+        'MinimumSales' => ['expression' => 'SUM(Amount)', 'placement' => 'having'],
+    ]);
     $havingEngine = new SqlResourceFilteringEngine();
     (new SqlRepository($havingEngine, $havingRegistry))->execute([
         'resource' => 'having',
+        ...$havingExecution,
         'filters' => [['field' => 'MinimumSales', 'operator' => '>=', 'value' => 100]],
     ]);
     filteringAssert(
@@ -229,12 +238,14 @@ SQL;
     $cteFile = $testDirectory . DIRECTORY_SEPARATOR . 'cte.sql';
     file_put_contents($cteFile, 'WITH Recent AS (SELECT Id, CreatedAt FROM Events) SELECT Id AS Category, 0 AS Sales FROM Recent ORDER BY Category');
     $files[] = $cteFile;
-    $cteRegistry = new SqlResourceRegistry(['cte' => filteringDefinition($cteFile, [
-        'CreatedAfter' => ['expression' => 'Recent.CreatedAt', 'location' => 'where'],
-    ])]);
+    $cteRegistry = new SqlResourceRegistry([], $testDirectory);
+    $cteExecution = filteringExecution([
+        'CreatedAfter' => ['expression' => 'Recent.CreatedAt', 'placement' => 'source'],
+    ]);
     $cteEngine = new SqlResourceFilteringEngine();
     (new SqlRepository($cteEngine, $cteRegistry))->execute([
         'resource' => 'cte',
+        ...$cteExecution,
         'filters' => [['field' => 'CreatedAfter', 'operator' => '>', 'value' => '2026-01-01']],
     ]);
     $cteData = end($cteEngine->executions);
@@ -247,12 +258,14 @@ SQL;
     $unionFile = $testDirectory . DIRECTORY_SEPARATOR . 'union.sql';
     file_put_contents($unionFile, 'SELECT Id AS Category, 0 AS Sales FROM A UNION ALL SELECT Id, 0 FROM B');
     $files[] = $unionFile;
-    $unionRegistry = new SqlResourceRegistry(['union' => filteringDefinition($unionFile, [
-        'SourceId' => ['expression' => 'Id', 'location' => 'where'],
-    ])]);
+    $unionRegistry = new SqlResourceRegistry([], $testDirectory);
+    $unionExecution = filteringExecution([
+        'SourceId' => ['expression' => 'Id', 'placement' => 'source'],
+    ]);
     $unionFailure = filteringFailure(
         fn () => (new SqlRepository(new SqlResourceFilteringEngine(), $unionRegistry))->execute([
             'resource' => 'union',
+            ...$unionExecution,
             'filters' => [['field' => 'SourceId', 'operator' => '=', 'value' => 1]],
         ]),
         'Ambiguous set-operation WHERE filtering was accepted.'
@@ -263,12 +276,14 @@ SQL;
         'Ambiguous set-operation filtering returned the wrong error.'
     );
 
-    $unionOutputRegistry = new SqlResourceRegistry(['union-output' => filteringDefinition($unionFile, [
-        'LogicalCategory' => ['expression' => 'Category', 'location' => 'output'],
-    ])]);
+    $unionOutputRegistry = $unionRegistry;
+    $unionOutputExecution = filteringExecution([
+        'LogicalCategory' => ['expression' => 'Category', 'placement' => 'output'],
+    ]);
     $unionOutputEngine = new SqlResourceFilteringEngine();
     (new SqlRepository($unionOutputEngine, $unionOutputRegistry))->execute([
-        'resource' => 'union-output',
+        'resource' => 'union',
+        ...$unionOutputExecution,
         'filters' => [['field' => 'LogicalCategory', 'operator' => '=', 'value' => "1' OR 1=1 --"]],
     ]);
     $unionOutputData = end($unionOutputEngine->executions);
@@ -281,6 +296,7 @@ SQL;
     $mixedOrFailure = filteringFailure(
         fn () => (new SqlRepository(new SqlResourceFilteringEngine(), $complexRegistry))->execute([
             'resource' => 'complex',
+            ...$complexExecution,
             'filterLogic' => 'OR',
             'filters' => [
                 ['field' => 'CategorySearch', 'operator' => 'LIKE', 'value' => 'A%'],
@@ -298,12 +314,14 @@ SQL;
     $derivedFile = $testDirectory . DIRECTORY_SEPARATOR . 'derived.sql';
     file_put_contents($derivedFile, 'SELECT D.Id AS Category, ROW_NUMBER() OVER (ORDER BY D.CreatedAt) AS Sales FROM (SELECT Id, CreatedAt FROM Events WHERE Active = 1) AS D ORDER BY Category');
     $files[] = $derivedFile;
-    $derivedRegistry = new SqlResourceRegistry(['derived' => filteringDefinition($derivedFile, [
-        'CreatedAfter' => ['expression' => 'D.CreatedAt', 'location' => 'where'],
-    ])]);
+    $derivedRegistry = new SqlResourceRegistry([], $testDirectory);
+    $derivedExecution = filteringExecution([
+        'CreatedAfter' => ['expression' => 'D.CreatedAt', 'placement' => 'source'],
+    ]);
     $derivedEngine = new SqlResourceFilteringEngine();
     (new SqlRepository($derivedEngine, $derivedRegistry))->execute([
         'resource' => 'derived',
+        ...$derivedExecution,
         'filters' => [['field' => 'CreatedAfter', 'operator' => '>', 'value' => '2026-01-01']],
     ]);
     $derivedData = end($derivedEngine->executions);
@@ -315,14 +333,15 @@ SQL;
     );
 
     foreach ([
-        ['Bad' => ['expression' => 'BIL.Id; DELETE FROM BIL', 'location' => 'where']],
-        ['Bad' => ['expression' => 'BIL.Id', 'location' => 'join']],
-        ['Bad' => ['expression' => 'BIL.Id', 'location' => 'where', 'unknown' => true]],
+        ['Bad' => ['expression' => 'BIL.Id; DELETE FROM BIL', 'placement' => 'source']],
+        ['Bad' => ['expression' => 'BIL.Id', 'placement' => 'join']],
+        ['Bad' => ['expression' => 'BIL.Id', 'placement' => 'source', 'unknown' => true]],
     ] as $index => $invalidFilters) {
         filteringFailure(
-            fn () => (new SqlResourceRegistry([
-                'invalid' => filteringDefinition($complexFile, $invalidFilters),
-            ]))->resolve('invalid'),
+            fn () => (new SqlResourceRegistry([], $testDirectory))->resolve(
+                'complex',
+                filteringExecution($invalidFilters)['execution']
+            ),
             "Invalid filter mapping {$index} was accepted."
         );
     }

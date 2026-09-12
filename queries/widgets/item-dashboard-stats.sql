@@ -4,4 +4,3 @@ SELECT
     MAX(Sale_Rate) AS MaximumSP,
     SUM(Sale_Rate*Cl_Stock) AS StockValue
 FROM ItemMasterTable
-/*__RUNTIME_FILTERS__*/

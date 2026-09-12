@@ -181,7 +181,7 @@ Frontend should control:
 
 Backend controls:
 
-- SQL Resource SQL, discovery root/exclusions, and legacy mappings;
+- SQL Resource SQL and discovery root/exclusions;
 - allowed actions, columns, filters, keys, identity fields, and filter mappings;
 - SQL expressions, WHERE/HAVING/output placement, joins, grouping, and resource
   default ordering;
@@ -192,7 +192,7 @@ Frontend must never send:
 
 - database credentials, encryption keys, connection strings, or driver options;
 - arbitrary SQL, SQL fragments, resource file paths, URLs, or filesystem paths;
-- arbitrary SQL Resource filter expressions/locations or internal filter markers;
+- arbitrary SQL Resource filter expressions or placement values;
 - private normalized keys such as `controller`, `table`, `columns`, `column`,
   `where`, `top`, `page`, `pageSize`, or `params`;
 - client-selected schema/table names for Write actions;

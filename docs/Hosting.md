@@ -36,7 +36,7 @@ To encrypt an existing plaintext database configuration, run:
 setup-database-encryption.bat
 ```
 
-The setup uses the bundled PHP and `php.ini`, checks OpenSSL, verifies that `database.json` is plaintext before generating a Base64-encoded 32-byte key, and persists the key as the Windows User environment variable `GENERIC_SQL_API_ENCRYPTION_KEY`. It then encrypts the complete configuration as one AES-256-GCM payload, retains an ignored plaintext backup for recovery, and validates the connection through `scripts/check-database.php`.
+The setup uses the bundled PHP and `php.ini`, checks OpenSSL, verifies that `database.json` is plaintext before generating a Base64-encoded 32-byte key, and persists the key as the Windows User environment variable `GENERIC_SQL_API_ENCRYPTION_KEY`. It then encrypts the complete configuration as one AES-256-GCM payload without retaining a plaintext backup and validates the connection through `scripts/check-database.php`.
 
 Open a new terminal—or restart IIS/FastCGI or the relevant service—after setup so the new process inherits the persisted variable. Run the setup only for a plaintext configuration; do not rerun it against an already encrypted envelope. A legacy password-only encrypted configuration remains readable at runtime but requires its existing key and a manual PHP migration.
 

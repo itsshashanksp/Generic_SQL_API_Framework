@@ -12,7 +12,7 @@ version supports it.
 | Filter subqueries / EXISTS | IN/NOT IN/EXISTS/NOT EXISTS only | Can be authored in SQL; runtime values are not subqueries | No |
 | AND / OR | One top-level logic | One logic; OR cannot span locations | One top-level logic |
 | Integer-date filter conversion | BETWEEN on integer metadata | Configured `integer-date` | Live database type validation |
-| Sorting | Logical fields/selected aliases | Execution/legacy output aliases and defaultSort | No |
+| Sorting | Logical fields/selected aliases | Execution output aliases and defaultSort | No |
 | Pagination | Count + OFFSET/FETCH or ROW_NUMBER | Same; TOP optimization; authored OFFSET/FETCH exclusive | No |
 | TOP / limit | Public positive `limit` | May be authored; optimization supported | No |
 | DISTINCT | Public boolean | May be authored | No |

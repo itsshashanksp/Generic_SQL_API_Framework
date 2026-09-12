@@ -87,7 +87,7 @@ set operations; a general parser would be fragile. Consequently:
 - a resource with no runtime controls needs no `execution.columns`;
 - output filters and sort need the relevant names in `execution.columns`;
 - `execution.defaultSort` requires `execution.columns` and uses only those fields;
-- pagination requires either an approved runtime sort or default sort.
+- pagination requires an approved runtime/default sort or authored top-level order.
 
 ## Custom filters
 
@@ -161,8 +161,7 @@ as arbitrary trusted SQL. The validator permits only:
 
 Semicolons, comments, placeholders, Boolean clauses, function nesting, operators,
 and free-form SQL fragments cannot pass that grammar. More complex mappings must
-remain in reviewed legacy server configuration or be expressed directly in a
-dedicated SQL Resource.
+be expressed through the supported grammar or a dedicated SQL Resource.
 
 ## Runtime filters
 
@@ -190,32 +189,25 @@ rejected as ambiguous; use output filtering or a dedicated resource.
 
 Runtime and default sorts accept only an approved output column with ASC or DESC.
 No expression or numeric positional ordering is accepted. A non-empty runtime
-sort overrides `execution.defaultSort` or a legacy default.
+sort overrides `execution.defaultSort`.
 
 Pagination preserves the existing count plus SQL Server compatibility behavior:
 compatibility 110+ uses OFFSET/FETCH; older versions use ROW_NUMBER. It does not
-add a page-size cap. Pagination without approved ordering is rejected.
+add a page-size cap. Pagination without runtime/default or authored ordering is rejected.
 
 Authored OFFSET/FETCH remains exclusive: any runtime filters, sort, or pagination
 produce `INVALID_SQL_PAGINATION`. Authored TOP/ORDER BY preservation and the
 complete-first-page TOP optimization remain unchanged.
 
-## Legacy compatibility
+## Short-ID compatibility
 
-`config/sql-resources.php` is now an optional compatibility/global-settings
-layer. Existing entries and IDs such as `item` and `customer` retain their
-server-owned columns, filters, value types, placement, defaults, and marker
-behavior. New code should use relative discovered IDs.
-
-When no legacy entry exists, a short basename such as `item` is accepted only if
+A short basename such as `item` is accepted only if
 exactly one discovered SQL file has that basename. If several directories contain
 `item.sql`, the caller must use the full relative ID. This eases migration without
 making resolution nondeterministic.
 
-The legacy `/*__RUNTIME_FILTERS__*/` source marker remains supported only for a
-legacy definition with `filterPlacement: source`. Discovered execution metadata
-does not need a marker: source predicates use depth-aware top-level WHERE
-insertion. Existing marker comments are harmless for a discovered request.
+SQL files do not require a runtime-filter marker: source predicates use
+depth-aware top-level WHERE insertion.
 
 See [SQL Resource configuration](SQL-Resource-Configuration.md) and
 [SQL Resource files](SQL-Resource-Files.md) for migration and authoring details.

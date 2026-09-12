@@ -86,11 +86,13 @@ Use the platform/service secret mechanism rather than a shell export for product
 
 1. Reads and validates the existing plaintext JSON object.
 2. Encrypts the complete object as one AES-256-GCM payload.
-3. Creates `database.json.backup` (or a uniquely suffixed backup if one exists).
-4. Replaces `database.json` through a temporary file.
+3. Writes and decrypts a temporary encrypted file to verify it.
+4. Replaces `database.json` and verifies it again.
 5. Refuses an already fully encrypted configuration.
 
-The backup contains plaintext. It is ignored by Git, but must still be moved to protected recovery storage or securely removed after the encrypted configuration and connection are verified. If replacement fails, the backup remains available. The utility never prints configuration values, ciphertext, or the key.
+The utility does not create or retain a plaintext backup and never prints
+configuration values, ciphertext, or the key. Create any operational backup
+explicitly in protected storage before migration if deployment policy requires it.
 
 Do not rerun setup against an encrypted file. For key rotation, decrypt with the existing key in a controlled environment, create a plaintext migration input, install a new key, rerun the migration, validate the connection, and then retire the old key/configuration pair according to deployment policy.
 
@@ -113,7 +115,7 @@ It prints `CONNECTED` on success or a sanitized failure on error. Database-indep
 ## Security and troubleshooting
 
 - Keep `GENERIC_SQL_API_ENCRYPTION_KEY` separate from the encrypted file and restrict access to both.
-- Never commit `database.json` or its plaintext backup files.
+- Never commit `database.json`, plaintext configuration copies, or encryption keys.
 - A missing-key error means the PHP worker does not see `GENERIC_SQL_API_ENCRYPTION_KEY`.
 - An invalid-key error means the environment value is not strict Base64 for exactly 32 bytes.
 - A decryption failure means authentication failed, the payload is malformed, or the key/payload pair does not match.

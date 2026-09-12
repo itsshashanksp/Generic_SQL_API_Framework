@@ -75,10 +75,9 @@ try {
     $item = $registry->resolve('reports/item');
     discoveryAssert(
         $item['file'] === realpath($itemFile)
-            && $item['discovered'] === true
             && $item['columns'] === []
             && $item['defaultSort'] === [],
-        'A discovered resource required legacy metadata.'
+        'A discovered resource required execution metadata.'
     );
     discoveryAssert(
         $registry->resolve('item')['file'] === realpath($itemFile),
@@ -274,16 +273,6 @@ try {
         'Discovered TOP first-page behavior regressed.'
     );
 
-    $legacyRegistry = new SqlResourceRegistry(['item' => [
-        'file' => $itemFile,
-        'columns' => ['Item_Code', 'Item_Desc', 'Item_MRP'],
-        'defaultSort' => [['field' => 'Item_Code', 'direction' => 'ASC']],
-    ]], $root);
-    discoveryAssert(
-        $legacyRegistry->resolve('item')['discovered'] === false,
-        'Legacy SQL resource configuration compatibility failed.'
-    );
-
     $other = $root . DIRECTORY_SEPARATOR . 'archive';
     mkdir($other, 0700, true);
     $ambiguousItem = $other . DIRECTORY_SEPARATOR . 'item.sql';
@@ -317,11 +306,20 @@ try {
     );
 
     $realRegistry = new SqlResourceRegistry();
+    $realIds = $realRegistry->discoverResourceIds();
     discoveryAssert(
-        $realRegistry->resolve('reports/item')['discovered'] === true
-            && $realRegistry->resolve('item')['discovered'] === false,
-        'Repository resource discovery or legacy compatibility failed.'
+        $realRegistry->resolve('reports/item')['file'] === realpath(QUERY_PATH . '/reports/item.sql')
+            && $realRegistry->resolve('item')['file'] === realpath(QUERY_PATH . '/reports/item.sql')
+            && in_array('reports/customer', $realIds, true)
+            && in_array('widgets/item-dashboard-stats', $realIds, true),
+        'Repository resource discovery or unique basename compatibility failed.'
     );
+    foreach ($realIds as $realId) {
+        discoveryAssert(
+            !str_contains((string)file_get_contents($realRegistry->resolve($realId)['file']), '/*__RUNTIME_FILTERS__*/'),
+            "Obsolete runtime-filter marker remains in {$realId}."
+        );
+    }
 
     echo "SQL resource discovery/execution metadata tests passed.\n";
 } finally {

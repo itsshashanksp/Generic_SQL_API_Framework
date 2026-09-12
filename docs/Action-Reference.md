@@ -150,7 +150,7 @@ Required: `action`, `resource`. Optional: `execution`, `filters`, `sort`,
 | `execution.filters` | object | no | Logical mappings with `expression`, `placement`, and optional `valueType`. |
 | `execution.defaultSort` | non-empty sort array | no | Default ordering; requires `execution.columns`. |
 | `filters` | array | no | Runtime values for permitted output/mapped fields. |
-| `sort` | array | no | Runtime order using execution or legacy output columns. |
+| `sort` | array | no | Runtime order using execution output columns. |
 | `pagination` | object | no | Positive page/pageSize; requires an approved sort. |
 | `filterLogic` | string | no | AND or OR; default AND. |
 
