@@ -52,13 +52,20 @@ Unknown properties are rejected. Raw SQL, arbitrary SELECT parameters, client-su
 `resource` must match the exact ID of an entry in `config/sql-resources.php`;
 paths, filenames, URLs, SQL text, connection settings, and unknown properties
 are rejected. Each entry maps an internal file to exposed output aliases and a
-default sort. Runtime filters may use a separate `filterColumns` allowlist; an
-`integer-date` entry in `filterValueTypes` converts a validated `YYYY-MM-DD` UI
-value to its `YYYYMMDD` integer parameter. SQL runtime filters support
+default sort. Existing resources may use a separate `filterColumns` allowlist;
+new complex resources may instead map logical filter names to server-owned SQL
+expressions and explicit `output`, `where`, or `having` locations. An
+`integer-date` mapping converts a validated `YYYY-MM-DD` UI value to its
+`YYYYMMDD` integer parameter. SQL runtime filters support
 comparisons, LIKE, IN, BETWEEN, and NULL checks. Filter values are prepared
 parameters. Runtime sort remains limited to exposed output aliases and
 `ASC`/`DESC`; pagination reuses the SQL Server compatibility-aware pagination
 builder. The resource-file guide documents the implemented `TOP` optimization.
+
+The frontend never sends those SQL expressions or locations. It sends only the
+logical field, operator, and value. WHERE/HAVING expressions come from the
+registered resource, and values remain prepared parameters. OR logic cannot
+span multiple SQL locations because that would change its meaning.
 
 Backend registration and file-authoring details are documented separately in
 [SQL Resource Configuration](SQL-Resource-Configuration.md) and

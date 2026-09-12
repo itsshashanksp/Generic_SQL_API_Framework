@@ -91,6 +91,15 @@ allowlist and marker placement; the repository replaces the marker only with
 quoted allowlisted identifiers and prepared placeholders before aggregation.
 Sorting remains restricted to returned columns.
 
+For complex resources, an alternative registry-owned `filters` map binds each
+logical frontend field to a reviewed SQL expression and an explicit output,
+WHERE, or HAVING location. `SqlResourceStatement` identifies only top-level
+clause boundaries, ignoring nested queries and window expressions; it never
+infers placement from client input. Ambiguous set-operation branch placement
+and OR logic spanning query stages are rejected. Legacy output filtering and
+the source marker remain backward compatible, and all values continue through
+prepared positional parameters.
+
 | Builder | Role |
 |---|---|
 | `SelectBuilder` | Orchestrates SELECT/CTE construction and delegates clauses; renders allow-listed field functions |

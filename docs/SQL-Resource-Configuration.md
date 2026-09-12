@@ -58,6 +58,7 @@ Configuration fields are:
 | `filterColumns` | no | Fields allowed in runtime filters; defaults to `columns` |
 | `filterValueTypes` | no | Per-filter conversion metadata; only `integer-date` is implemented |
 | `filterPlacement` | no | `output` by default; `source` enables the controlled filter marker |
+| `filters` | no | Alternative logical-field map for explicit output/WHERE/HAVING expressions and optional value type |
 
 The registry rejects an entry with a missing/empty required field, invalid column name, invalid filter metadata, invalid default sort, unavailable file, or incorrect runtime-filter marker.
 
@@ -126,6 +127,58 @@ This separation supports grouped reports such as `customer`: `StDate` can filter
 - `source`: the SQL file must contain exactly one `/*__RUNTIME_FILTERS__*/` marker. The repository replaces it with a generated `WHERE` clause, or an empty string when no filters are supplied. This is intended for filtering rows before grouping or aggregation.
 
 The marker is the only implemented SQL-file placeholder. Source filtering always generates a complete `WHERE` clause, not an `AND` fragment; place the marker where a `WHERE` clause is syntactically valid.
+
+### Explicit filter mappings
+
+For complex SQL, use `filters` instead of `filterColumns`, `filterValueTypes`,
+and `filterPlacement`:
+
+```php
+'filters' => [
+    'BillDate' => [
+        'expression' => 'BIL.Bill_Date',
+        'location' => 'where',
+        'valueType' => 'integer-date',
+    ],
+    'Category' => [
+        'expression' => 'CAT.Cat_Desc',
+        'location' => 'where',
+    ],
+    'MinimumSales' => [
+        'expression' => 'SUM(BIL.Item_Rate)',
+        'location' => 'having',
+    ],
+]
+```
+
+The map key is the logical field accepted from the frontend. `expression` is
+trusted backend configuration and never comes from the request. `location` is:
+
+- `output`: filter a registered returned alias on the generated outer wrapper;
+- `where`: add the expression to the main SELECT's top-level WHERE, creating
+  that clause when absent;
+- `having`: add the aggregate expression to the main SELECT's top-level HAVING,
+  creating that clause when absent.
+
+Mapped output expressions must name a configured `columns` alias. WHERE/HAVING
+expressions may be qualified columns or reviewed expressions. They cannot
+contain parameter markers, statement separators, or SQL comments. Values still
+use the normal operator allowlist, `?` placeholders, and optional
+`integer-date` conversion.
+
+Insertion scans only top-level clause boundaries and ignores CTE bodies,
+subqueries, derived tables, and window clauses. It does not attempt to infer a
+location: the registry must declare it. WHERE/HAVING insertion into a top-level
+UNION/UNION ALL/INTERSECT/EXCEPT is rejected as ambiguous; use an `output`
+mapping over the combined result or a dedicated resource for a branch.
+
+`filterLogic: "OR"` is supported when all requested filters use one location.
+OR across WHERE, HAVING, or output locations is rejected because splitting it
+across query stages would not preserve Boolean semantics. AND may span them.
+
+Mapped filters do not require a placeholder. The legacy
+`/*__RUNTIME_FILTERS__*/` marker remains supported only with
+`filterPlacement: source`; mapped and legacy configuration cannot be combined.
 
 ## Default Sort
 

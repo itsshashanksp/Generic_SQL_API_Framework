@@ -35,6 +35,10 @@ All notable backend changes are recorded here. The project follows semantic vers
 
 ### Fixed
 
+- Added resource-owned logical filter mappings with explicit output, WHERE, and
+  HAVING placement, while preserving automatic outer filtering and the legacy
+  source marker. Mixed-stage OR and ambiguous set-operation insertion are
+  rejected, and runtime values remain prepared parameters.
 - Credential configuration, decryption, and key failures now use safe messages and avoid logging credential exception traces or secret values.
 - Resolved internal positional ordering to validated logical fields for window functions and legacy pagination, preventing SQL Server from receiving `ROW_NUMBER() OVER (ORDER BY 1)`.
 - Added regression coverage that preserves top-level ordering while protecting window contexts.

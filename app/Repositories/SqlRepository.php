@@ -34,19 +34,27 @@ class SqlRepository
         foreach ($definition['columns'] as $column) {
             $allowedColumns[strtolower($column)] = $column;
         }
-        $allowedFilterColumns = [];
-        foreach ($definition['filterColumns'] as $column) {
-            $allowedFilterColumns[strtolower($column)] = [
-                'column' => $column,
-                'valueType' => $definition['filterValueTypes'][strtolower($column)] ?? null,
-            ];
+        $allowedFilters = $definition['filters'];
+        $filtersByLocation = ['output' => [], 'source' => [], 'where' => [], 'having' => []];
+        foreach ($request['filters'] ?? [] as $filter) {
+            $filterDefinition = $this->requireAllowedFilterColumn($filter['field'], $allowedFilters);
+            $filtersByLocation[$filterDefinition['location']][] = $filter;
+        }
+        $usedLocations = array_keys(array_filter($filtersByLocation));
+        if (strtoupper((string)($request['filterLogic'] ?? 'AND')) === 'OR'
+            && count($usedLocations) > 1) {
+            throw new ApiRequestException(
+                'Runtime filters with OR must use one SQL location.',
+                'INVALID_SQL_RUNTIME_FILTER',
+                [['path' => 'filterLogic', 'message' => 'OR cannot span output, WHERE, and HAVING locations.']]
+            );
         }
         $filterPlacement = $definition['filterPlacement'];
         if ($filterPlacement === 'source') {
             [$sourceWhereSql, $params] = $this->buildWhere(
-                $request['filters'] ?? [],
+                $filtersByLocation['source'],
                 $request['filterLogic'] ?? 'AND',
-                $allowedFilterColumns,
+                $allowedFilters,
                 null
             );
             $sql = str_replace(
@@ -56,15 +64,35 @@ class SqlRepository
             );
             $whereSql = '';
         } else {
-            [$whereSql, $params] = $this->buildWhere(
-                $request['filters'] ?? [],
+            [$mappedWhereSql, $whereParams] = $this->buildWhere(
+                $filtersByLocation['where'],
                 $request['filterLogic'] ?? 'AND',
-                $allowedFilterColumns
+                $allowedFilters,
+                null,
+                false
             );
+            [$mappedHavingSql, $havingParams] = $this->buildWhere(
+                $filtersByLocation['having'],
+                $request['filterLogic'] ?? 'AND',
+                $allowedFilters,
+                null,
+                false
+            );
+            [$whereSql, $outputParams] = $this->buildWhere(
+                $filtersByLocation['output'],
+                $request['filterLogic'] ?? 'AND',
+                $allowedFilters
+            );
+            $params = array_merge($whereParams, $havingParams, $outputParams);
         }
         $statement = SqlResourceStatement::analyze($sql);
         $queryPrefix = $statement->prefix();
-        $sql = $statement->body();
+        $sql = $filterPlacement === 'mapped'
+            ? $statement->injectMappedFilters(
+                $mappedWhereSql === '' ? null : $mappedWhereSql,
+                $mappedHavingSql === '' ? null : $mappedHavingSql
+            )
+            : $statement->body();
         $querySuffix = $statement->suffix();
         if ($statement->hasAuthoredPagination()
             && (!empty($request['filters']) || !empty($request['sort']) || isset($request['pagination']))) {
@@ -251,7 +279,8 @@ class SqlRepository
         array $filters,
         string $logic,
         array $allowedColumns,
-        ?string $qualifier = 'SqlResource'
+        ?string $qualifier = 'SqlResource',
+        bool $includeKeyword = true
     ): array
     {
         if ($filters === []) return ['', []];
@@ -261,9 +290,15 @@ class SqlRepository
 
         foreach ($filters as $filter) {
             $filterField = $this->requireAllowedFilterColumn($filter['field'], $allowedColumns);
-            $field = $filterField['column'];
             $operator = strtoupper($filter['operator']);
-            $column = ($qualifier === null ? '' : $qualifier . '.') . '[' . $field . ']';
+            if ($filterField['mappedExpression']) {
+                $column = $qualifier === null
+                    ? '(' . $filterField['expression'] . ')'
+                    : $qualifier . '.[' . $filterField['expression'] . ']';
+            } else {
+                $column = ($qualifier === null ? '' : $qualifier . '.')
+                    . '[' . $filterField['expression'] . ']';
+            }
             if (in_array($operator, ['IS NULL', 'IS NOT NULL'], true)) {
                 $conditions[] = "{$column} {$operator}";
             } elseif (in_array($operator, ['IN', 'NOT IN'], true)) {
@@ -281,7 +316,7 @@ class SqlRepository
             }
         }
 
-        return [' WHERE ' . implode(" {$logic} ", $conditions), $params];
+        return [($includeKeyword ? ' WHERE ' : '') . implode(" {$logic} ", $conditions), $params];
     }
 
     private function buildOrderBy(

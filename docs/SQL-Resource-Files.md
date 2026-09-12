@@ -189,6 +189,11 @@ Supported operators are `=`, `!=`, `<>`, `>`, `<`, `>=`, `<=`, `LIKE`, `NOT LIKE
 
 Field names must be unqualified identifiers and must match the resource's `filterColumns` (or `columns` when no separate filter list exists). The repository inserts only the canonical allowlisted identifier, bracket-quoted, and an allowlisted operator. Values are never interpolated: it creates `?` placeholders and passes values to `QueryEngine::executePrepared`.
 
+For a mapped complex resource, the request field instead matches a logical key
+in the registry's `filters` map. The registry owns the corresponding SQL
+expression and its `output`, `where`, or `having` location. The frontend never
+knows or submits names such as `BIL.Bill_Date` or `SUM(BIL.Item_Rate)`.
+
 ### Output placement
 
 This is the default. For the basic item query, a runtime filter produces the equivalent structure:
@@ -216,6 +221,14 @@ GROUP BY Cust_Name
 The repository replaces the marker with `WHERE ...` before execution. With no runtime filters it replaces the marker with an empty string. The field need not be returned, as demonstrated by `StDate` in the customer report.
 
 The marker is not arbitrary templating: no other placeholder is recognized, and clients cannot control the replacement text. Because the generated fragment starts with `WHERE`, do not place it after an existing `WHERE` or where only an `AND` predicate would be valid.
+
+The marker is retained for existing source-filter resources such as Customer.
+It is optional architecture, not a requirement for new filterable SQL. Simple
+resources use safe outer filtering automatically. Complex single-query
+resources can use explicit server-side WHERE/HAVING mappings, which insert at
+depth-aware top-level clause boundaries. With no requested filters, mapped SQL
+receives no filter clause or parameters. Set-operation branch placement is not
+guessed; use output filtering or separate resources.
 
 For an integer-backed date field configured as `integer-date`, valid ISO UI input is converted before binding:
 

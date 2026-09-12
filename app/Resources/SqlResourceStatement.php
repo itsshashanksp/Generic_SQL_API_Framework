@@ -96,6 +96,78 @@ class SqlResourceStatement
         return $this->authoredPagination;
     }
 
+    public function injectMappedFilters(?string $whereCondition, ?string $havingCondition): string
+    {
+        if ($whereCondition === null && $havingCondition === null) {
+            return $this->body;
+        }
+
+        $tokens = self::topLevelTokens($this->body);
+        foreach ($tokens as $token) {
+            if (in_array($token['value'], ['UNION', 'INTERSECT', 'EXCEPT'], true)) {
+                throw new ApiRequestException(
+                    'Runtime filter placement is ambiguous for this SQL resource.',
+                    'INVALID_SQL_RUNTIME_FILTER',
+                    [['path' => 'filters', 'message' => 'Use an output filter or a dedicated resource for set-operation branches.']]
+                );
+            }
+        }
+
+        $insertions = [];
+        if ($whereCondition !== null) {
+            $boundary = $this->firstTokenPosition($tokens, ['GROUP', 'HAVING', 'ORDER', 'OFFSET', 'FETCH', 'FOR']);
+            $where = $this->firstTokenPosition($tokens, ['WHERE']);
+            $position = $boundary ?? strlen($this->body);
+            $insertions[] = [
+                'position' => $position,
+                'priority' => 0,
+                'sql' => $where !== null && $where < $position
+                    ? " AND ({$whereCondition}) "
+                    : " WHERE {$whereCondition} ",
+            ];
+        }
+        if ($havingCondition !== null) {
+            $boundary = $this->firstTokenPosition($tokens, ['ORDER', 'OFFSET', 'FETCH', 'FOR']);
+            $having = $this->firstTokenPosition($tokens, ['HAVING']);
+            $position = $boundary ?? strlen($this->body);
+            $insertions[] = [
+                'position' => $position,
+                'priority' => 1,
+                'sql' => $having !== null && $having < $position
+                    ? " AND ({$havingCondition}) "
+                    : " HAVING {$havingCondition} ",
+            ];
+        }
+
+        usort($insertions, function (array $left, array $right): int {
+            $positionOrder = $right['position'] <=> $left['position'];
+            return $positionOrder !== 0
+                ? $positionOrder
+                : $right['priority'] <=> $left['priority'];
+        });
+        $body = $this->body;
+        foreach ($insertions as $insertion) {
+            $body = substr($body, 0, $insertion['position'])
+                . $insertion['sql']
+                . substr($body, $insertion['position']);
+        }
+        return $body;
+    }
+
+    private function firstTokenPosition(array $tokens, array $values): ?int
+    {
+        foreach ($tokens as $index => $token) {
+            if (in_array($token['value'], $values, true)) {
+                if ($token['value'] === 'FOR'
+                    && !in_array($tokens[$index + 1]['value'] ?? null, ['JSON', 'XML', 'BROWSE'], true)) {
+                    continue;
+                }
+                return $token['start'];
+            }
+        }
+        return null;
+    }
+
     private static function topLevelTokens(string $sql): array
     {
         $tokens = [];
