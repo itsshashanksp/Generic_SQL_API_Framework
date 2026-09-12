@@ -27,7 +27,10 @@ class SqlRepository
     public function execute(array $request): array
     {
         $generationStarted = microtime(true);
-        $definition = $this->registry->resolve($request['resource']);
+        $definition = $this->registry->resolve(
+            $request['resource'],
+            $request['execution'] ?? []
+        );
         $sql = trim($this->queryEngine->getQuery($definition['file']));
         $sql = rtrim($sql, "; \t\n\r\0\x0B");
         $allowedColumns = [];
@@ -105,6 +108,16 @@ class SqlRepository
         $sort = !empty($request['sort'])
             ? $request['sort']
             : $definition['defaultSort'];
+        if (isset($request['pagination']) && $sort === []) {
+            throw new ApiRequestException(
+                'SQL resource pagination requires an approved sort.',
+                'INVALID_SQL_PAGINATION',
+                [[
+                    'path' => 'execution.defaultSort',
+                    'message' => 'Supply execution columns with defaultSort, or send an approved runtime sort.',
+                ]]
+            );
+        }
         $orderSql = $this->buildOrderBy($sort, $allowedColumns);
         $topLevelOrderBy = $this->findTopLevelOrderBy($sql);
         $countResourceSql = $topLevelOrderBy === null

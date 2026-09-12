@@ -82,16 +82,17 @@ This is structured query composition, not arbitrary SQL. See [JSON Query Mode](Q
 
 ### Purpose
 
-Execute an approved server-owned, read-only SQL Resource.
+Discover and execute a server-owned, read-only SQL Resource.
 
 ### Request
 
-Required: `action`, `resource`. Optional: `filters`, `sort`, `pagination`, `filterLogic`.
+Required: `action`, `resource`. Optional: `execution`, `filters`, `sort`,
+`pagination`, and `filterLogic`.
 
 ### Minimal example
 
 ```json
-{"action":"sql","resource":"item"}
+{"action":"sql","resource":"reports/item"}
 ```
 
 ### Full example
@@ -99,9 +100,41 @@ Required: `action`, `resource`. Optional: `filters`, `sort`, `pagination`, `filt
 ```json
 {
   "action": "sql",
-  "resource": "item",
-  "filters": [{ "field": "Item_Desc", "operator": "LIKE", "value": "%pen%" }],
-  "sort": [{ "field": "Item_Code", "direction": "DESC" }],
+  "resource": "reports/customer",
+  "execution": {
+    "columns": [
+      "Cust_Name",
+      "TotalCustomers",
+      "MinimumBill",
+      "MaximumBill"
+    ],
+    "filters": {
+      "StDate": {
+        "expression": "StDate",
+        "placement": "source",
+        "valueType": "integer-date"
+      },
+      "MinimumCustomers": {
+        "expression": "COUNT(*)",
+        "placement": "having"
+      }
+    },
+    "defaultSort": [
+      { "field": "Cust_Name", "direction": "ASC" }
+    ]
+  },
+  "filters": [
+    {
+      "field": "StDate",
+      "operator": "BETWEEN",
+      "value": ["2021-04-01", "2022-03-31"]
+    },
+    {
+      "field": "MinimumCustomers",
+      "operator": ">=",
+      "value": 2
+    }
+  ],
   "pagination": { "page": 1, "pageSize": 25 },
   "filterLogic": "AND"
 }
@@ -111,16 +144,22 @@ Required: `action`, `resource`. Optional: `filters`, `sort`, `pagination`, `filt
 
 | Field | Type | Required | Description |
 |---|---|---:|---|
-| `resource` | string | yes | Exact ID in `config/sql-resources.php`. |
-| `filters` | array | no | Approved logical filter fields and SQL Resource operators. |
-| `sort` | array | no | Approved exposed output aliases; configured default otherwise. |
-| `pagination` | object | no | Positive integer page/pageSize. |
+| `resource` | string | yes | Safe relative SQL-file ID without `.sql`. |
+| `execution` | object | no | Validated output/filter/default-sort metadata. |
+| `execution.columns` | non-empty identifier array | conditional | Output aliases used by runtime output filtering/sorting. |
+| `execution.filters` | object | no | Logical mappings with `expression`, `placement`, and optional `valueType`. |
+| `execution.defaultSort` | non-empty sort array | no | Default ordering; requires `execution.columns`. |
+| `filters` | array | no | Runtime values for permitted output/mapped fields. |
+| `sort` | array | no | Runtime order using execution or legacy output columns. |
+| `pagination` | object | no | Positive page/pageSize; requires an approved sort. |
 | `filterLogic` | string | no | AND or OR; default AND. |
 
 ### Validation
 
-Resource IDs, runtime fields, operators, values, sorting, and pagination are
-validated. Registry configuration determines filter placement and conversion.
+The resolver confines discovery to the configured root, excludes internal
+directories, accepts only slash-separated logical IDs, and resolves only SQL
+files. Execution expressions use a narrow identifier/aggregate grammar. Output
+fields, operators, values, directions, placement, and integer dates are checked.
 
 ### Response
 
@@ -130,12 +169,16 @@ Returns resource rows with `Data Loaded Successfully` in the standard query enve
 
 In addition to common errors: `INVALID_SQL_RESOURCE`,
 `INVALID_SQL_RUNTIME_FIELD`, `INVALID_SQL_RUNTIME_VALUE`,
-`INVALID_SQL_RUNTIME_FILTER`, and `INVALID_SQL_PAGINATION` (all HTTP 400).
+`INVALID_SQL_RUNTIME_FILTER`, and `INVALID_SQL_PAGINATION` (HTTP 400).
 
 ### Notes
 
-Clients never send SQL, file paths, expressions, or filter placement. See
-[SQL Resource Mode](SQL-Resource-Mode.md).
+A new file such as `queries/reports/new-report.sql` works as
+`reports/new-report` without registration. Legacy registry IDs continue to
+work. The backend does not parse general SQL projections; supply
+`execution.columns` when runtime controls need output-name validation. Clients
+never send SQL text or filesystem paths. See [SQL Resource Mode](SQL-Resource-Mode.md).
+
 
 ## `insert`
 

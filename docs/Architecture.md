@@ -32,8 +32,8 @@ Validation and normalization occur in `api/index.php` before controller dispatch
 | Controllers | Query, SQL-resource, or write operation and shared response message; no SQL construction |
 | Services | Thin delegation to query or metadata repositories |
 | `QueryRepository` | Execution/orchestration facade for SELECT, set operations, and routines |
-| `SqlResourceRegistry` | Maps exact approved IDs to backend files, exposed output aliases, and default sorting; enforces path containment |
-| `SqlRepository` | Loads a registered server-owned SELECT/CTE, preserves CTE scope around wrappers, safely applies runtime state, and reuses pagination/execution infrastructure |
+| `SqlResourceRegistry` | Recursively discovers safe path-derived IDs, applies validated execution metadata, retains legacy mappings, and enforces exclusions/collisions/path containment |
+| `SqlRepository` | Loads a discovered server-owned SELECT/CTE, preserves CTE scope around wrappers, safely applies runtime state, and reuses pagination/execution infrastructure |
 | `WriteResourceRegistry` | Maps exact approved write IDs to fixed schema/table and column/key allowlists; defaults to deny-all |
 | `WriteRepository` | Loads write metadata, validates payloads, chooses a write builder, executes prepared SQL, and formats operation results |
 | `ScopedMetadataRepository` | Adds request-local inferred CTE output metadata while delegating physical table/column checks to `MetadataRepository` |
@@ -47,10 +47,11 @@ Validation and normalization occur in `api/index.php` before controller dispatch
 `QueryRepository` is not a monolithic SQL builder. It owns a `SelectBuilder`, `RoutineBuilder`, and `SetOperationBuilder`, executes their output through `QueryEngine`, and attaches pagination totals.
 
 `SqlRepository` is deliberately separate from the Universal JSON builders. Its
-base SQL is trusted application code selected only through the registry. The
-client cannot supply SQL or a file path. Runtime sort and filter fields are checked
-against per-resource allowlists, identifiers are quoted by the repository, and
-values are passed to `QueryEngine::executePrepared`. Both paths converge on the
+base SQL is trusted application code selected through recursive discovery or a
+legacy registry entry. The client cannot supply SQL or a file path. Optional
+execution metadata uses strict identifier/aggregate/placement grammar and forms
+the runtime allowlists; values are passed to `QueryEngine::executePrepared`.
+Both paths converge on the
 same `QueryEngine`, database connection, exception handling, and `Response`
 envelope. Server-owned SQL is parsed by SQL Server and does not pass through the
 JSON Query function/expression allowlists. A small statement analyzer retains
@@ -79,26 +80,18 @@ metadata. HOLDLOCK reduces the absent-row race,
 but does not remove SQL Server MERGE caveats or replace deployment-specific
 concurrency testing. Transactions remain unsupported by the public contract.
 
-SQL resources may define `filterColumns` separately from returned `columns`.
-For example, a grouped report can return `Cust_Name` and aggregate aliases
-while allowing source filters on `Cust_Name` and `StDate`. If that database
-date is stored as an integer, `filterValueTypes: ['StDate' => 'integer-date']`
-converts ISO UI dates to validated integer parameters.
-Normal resources filter the wrapped output. An aggregate resource that must
-filter source rows declares `filterPlacement: source` and contains exactly one
-controlled `/*__RUNTIME_FILTERS__*/` marker. The registry validates the field
-allowlist and marker placement; the repository replaces the marker only with
-quoted allowlisted identifiers and prepared placeholders before aggregation.
-Sorting remains restricted to returned columns.
+Discovery does not parse projections. A metadata-free resource can execute
+unchanged; runtime output filters, sorting, and pagination declare stable aliases
+in `execution.columns`. Optional mappings bind logical fields to a validated
+output identifier, source identifier, or simple aggregate HAVING expression.
+`SqlResourceStatement` identifies only top-level clause boundaries, ignoring
+nested queries and window expressions. Ambiguous set-operation placement and OR
+logic spanning query stages are rejected.
 
-For complex resources, an alternative registry-owned `filters` map binds each
-logical frontend field to a reviewed SQL expression and an explicit output,
-WHERE, or HAVING location. `SqlResourceStatement` identifies only top-level
-clause boundaries, ignoring nested queries and window expressions; it never
-infers placement from client input. Ambiguous set-operation branch placement
-and OR logic spanning query stages are rejected. Legacy output filtering and
-the source marker remain backward compatible, and all values continue through
-prepared positional parameters.
+Legacy entries may still define `columns`, `filterColumns`, value types, trusted
+filter mappings, default sorting, and source marker placement. Their controlled
+`/*__RUNTIME_FILTERS__*/` behavior remains intact while callers migrate to full
+discovered IDs and public execution metadata.
 
 | Builder | Role |
 |---|---|

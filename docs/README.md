@@ -49,12 +49,12 @@ web root or `/index.php` when `api/` itself is the document root.
 ## Terminology
 
 - **JSON Query Mode** builds a validated SELECT from client-supplied structure.
-- **SQL Resource Mode** executes a server-owned, registered, read-only SQL file;
-  the client supplies only its resource ID and approved runtime controls.
+- **SQL Resource Mode** discovers and executes server-owned, read-only SQL files;
+  the client supplies a safe resource ID and optional validated execution metadata.
 - **Write API** performs registered single-object INSERT, UPDATE, DELETE, or UPSERT.
 - **Universal JSON Contract** is the shared request dispatch and response envelope.
-- **Resource allowlist** is server configuration that maps a public ID to private
-  SQL or database objects and permitted fields.
+- **Execution metadata** declares approved SQL Resource output controls and
+  narrowly constrained source/HAVING mappings; it never contains arbitrary SQL.
 
 Documentation describes the current implementation. Planned work belongs only in
 [Roadmap](Roadmap.md); it is not part of the public contract.

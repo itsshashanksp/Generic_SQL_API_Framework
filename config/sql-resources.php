@@ -1,6 +1,10 @@
 <?php
 
 return [
+    '__settings' => [
+        'root' => QUERY_PATH,
+        'exclude' => ['system'],
+    ],
     'item' => [
         'file' => QUERY_PATH . '/reports/item.sql',
         'columns' => ['Item_Code', 'Item_Desc', 'Item_MRP'],
@@ -59,5 +63,10 @@ return [
             ['field' => 'Month', 'direction' => 'ASC'],
             ['field' => 'Category', 'direction' => 'ASC'],
         ],
+    ],
+    'TOP-10-month-Wise-Category-wise' => [
+        'file' => QUERY_PATH . '/widgets/TOP-10-month-Wise-Category-wise.sql',
+        'columns' => ['Month', 'Category', 'Sales'],
+        'defaultSort' => [['field' => 'Sales', 'direction' => 'DESC']],
     ],
 ];

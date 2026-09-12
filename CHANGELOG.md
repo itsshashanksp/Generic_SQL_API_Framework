@@ -6,6 +6,12 @@ All notable backend changes are recorded here. The project follows semantic vers
 
 ### Added
 
+- Recursive SQL Resource auto-discovery with safe path-derived IDs, excluded
+  internal directories, collision checks, and unique-basename compatibility.
+- Strict frontend execution metadata for output columns, output/source/HAVING
+  filter mappings, integer-date conversion, and deterministic default sorting.
+- Database-independent discovery, traversal, expression-injection, runtime
+  transformation, pagination, compatibility, and collision regression tests.
 - Public single-object INSERT, UPDATE, DELETE, and UPSERT actions routed through
   dedicated controller/service/repository and write-builder layers.
 - Deny-by-default write-resource registry with per-resource action, schema/table,

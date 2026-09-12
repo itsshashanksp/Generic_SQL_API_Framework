@@ -10,7 +10,7 @@ The implemented backend provides:
 
 - SELECT queries with aliases, expressions, supported functions, filtering, joins, grouping, sorting, and pagination
 - window functions, filter subqueries, CTEs, and UNION/UNION ALL within documented limits
-- registered, server-owned read-only SQL Resources with approved runtime filtering, sorting, and pagination
+- auto-discovered, server-owned read-only SQL Resources with approved runtime filtering, sorting, and pagination
 - deny-by-default single-object INSERT, UPDATE, DELETE, and UPSERT resources
 - stored procedure, scalar function, and table-valued function execution with positional parameters
 - SQL Server metadata actions

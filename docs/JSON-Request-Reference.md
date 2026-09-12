@@ -13,7 +13,7 @@ Unknown top-level properties are rejected for every action.
 | Action | Required fields | Optional fields |
 |---|---|---|
 | `select` | `source`, `fields` | `filters`, `joins`, `groupBy`, `having`, `sort`, `pagination`, `distinct`, `limit`, `filterLogic`, `with` |
-| `sql` | `resource` | `filters`, `sort`, `pagination`, `filterLogic` |
+| `sql` | `resource` | `execution`, `filters`, `sort`, `pagination`, `filterLogic` |
 | `insert` | `resource`, non-empty `data` object | none |
 | `update` | `resource`, non-empty `data` object, non-empty `filters` | `filterLogic` |
 | `delete` | `resource`, non-empty `filters` | `filterLogic` |
@@ -28,23 +28,40 @@ Identifiers use `^[A-Za-z_][A-Za-z0-9_.]*$`: letters/underscore first, then lett
 
 The `sql` action overview is documented in [API](API.md#controlled-sql-resource-request).
 Backend developers should use [SQL Resource Configuration](SQL-Resource-Configuration.md)
-and [SQL Resource Files](SQL-Resource-Files.md) for registry and file details.
-Its resource IDs use the stricter `^[A-Za-z0-9][A-Za-z0-9_-]*$` shape and must
-also exist in the server registry. Its sort fields are unqualified output aliases;
-filter fields come from either the legacy `filterColumns` allowlist (defaulting
-to output columns) or the resource's mapped `filters` keys. Neither accepts
-arbitrary database fields or client-supplied SQL expressions.
+and [SQL Resource Files](SQL-Resource-Files.md) for discovery and file details.
+Resource IDs use slash-separated segments matching
+`[A-Za-z0-9][A-Za-z0-9_-]*`. They resolve to discovered `.sql` files beneath the
+fixed root or to legacy entries. Sort/filter fields come from validated
+`execution` metadata or legacy allowlists; arbitrary SQL is never accepted.
 
-These restrictions describe client-composed JSON. A registered SQL Resource is
+These restrictions describe client-composed JSON. A discovered SQL Resource is
 backend-owned SQL and may use SQL Server functions, CTEs, joins, windows,
 subqueries, and set operations that are intentionally not exposed by the JSON
 Query function or expression allowlists. The client still supplies only the
 resource ID and documented runtime controls, never SQL text.
 
+### SQL execution metadata
+
+`execution` is optional and accepted only by `sql`:
+
+| Name | Shape | Rules |
+|---|---|---|
+| `columns` | non-empty unique identifier list | Output controls only; not projection/redaction. |
+| `filters` | object keyed by unique logical identifiers | Each mapping has `expression`, `placement`, and optional `valueType`. |
+| `defaultSort` | non-empty sort list | Fields must be in `columns`; directions are `ASC`/`DESC`. |
+
+An output mapping expression must exactly match an execution column. A source
+expression is one optionally qualified identifier. A having expression is
+`COUNT`, `SUM`, `AVG`, `MIN`, or `MAX` over one identifier or `*`. Placements are
+`output`, `source`, and `having`; the only value type is `integer-date`. An
+execution column is automatically usable as an output filter unless an explicit
+mapping with the same logical name overrides it. Pagination requires an approved
+runtime sort or default sort.
+
 ## CRUD writes
 
-CRUD `resource` IDs use the same restricted ID syntax as SQL resources, but are
-resolved from the separate `config/write-resources.php` registry. Clients cannot
+CRUD `resource` IDs use one non-path segment of the restricted identifier syntax
+and are resolved from the separate `config/write-resources.php` registry. Clients cannot
 send `source`, table/schema names, SQL, expressions, file paths, metadata, or
 connection information. `data` is a JSON object keyed by unqualified column
 names; every value must be a string, number, boolean, or null. Arrays and nested

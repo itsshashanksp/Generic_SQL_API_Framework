@@ -32,7 +32,7 @@ shape/count is `INVALID_REQUEST`; metadata/build/execution failures are
 `QUERY_ERROR`.
 
 INTERSECT and EXCEPT have internal builder support but no public action, so they
-are not available through JSON Query Mode. A registered SQL Resource can contain
+are not available through JSON Query Mode. A reviewed SQL Resource can contain
 server-owned UNION, UNION ALL, INTERSECT, or EXCEPT SQL, subject to the resource
 executor rules. Mapped inner WHERE/HAVING runtime placement on a top-level set
 operation is rejected as ambiguous; output wrapping or a dedicated resource is

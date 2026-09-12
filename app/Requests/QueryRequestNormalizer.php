@@ -10,6 +10,7 @@ class QueryRequestNormalizer
                 'controller' => 'SQL',
                 'action' => 'execute',
                 'resource' => $request['resource'],
+                ...isset($request['execution']) ? ['execution' => $request['execution']] : [],
                 ...isset($request['filters']) ? ['filters' => $request['filters']] : [],
                 ...isset($request['sort']) ? ['sort' => $request['sort']] : [],
                 ...isset($request['pagination']) ? ['pagination' => $request['pagination']] : [],

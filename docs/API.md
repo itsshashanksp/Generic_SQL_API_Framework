@@ -47,44 +47,64 @@ Unknown properties are rejected. Raw SQL, arbitrary SELECT parameters, client-su
 
 ### Controlled SQL resource request
 
+A SQL file under the discovery root is addressed by its relative path without
+the `.sql` suffix. For example, `queries/reports/item.sql` is:
+
+```json
+{"action":"sql","resource":"reports/item"}
+```
+
+Runtime controls use validated execution metadata:
+
 ```json
 {
   "action": "sql",
-  "resource": "item",
-  "filters": [{ "field": "Item_Desc", "operator": "LIKE", "value": "%pen%" }],
-  "sort": [{ "field": "Item_Code", "direction": "DESC" }],
+  "resource": "reports/item",
+  "execution": {
+    "columns": ["Item_Code", "Item_Desc", "Item_MRP"],
+    "defaultSort": [
+      { "field": "Item_Code", "direction": "ASC" }
+    ]
+  },
+  "filters": [
+    { "field": "Item_Desc", "operator": "LIKE", "value": "%pen%" }
+  ],
+  "sort": [
+    { "field": "Item_Code", "direction": "DESC" }
+  ],
   "pagination": { "page": 1, "pageSize": 25 },
   "filterLogic": "AND"
 }
 ```
 
-`resource` must match the exact ID of an entry in `config/sql-resources.php`;
-paths, filenames, URLs, SQL text, connection settings, and unknown properties
-are rejected. Each entry maps an internal file to exposed output aliases and a
-default sort. Existing resources may use a separate `filterColumns` allowlist;
-new complex resources may instead map logical filter names to server-owned SQL
-expressions and explicit `output`, `where`, or `having` locations. An
-`integer-date` mapping converts a validated `YYYY-MM-DD` UI value to its
-`YYYYMMDD` integer parameter. SQL runtime filters support
-comparisons, LIKE, IN, BETWEEN, and NULL checks. Filter values are prepared
-parameters. Runtime sort remains limited to exposed output aliases and
-`ASC`/`DESC`; pagination reuses the SQL Server compatibility-aware pagination
-builder. The resource-file guide documents the implemented `TOP` optimization.
+The backend recursively discovers `.sql` resources beneath the fixed
+server root and excludes `queries/system` by default. Logical IDs contain safe
+slash-separated segments; extensions, absolute paths, `..\`, backslashes, null
+bytes, directories, non-SQL files, and escaped real paths are rejected. The
+client never supplies a filesystem path or SQL text.
 
-The frontend never sends those SQL expressions or locations. It sends only the
-logical field, operator, and value. WHERE/HAVING expressions come from the
-registered resource, and values remain prepared parameters. OR logic cannot
-span multiple SQL locations because that would change its meaning.
+`execution.columns` declares stable output aliases used to validate outer
+filters and sorting. It is unnecessary when a simple resource is executed without
+runtime controls. The backend deliberately does not parse arbitrary SQL Server
+projections. `execution.defaultSort` requires columns and is used when runtime
+`sort` is absent. Pagination requires an approved runtime or default sort.
 
-Backend registration and file-authoring details are documented separately in
-[SQL Resource Configuration](SQL-Resource-Configuration.md) and
+`execution.filters` adds logical mappings. Output mappings must resolve to an
+execution column. `source` expressions are limited to identifiers such as
+`BIL.Bill_Date`; `having` expressions are limited to COUNT/SUM/AVG/MIN/MAX
+over one identifier or `*`. The only custom value type is `integer-date`.
+Placement, expressions, field names, types, operators, and directions are
+validated; values remain prepared parameters.
+
+Legacy entries in `config/sql-resources.php` remain available for existing
+short IDs such as `item` and `customer`. New resources need no per-file PHP
+entry. A unique basename can also preserve a short-ID fallback, but the relative
+ID is preferred and required when basenames are ambiguous.
+
+See [SQL Resource Mode](SQL-Resource-Mode.md),
+[SQL Resource Configuration](SQL-Resource-Configuration.md), and
 [SQL Resource Files](SQL-Resource-Files.md).
 
-The registered SQL owns static projections, joins, grouping, HAVING, CTEs,
-subqueries, set operations, windows, and SQL Server-specific functions. It is
-not constrained by JSON Query Mode's function/expression allowlists. Dynamic
-query structure and free-text SQL are not SQL action properties; clients send
-only the runtime properties documented above.
 
 ### CRUD write requests
 

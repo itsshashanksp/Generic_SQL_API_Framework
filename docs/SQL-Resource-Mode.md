@@ -1,212 +1,237 @@
 # SQL Resource Mode
 
-SQL Resource Mode executes an administrator-approved, server-owned, read-only SQL
-file. It is the escape hatch for report SQL that is too complex for JSON Query
-Mode without exposing arbitrary SQL to clients.
+SQL Resource Mode discovers and executes server-owned, read-only SQL files. It
+supports curated SQL Server reports without exposing arbitrary SQL or filesystem
+paths to clients.
 
-| JSON Query Mode | SQL Resource Mode |
-|---|---|
-| Frontend supplies validated query structure. | Backend author owns complete SQL structure. |
-| Public function/join/expression allowlists apply. | SQL file may use SQL Server syntax within read-only resource constraints. |
-| Physical source/field identifiers are supplied by the client and metadata-checked. | Client supplies an opaque resource ID and approved logical runtime fields. |
-| Best for configurable simple/advanced SELECTs. | Best for curated reports, dashboards, CTEs, APPLY/PIVOT, or specialized SQL. |
+## Auto-discovery
 
-## Frontend contract
+The default discovery root is `queries/`. SQL files below it receive a relative
+logical ID with the `.sql` extension removed:
 
-Minimal:
+```text
+queries/reports/customer.sql                 -> reports/customer
+queries/reports/item.sql                     -> reports/item
+queries/widgets/bill-top-10-categories.sql   -> widgets/bill-top-10-categories
+```
+
+Create `queries/reports/new-report.sql`, then call:
 
 ```json
-{"action":"sql","resource":"item"}
+{"action":"sql","resource":"reports/new-report"}
 ```
 
-With every runtime control:
+No per-resource entry in `config/sql-resources.php` is required. Discovery is
+recursive and deterministic. `queries/system` is excluded by default because it
+contains internal metadata statements, not public SQL Resources.
 
-```json
-{
-  "action": "sql",
-  "resource": "item",
-  "filters": [{ "field": "Item_Desc", "operator": "LIKE", "value": "%pen%" }],
-  "sort": [{ "field": "Item_Code", "direction": "DESC" }],
-  "pagination": { "page": 1, "pageSize": 25 },
-  "filterLogic": "AND"
-}
-```
+Logical IDs use slash-separated segments matching
+`[A-Za-z0-9][A-Za-z0-9_-]*`. They cannot contain `.`, `..`, empty segments,
+backslashes, absolute roots, drive prefixes, null bytes, extensions, or URL/path
+syntax. Only real `.sql` files contained by the resolved server root are eligible;
+directories, other extensions, escaped symlinks, and nonexistent IDs fail with
+`INVALID_SQL_RESOURCE`. Case-insensitive identity collisions fail as server
+configuration errors instead of resolving unpredictably.
 
-The only accepted top-level properties are `action`, `resource`, `filters`,
-`sort`, `pagination`, and `filterLogic`. The ID must match
-`^[A-Za-z0-9][A-Za-z0-9_-]*$` and an exact registry key.
+## Minimal execution
 
-The frontend must not send SQL, SQL expressions, table/schema names, a filename,
-a filesystem path, connection settings, runtime filter location, or a marker.
-
-## Backend registry
-
-Resources live in `config/sql-resources.php`. A simple output-filtered entry is:
-
-```php
-'item' => [
-    'file' => QUERY_PATH . '/reports/item.sql',
-    'columns' => ['Item_Code', 'Item_Desc', 'Item_MRP'],
-    'filterColumns' => ['Item_Code', 'Item_Desc'],
-    'defaultSort' => [
-        ['field' => 'Item_Code', 'direction' => 'ASC'],
-    ],
-],
-```
-
-`file` must resolve inside `QUERY_PATH`. `columns` is the exact exposed output
-alias allowlist for runtime sort and wrapper references. `defaultSort` is required
-and each field must be in `columns`. Legacy `filterColumns` defaults to `columns`.
-
-An integer date mapping adds:
-
-```php
-'filterValueTypes' => [
-    'Bill_Date' => 'integer-date',
-],
-```
-
-Only `integer-date` is implemented. It accepts valid `YYYY-MM-DD` or `YYYYMMDD`
-input and binds an integer.
-
-## Complex runtime filter mapping
-
-New complex resources can map logical frontend names to backend expressions and
-locations:
-
-```php
-'customer-summary' => [
-    'file' => QUERY_PATH . '/reports/customer-summary.sql',
-    'columns' => ['CustomerName', 'TotalBills', 'MinimumBill', 'MaximumBill'],
-    'filters' => [
-        'CustomerName' => [
-            'expression' => 'C.Cust_Name',
-            'location' => 'where',
-        ],
-        'BillDate' => [
-            'expression' => 'B.Bill_Date',
-            'location' => 'where',
-            'valueType' => 'integer-date',
-        ],
-        'TotalBills' => [
-            'expression' => 'COUNT(*)',
-            'location' => 'having',
-        ],
-    ],
-    'defaultSort' => [
-        ['field' => 'CustomerName', 'direction' => 'ASC'],
-    ],
-],
-```
-
-Mapping keys are the logical `filters[].field` values accepted from clients.
-`expression` and `location` are trusted server configuration, never request data.
-Locations mean:
-
-- `output`: filter an outer `SqlResource` wrapper by an exposed result alias;
-- `where`: inject at the top-level WHERE before GROUP BY/HAVING/ORDER BY;
-- `having`: inject at top-level HAVING before ORDER BY.
-
-Mapped and legacy filter settings cannot be mixed in one resource. Expressions
-are constrained server configuration: empty values, placeholders, semicolons,
-and SQL comment tokens are rejected. OR filters must all resolve to one location.
-Top-level set operations reject mapped WHERE/HAVING insertion as ambiguous;
-choose output placement or author a dedicated resource.
-
-## Legacy source marker
-
-An existing resource may set `filterPlacement => 'source'` and contain exactly
-one backend marker `/*__RUNTIME_FILTERS__*/`. The executor replaces it with a
-prepared source WHERE clause. This marker is an internal SQL-file authoring
-contract only. Frontends neither generate nor know about it. Output placement
-requires no marker. See [SQL Resource files](SQL-Resource-Files.md).
-
-## SQL-file capabilities
-
-The resource analyzer accepts one read-only statement whose first top-level
-operation is SELECT, optionally preceded by WITH. It rejects top-level SELECT
-INTO and additional statements. Within that server-owned query, authors may use
-normal SQL Server SELECT syntax, including:
-
-- standard or recursive CTEs, nested subqueries, and derived tables;
-- INNER/LEFT/RIGHT/FULL/CROSS joins, multiple/non-equality predicates, CROSS
-  APPLY, and OUTER APPLY;
-- UNION, UNION ALL, INTERSECT, and EXCEPT;
-- window functions and PARTITION BY;
-- CASE, SQL Server scalar/aggregate/window/JSON/XML functions, and complex
-  expressions;
-- PIVOT/UNPIVOT, TOP, complex GROUP BY/HAVING, and server-authored ORDER BY.
-
-These are capabilities of the approved SQL text, not JSON properties parsed by
-the API. Actual syntax and availability still depend on the connected SQL Server
-version, compatibility level, permissions, and referenced objects.
-
-The executor separates a WITH prefix and an `OPTION(...)` suffix so count and
-pagination transformations remain valid. It detects top-level clauses with
-depth-aware scanning. An authored top-level ORDER BY is retained when it can be
-executed directly; otherwise resource output is wrapped for approved runtime
-controls.
-
-## Runtime sorting and pagination
-
-Sort fields must be resource `columns`; direction is ASC/DESC. When omitted,
-`defaultSort` is used. Pagination requires positive page/pageSize and uses a count
-plus compatibility-aware OFFSET/FETCH or ROW_NUMBER strategy.
-
-Authored OFFSET/FETCH makes the resource own pagination. Any request filter,
-sort, or pagination is then rejected with `INVALID_SQL_PAGINATION`. For a TOP
-resource whose whole result fits the requested first page, the executor can run
-the authored query directly and infer `totalRows` from returned rows.
-
-## Security and validation
-
-- Registry lookup prevents client-controlled paths and arbitrary SQL.
-- Real-path validation confines files to the query directory.
-- The analyzer enforces one read-only query and blocks SELECT INTO.
-- Output, filter, and sort fields are allowlisted.
-- Values are prepared parameters; field expressions remain server-owned.
-- Invalid IDs use `INVALID_SQL_RESOURCE`; invalid fields/values/placement or
-  pagination use the specific codes in [Validation and errors](Validation-and-Errors.md).
-
-This is defense in depth, not authentication. The endpoint currently has no API
-authentication or authorization.
-
-## Example: grouped customer report
-
-Backend SQL can group by customer and expose stable aliases:
+A simple resource needs only its SQL file and resource ID:
 
 ```sql
 SELECT
-    C.Cust_Name AS CustomerName,
-    COUNT(*) AS TotalBills,
-    MIN(B.Bill_Amt) AS MinimumBill,
-    MAX(B.Bill_Amt) AS MaximumBill
-FROM CustomerTable AS C
-INNER JOIN BillTable AS B ON B.Cust_Code = C.Cust_Code
-GROUP BY C.Cust_Name
+    Item_Code,
+    Item_Desc,
+    Item_MRP
+FROM ItemMasterTable
 ```
 
-With the mapped registry above, a frontend can request:
+```json
+{"action":"sql","resource":"reports/item"}
+```
+
+No output parser or metadata query is required. This is the least fragile choice
+for arbitrary server-owned SQL Server syntax.
+
+## Execution metadata
+
+Runtime output filtering, sorting, and deterministic pagination need names that
+can be validated before executing the query. Supply those once in the frontend's
+reviewed report definition as the SQL action's `execution` object:
 
 ```json
 {
   "action": "sql",
-  "resource": "customer-summary",
+  "resource": "reports/item",
+  "execution": {
+    "columns": ["Item_Code", "Item_Desc", "Item_MRP"],
+    "defaultSort": [
+      { "field": "Item_Code", "direction": "ASC" }
+    ]
+  },
   "filters": [
-    { "field": "CustomerName", "operator": "LIKE", "value": "%John%" },
-    { "field": "BillDate", "operator": "BETWEEN", "value": ["2026-01-01", "2026-12-31"] },
-    { "field": "TotalBills", "operator": ">", "value": 2 }
+    { "field": "Item_Desc", "operator": "LIKE", "value": "%pen%" }
   ],
-  "sort": [{ "field": "TotalBills", "direction": "DESC" }],
-  "pagination": { "page": 1, "pageSize": 25 },
-  "filterLogic": "AND"
+  "pagination": { "page": 1, "pageSize": 25 }
 }
 ```
 
-The registry controls where CustomerName/BillDate (WHERE) and TotalBills
-(HAVING) are placed. All three values remain prepared. This illustrative resource
-must be registered before the request is usable; clients cannot create it.
+`execution.columns` contains unqualified stable output aliases. Each becomes an
+automatically permitted outer/output filter and an allowed runtime/default sort
+field. It does not change projection or redact response fields. The SQL SELECT
+list remains authoritative for returned data.
 
-Existing repository resource IDs and exact authoring rules are documented in
-[SQL Resource configuration](SQL-Resource-Configuration.md) and
-[SQL Resource files](SQL-Resource-Files.md).
+The backend does not attempt to parse general SQL Server projections. Aliases can
+be nested inside CTEs, derived tables, PIVOT, JSON/XML expressions, windows, and
+set operations; a general parser would be fragile. Consequently:
+
+- a resource with no runtime controls needs no `execution.columns`;
+- output filters and sort need the relevant names in `execution.columns`;
+- `execution.defaultSort` requires `execution.columns` and uses only those fields;
+- pagination requires either an approved runtime sort or default sort.
+
+## Custom filters
+
+Use `execution.filters` when the frontend logical name differs from an output
+alias or filtering must occur before aggregation:
+
+```json
+{
+  "action": "sql",
+  "resource": "reports/customer",
+  "execution": {
+    "columns": [
+      "Cust_Name",
+      "TotalCustomers",
+      "MinimumBill",
+      "MaximumBill"
+    ],
+    "filters": {
+      "StDate": {
+        "expression": "StDate",
+        "placement": "source",
+        "valueType": "integer-date"
+      },
+      "MinimumCustomers": {
+        "expression": "COUNT(*)",
+        "placement": "having"
+      }
+    },
+    "defaultSort": [
+      { "field": "Cust_Name", "direction": "ASC" }
+    ]
+  },
+  "filters": [
+    {
+      "field": "StDate",
+      "operator": "BETWEEN",
+      "value": ["2021-04-01", "2022-03-31"]
+    },
+    {
+      "field": "MinimumCustomers",
+      "operator": ">=",
+      "value": 2
+    }
+  ],
+  "filterLogic": "AND",
+  "pagination": { "page": 1, "pageSize": 25 }
+}
+```
+
+The example matches the repository's actual `customer.sql`: it has `StDate` on
+`CustomerTable`; there is no invented `BIL` alias. `source` inserts a top-level
+WHERE predicate before GROUP BY. `having` inserts a top-level HAVING predicate.
+`output` (the default) filters the generated outer `SqlResource` wrapper.
+
+### Execution filter schema
+
+| Property | Required | Accepted behavior |
+|---|---:|---|
+| logical filter key | yes | Unqualified identifier sent later as `filters[].field`. |
+| `placement` | no | `output` (default), `source`, or `having`. |
+| `expression` | conditional | Defaults to logical key for output; required otherwise. |
+| `valueType` | no | Only `integer-date`. |
+
+Execution metadata arrives over the public request and is therefore not treated
+as arbitrary trusted SQL. The validator permits only:
+
+- output expressions that exactly name an `execution.columns` identifier;
+- source expressions that are identifiers, optionally qualified, such as
+  `BIL.Bill_Date`;
+- HAVING expressions using COUNT, SUM, AVG, MIN, or MAX over one identifier or `*`.
+
+Semicolons, comments, placeholders, Boolean clauses, function nesting, operators,
+and free-form SQL fragments cannot pass that grammar. More complex mappings must
+remain in reviewed legacy server configuration or be expressed directly in a
+dedicated SQL Resource.
+
+## Runtime filters
+
+Runtime filters remain separate from execution metadata:
+
+```json
+{
+  "field": "StDate",
+  "operator": "BETWEEN",
+  "value": ["2021-04-01", "2022-03-31"]
+}
+```
+
+Supported operators are `=`, `!=`, `<>`, `>`, `<`, `>=`, `<=`, `LIKE`,
+`NOT LIKE`, `IN`, `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `IS NULL`, and
+`IS NOT NULL`. Values become positional prepared parameters. `integer-date`
+validates real `YYYY-MM-DD` or `YYYYMMDD` input and binds an integer.
+
+AND may span output/source/HAVING stages. OR is accepted only when all requested
+filters resolve to one SQL stage; otherwise `INVALID_SQL_RUNTIME_FILTER` prevents
+a semantic rewrite. Source/HAVING injection on a top-level set operation is also
+rejected as ambiguous; use output filtering or a dedicated resource.
+
+## Sorting and pagination
+
+Runtime and default sorts accept only an approved output column with ASC or DESC.
+No expression or numeric positional ordering is accepted. A non-empty runtime
+sort overrides `execution.defaultSort` or a legacy default.
+
+Pagination preserves the existing count plus SQL Server compatibility behavior:
+compatibility 110+ uses OFFSET/FETCH; older versions use ROW_NUMBER. It does not
+add a page-size cap. Pagination without approved ordering is rejected.
+
+Authored OFFSET/FETCH remains exclusive: any runtime filters, sort, or pagination
+produce `INVALID_SQL_PAGINATION`. Authored TOP/ORDER BY preservation and the
+complete-first-page TOP optimization remain unchanged.
+
+## Legacy compatibility
+
+`config/sql-resources.php` is now an optional compatibility/global-settings
+layer. Existing entries and IDs such as `item` and `customer` retain their
+server-owned columns, filters, value types, placement, defaults, and marker
+behavior. New code should use relative discovered IDs.
+
+When no legacy entry exists, a short basename such as `item` is accepted only if
+exactly one discovered SQL file has that basename. If several directories contain
+`item.sql`, the caller must use the full relative ID. This eases migration without
+making resolution nondeterministic.
+
+The legacy `/*__RUNTIME_FILTERS__*/` source marker remains supported only for a
+legacy definition with `filterPlacement: source`. Discovered execution metadata
+does not need a marker: source predicates use depth-aware top-level WHERE
+insertion. Existing marker comments are harmless for a discovered request.
+
+See [SQL Resource configuration](SQL-Resource-Configuration.md) and
+[SQL Resource files](SQL-Resource-Files.md) for migration and authoring details.
+
+## SQL capabilities and security
+
+The statement analyzer still requires one server-owned read-only SELECT,
+optionally beginning with WITH. It rejects top-level SELECT INTO and additional
+statements. Approved files may use CTEs, subqueries, derived tables, all SQL
+Server join/APPLY forms, set operations, windows/PARTITION BY, CASE, JSON/XML,
+PIVOT/UNPIVOT, functions, grouping, HAVING, TOP, and ordering.
+
+This broader SQL belongs only in the file. Clients cannot send SQL text, paths,
+filenames, extensions, clauses, database credentials, or arbitrary expressions.
+Real-path containment, excluded directories, strict identifiers, constrained
+execution expressions, fixed operator/placement/direction enums, prepared values,
+and the read-only statement analyzer preserve the security boundary. The API
+still has no authentication or authorization, so production network controls and
+least-privilege database permissions remain required.

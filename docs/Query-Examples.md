@@ -173,6 +173,35 @@ Window sort values are logical fields, never numeric positions. `partitionBy` is
 
 Use `union` for duplicate-removing UNION. INTERSECT and EXCEPT are not public actions.
 
+## Auto-discovered SQL Resource
+
+`queries/reports/item.sql` is addressable by its relative ID without a new
+registry entry:
+
+```json
+{ "action": "sql", "resource": "reports/item" }
+```
+
+Add execution metadata when runtime output controls are needed:
+
+```json
+{
+  "action": "sql",
+  "resource": "reports/item",
+  "execution": {
+    "columns": ["Item_Code", "Item_Desc", "Item_MRP"],
+    "defaultSort": [{ "field": "Item_Code", "direction": "ASC" }]
+  },
+  "filters": [
+    { "field": "Item_Desc", "operator": "LIKE", "value": "%steel%" }
+  ],
+  "pagination": { "page": 1, "pageSize": 25 }
+}
+```
+
+`execution` is a direct top-level SQL action property. It is not wrapped in a
+`queryDefinition`, and it contains metadata rather than SQL text.
+
 ## Routines and metadata
 
 ```json

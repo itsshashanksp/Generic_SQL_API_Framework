@@ -33,12 +33,12 @@ launcher:
 
 The public actions are `select`, `sql`, `insert`, `update`, `delete`, `upsert`, `union`, `unionAll`, `procedure`, `function`, `tableFunction`, and the five metadata actions documented in [API.md](docs/API.md). Public property names such as `source`, `fields`, `field`, `resource`, `data`, `filters`, and `pagination` are normalized to a private execution model. Internal names such as `table`, `columns`, `column`, `where`, `top`, `page`, and `pageSize` are not accepted as public JSON.
 
-`sql` is a controlled report-resource action, not a raw-SQL endpoint. A client
-sends an allowlisted resource ID plus optional runtime filters, sorting, and
-pagination. The server loads the registered file under `queries/`, validates
-runtime fields against that resource's output columns or its separate
-`filterColumns` allowlist, binds all user values as prepared parameters, and
-uses the existing SQL Server connection.
+`sql` is a controlled report-resource action, not a raw-SQL endpoint. The server
+recursively discovers reviewed `.sql` files under `queries/`; for example,
+`queries/reports/customer.sql` is `reports/customer`. A simple resource needs no
+per-file registry entry. Optional, strictly validated `execution` metadata
+declares output aliases, filter mappings, and default sorting when runtime UI
+controls need them. All runtime values remain prepared parameters.
 
 Because that SQL is backend-owned and reviewed, SQL Resource Mode supports
 complex SQL Server SELECT/CTE queries, including joins/APPLY, subqueries,

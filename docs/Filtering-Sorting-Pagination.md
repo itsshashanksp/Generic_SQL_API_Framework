@@ -71,20 +71,30 @@ The frontend shape stays simple:
 ```json
 {
   "action": "sql",
-  "resource": "customer",
+  "resource": "reports/customer",
+  "execution": {
+    "columns": ["Cust_Name", "TotalCustomers", "MinimumBill", "MaximumBill"],
+    "filters": {
+      "StDate": {
+        "expression": "StDate",
+        "placement": "source",
+        "valueType": "integer-date"
+      }
+    }
+  },
   "filters": [
-    { "field": "CustomerName", "operator": "LIKE", "value": "%John%" },
-    { "field": "BillDate", "operator": "BETWEEN", "value": ["2026-01-01", "2026-12-31"] }
+    { "field": "Cust_Name", "operator": "LIKE", "value": "%John%" },
+    { "field": "StDate", "operator": "BETWEEN", "value": ["2026-01-01", "2026-12-31"] }
   ],
   "filterLogic": "AND"
 }
 ```
 
-The logical field must be configured by the selected resource. A legacy resource
-uses `filterColumns`, optional `filterValueTypes`, and one `filterPlacement`. A
-mapped resource uses `filters` to map each logical field to a server-owned SQL
-expression and an `output`, `where`, or `having` location. The client never sends
-the expression or location.
+The logical field must be declared by the SQL action's validated `execution`
+metadata or by a legacy resource definition. Execution columns provide output
+fields automatically; explicit mappings select `output`, `source`, or `having`.
+Source mappings accept only an optionally qualified identifier, and HAVING accepts
+only the documented single aggregate form. Values always remain prepared.
 
 `integer-date` accepts a real calendar date as `YYYY-MM-DD`, an eight-digit
 string, or an eight-digit JSON integer and binds it as a `YYYYMMDD` integer.
@@ -144,7 +154,8 @@ conversion; otherwise SQL Server handles parameter conversion.
 Direction defaults to ASC and may be ASC or DESC. Numeric positions such as
 `"field": "1"` are rejected. JSON Query sorting accepts a validated source field
 or selected top-level alias. SQL Resource sorting accepts only output aliases in
-the resource `columns` allowlist and uses `defaultSort` when the request omits it.
+`execution.columns` or a legacy columns allowlist and uses the applicable
+`defaultSort` when the request omits it.
 Writes, routines, metadata, and public set operations have no sort property.
 
 Window functions carry their own required `sort`; no positional ordering or

@@ -8,11 +8,11 @@ version supports it.
 | Capability | JSON Query Mode | SQL Resource Mode | Write API |
 |---|---|---|---|
 | SELECT | Public `select` | Server-owned SELECT/CTE | No |
-| Runtime comparison/LIKE/list/range/null filters | Yes | Yes, configured logical fields | UPDATE/DELETE only |
+| Runtime comparison/LIKE/list/range/null filters | Yes | Yes, declared execution or legacy logical fields | UPDATE/DELETE only |
 | Filter subqueries / EXISTS | IN/NOT IN/EXISTS/NOT EXISTS only | Can be authored in SQL; runtime values are not subqueries | No |
 | AND / OR | One top-level logic | One logic; OR cannot span locations | One top-level logic |
 | Integer-date filter conversion | BETWEEN on integer metadata | Configured `integer-date` | Live database type validation |
-| Sorting | Logical fields/selected aliases | Exposed output aliases/defaultSort | No |
+| Sorting | Logical fields/selected aliases | Execution/legacy output aliases and defaultSort | No |
 | Pagination | Count + OFFSET/FETCH or ROW_NUMBER | Same; TOP optimization; authored OFFSET/FETCH exclusive | No |
 | TOP / limit | Public positive `limit` | May be authored; optimization supported | No |
 | DISTINCT | Public boolean | May be authored | No |
@@ -32,7 +32,7 @@ version supports it.
 | UNION / UNION ALL | Public top-level actions | May be authored | No |
 | INTERSECT / EXCEPT | Internal builder only, not public | May be authored | No |
 | JSON/XML/PIVOT/UNPIVOT and specialized SQL Server syntax | No public expression | May be authored in approved SQL | No |
-| Runtime filter placement | Builder WHERE | Configured output/source/WHERE/HAVING | Builder WHERE |
+| Runtime filter placement | Builder WHERE | Validated output/source/HAVING | Builder WHERE |
 | INSERT | No | Read-only resources reject writes | Registered single object |
 | UPDATE | No | Read-only resources reject writes | Registered, non-empty filters |
 | DELETE | No | Read-only resources reject writes | Registered, non-empty filters |
@@ -41,7 +41,7 @@ version supports it.
 | Transactions | No public contract | No public contract | No public contract |
 | Prepared values | WHERE/HAVING | Runtime filters | Data and filters |
 | Client arbitrary SQL/path | Rejected/not a property | Rejected/not a property | Rejected/not a property |
-| Metadata checks | Tables/columns/projections | Registry/file/output allowlists | Registry plus live write metadata |
+| Metadata checks | Tables/columns/projections | Discovered file plus execution/legacy allowlists | Registry plus live write metadata |
 
 ## Other public execution surfaces
 

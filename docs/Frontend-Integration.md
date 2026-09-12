@@ -83,14 +83,26 @@ selects from the public JSON function/join/filter vocabulary.
 
 ## SQL Resource report
 
-Frontend configuration can store only the backend resource ID:
+Frontend configuration can store the path-derived resource ID and reviewed
+execution metadata. This is application configuration, not arbitrary user input:
 
 ```json
 {
   "title": "Customer bill summary",
   "queryDefinition": {
     "format": "sql",
-    "resource": "customer"
+    "resource": "reports/customer",
+    "execution": {
+      "columns": ["Cust_Name", "TotalCustomers", "MinimumBill", "MaximumBill"],
+      "filters": {
+        "StDate": {
+          "expression": "StDate",
+          "placement": "source",
+          "valueType": "integer-date"
+        }
+      },
+      "defaultSort": [{ "field": "Cust_Name", "direction": "ASC" }]
+    }
   }
 }
 ```
@@ -100,7 +112,18 @@ Translate it and the UI date/name controls to:
 ```json
 {
   "action": "sql",
-  "resource": "customer",
+  "resource": "reports/customer",
+  "execution": {
+    "columns": ["Cust_Name", "TotalCustomers", "MinimumBill", "MaximumBill"],
+    "filters": {
+      "StDate": {
+        "expression": "StDate",
+        "placement": "source",
+        "valueType": "integer-date"
+      }
+    },
+    "defaultSort": [{ "field": "Cust_Name", "direction": "ASC" }]
+  },
   "filters": [
     { "field": "Cust_Name", "operator": "LIKE", "value": "A%" },
     { "field": "StDate", "operator": "BETWEEN", "value": ["2021-04-01", "2022-03-31"] }
@@ -111,10 +134,11 @@ Translate it and the UI date/name controls to:
 }
 ```
 
-The backend resolves `customer`, validates logical fields, converts its configured
-integer date, injects prepared filters at the server-defined location, and runs
-server-owned SQL. The frontend neither knows nor reproduces its SQL marker,
-expressions, joins, grouping, or filesystem path.
+The backend resolves `reports/customer`, validates the execution grammar and
+logical fields, converts the integer date, inserts prepared filters at the
+approved stage, and runs server-owned SQL. `queryDefinition` itself is not an API
+property: the frontend translates its reviewed contents into the direct top-level
+request shown above. A resource with no UI controls can omit `execution` entirely.
 
 ## Write form
 
@@ -152,12 +176,12 @@ Frontend should control:
 - report title, labels, formatting, chart/table choice, and layout;
 - selected approved values and UI filter/operator controls;
 - current page/page size and approved sort state;
-- choosing among backend-published resource IDs and action definitions;
+- choosing among backend-published resource IDs and reviewed action definitions;
 - validation display and retry/user feedback.
 
 Backend controls:
 
-- SQL Resource SQL and files, registry IDs, and table/schema mappings;
+- SQL Resource SQL, discovery root/exclusions, and legacy mappings;
 - allowed actions, columns, filters, keys, identity fields, and filter mappings;
 - SQL expressions, WHERE/HAVING/output placement, joins, grouping, and resource
   default ordering;
@@ -168,7 +192,7 @@ Frontend must never send:
 
 - database credentials, encryption keys, connection strings, or driver options;
 - arbitrary SQL, SQL fragments, resource file paths, URLs, or filesystem paths;
-- SQL Resource filter expressions/locations or internal filter markers;
+- arbitrary SQL Resource filter expressions/locations or internal filter markers;
 - private normalized keys such as `controller`, `table`, `columns`, `column`,
   `where`, `top`, `page`, `pageSize`, or `params`;
 - client-selected schema/table names for Write actions;
