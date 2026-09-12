@@ -4,7 +4,7 @@
 
 A SQL resource file contains a predefined query owned and reviewed by the backend. The client sends a resource ID; `config/sql-resources.php` maps that ID to the file, and `SqlResourceRegistry` verifies that the resolved file stays under `Backend/queries`.
 
-`SqlRepository` reads the complete file, trims whitespace and trailing semicolons, requires the statement to begin with `SELECT`, applies the resource's configured runtime behavior, and calls `QueryEngine::executePrepared`. There is no general templating engine or client-defined placeholder syntax.
+`SqlRepository` reads the complete file, trims whitespace and trailing semicolons, accepts one read-only `SELECT` query with optional leading comments or a top-level `WITH` clause, applies the resource's configured runtime behavior, and calls `QueryEngine::executePrepared`. There is no general templating engine or client-defined placeholder syntax.
 
 Registration fields and the end-to-end class flow are covered in [SQL Resource Configuration](SQL-Resource-Configuration.md). This document focuses on authoring the `.sql` file.
 
@@ -56,15 +56,15 @@ The current implementation is intentionally small:
 1. `SqlResourceRegistry` reads the file only to validate marker count and placement.
 2. `SqlRepository` reads it again through `QueryEngine::getQuery()`.
 3. Leading/trailing whitespace is trimmed, and any semicolons plus whitespace at the end are removed.
-4. The remaining text must match a leading `SELECT` (case-insensitive).
+4. Statement analysis accepts a main `SELECT` or a `WITH` clause whose main statement is `SELECT`; it separates the CTE scope from the body used by wrappers.
 5. Runtime filters are inserted either outside the query or at the one controlled source marker.
 6. Runtime/default sorting and optional pagination are applied.
 7. `QueryEngine` prepares and executes the resulting SQL through ODBC.
 
 Practical consequences:
 
-- Start the file with `SELECT`. A leading SQL comment causes the current leading-`SELECT` check to fail.
-- Author one read query. The guard is not a full SQL parser, so code review and a least-privilege connection remain necessary.
+- Author one read query. Leading comments and top-level standard or recursive CTEs are accepted. Multiple statements, a non-SELECT main statement, and top-level `SELECT ... INTO` are rejected.
+- The statement analyzer is deliberately not a complete SQL Server parser. Resource review and a least-privilege connection remain necessary.
 - A trailing semicolon is allowed and removed. Do not rely on client or registry parameters embedded in the file; none are implemented.
 - SQL Server, not SQL Resource Mode, parses expressions, joins, aggregation, `CASE`, and window syntax.
 - Most resource queries are wrapped as a derived table. Stable, unique output names and SQL that is valid inside `FROM (...)` are important.
@@ -98,7 +98,7 @@ The backend does not validate the SQL result schema against `columns` and does n
 
 ## Complex SQL
 
-SQL Resource Mode does not maintain a feature allowlist inside the registered SQL text. A file may use SQL Server expressions that remain valid when the repository applies its wrapping rules. Prefer testing the resource both without runtime state and with every enabled filter, sort, and pagination path.
+SQL Resource Mode does not maintain a function or expression allowlist inside registered SQL. Server-owned files may use SQL Server-supported CTEs, recursive CTEs, subqueries, derived tables, EXISTS/NOT EXISTS, CASE, aggregates, nested/scalar/table-valued functions, JSON/XML functionality, windows and PARTITION BY, complex joins/APPLY, UNION/UNION ALL/INTERSECT/EXCEPT, GROUP BY, HAVING, TOP, and OFFSET/FETCH when valid for the execution shape. Prefer testing the resource both without runtime state and with every enabled filter, sort, and pagination path.
 
 ### Aggregates and source filtering
 
@@ -157,17 +157,21 @@ FROM CustomerTable
 
 Register `BillRank` if it may be used for runtime sorting. This example relies on SQL Server's window-function support; the SQL Resource pipeline does not use `WindowFunctionBuilder` to build or validate file contents.
 
-## CTE Files Are Not Currently Supported
+## CTE files
 
-Do not start a SQL resource with `WITH`. `SqlRepository` currently requires the trimmed file to begin with `SELECT`, so a normal top-level SQL Server CTE fails before execution:
+Standard and recursive CTE files are supported:
 
 ```sql
--- Not accepted by the current SQL Resource Mode
-WITH CustomerTotals AS (...)
-SELECT * FROM CustomerTotals
+WITH CustomerTotals AS (
+    SELECT CustomerCode, SUM(Amount) AS TotalAmount
+    FROM dbo.Sales
+    GROUP BY CustomerCode
+)
+SELECT CustomerCode, TotalAmount
+FROM CustomerTotals
 ```
 
-JSON Query Mode has its own implemented CTE builder, but that does not make CTE syntax available in resource files. Supporting top-level CTE files would require an application-code change and corresponding wrapping/count/pagination tests; it is not a current feature.
+The repository keeps the `WITH` prefix ahead of output-filter, count, modern OFFSET/FETCH, and legacy ROW_NUMBER wrappers so CTE names remain in scope. A trailing `OPTION (...)` query hint, including `MAXRECURSION`, is kept after the generated count/data statement. SQL Server owns CTE syntax and recursion rules; the resource path does not rebuild the CTE through JSON Query Mode.
 
 ## Runtime Filters
 
@@ -259,6 +263,8 @@ The pagination offset and size come from validated positive integers and are ren
 
 There is one implemented optimization: a top-level `SELECT TOP N ... ORDER BY ...` with no runtime filters or non-empty runtime sort, requested as page 1 with `pageSize >= N`, executes directly without a separate count; `totalRows` is inferred from `rowsReturned`. Other partial `TOP` pages use the normal count/pagination path.
 
+A resource may own an `ORDER BY ... OFFSET/FETCH` clause. It is executed directly when the request supplies no runtime filters, non-empty runtime sort, or pagination. Combining those runtime controls with authored OFFSET/FETCH is rejected with `INVALID_SQL_PAGINATION`, because wrapping or appending a second page clause could change semantics or generate invalid SQL. Use either authored pagination or framework pagination for a resource, not both.
+
 Without `pagination`, no count query is requested. The response has `meta.page` and `meta.pageSize` as `null`, and `meta.totalRows` defaults to the number of returned rows.
 
 ## Complete Example
@@ -339,7 +345,7 @@ The row and timing values above are illustrative. The property names match the S
 
 ## SQL Resource Rules
 
-- Start with one backend-owned `SELECT` query; do not place a comment or `WITH` before it.
+- Use one backend-owned read-only `SELECT`, optionally preceded by comments or a standard/recursive `WITH` clause.
 - Select only fields safe to return. `columns` controls runtime sorting, not response redaction.
 - Use stable, unique identifier aliases and keep the registry synchronized with them.
 - Use the exact source-filter marker only when the registration declares `filterPlacement: source`.
@@ -352,6 +358,6 @@ The row and timing values above are illustrative. The property names match the S
 
 Choose **JSON Query Mode** when the public request should select from the implemented structural options—fields, supported functions, validated joins, grouping, CTEs within that builder's limits, and similar query composition.
 
-Choose **SQL Resource Mode** when the backend should freeze the complete projection and business logic in a named file, while the client supplies only approved filters, sorting, and pagination. It is the suitable mode for reviewed report SQL, database-specific calculations, and query shapes not exposed by the JSON builder, provided the file satisfies the current leading-`SELECT` and wrapping rules.
+Choose **SQL Resource Mode** when the backend should freeze the complete projection and business logic in a named file, while the client supplies only approved filters, sorting, and pagination. It supports reviewed complex and SQL Server-specific query text without requiring functions or expressions to appear in JSON Query Mode's client-facing allowlists.
 
 Neither mode accepts raw SQL, SQL paths, credentials, connection information, or arbitrary runtime SQL expressions from the frontend.

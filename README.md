@@ -37,6 +37,12 @@ runtime fields against that resource's output columns or its separate
 `filterColumns` allowlist, binds all user values as prepared parameters, and
 uses the existing SQL Server connection.
 
+Because that SQL is backend-owned and reviewed, SQL Resource Mode supports
+complex SQL Server SELECT/CTE queries, including joins/APPLY, subqueries,
+windows, JSON/XML expressions, and set operations, without using JSON Query
+Mode's client-facing function and expression allowlists. Clients still cannot
+submit SQL text, tables, paths, credentials, or connection settings.
+
 Current query support includes SELECT, DISTINCT, SQL Server TOP through `limit`, aliases, CASE and arithmetic expressions, an allow-list of SQL functions, prepared WHERE values, INNER/LEFT/RIGHT equality joins, GROUP BY, aggregate HAVING, multi-field sorting, pagination, eight window functions, subqueries in selected filters, one CTE (including the recursive form), UNION/UNION ALL, routines, and database metadata reads. See the definitive [JSON request reference](docs/JSON-Request-Reference.md) and [capability matrix](docs/API.md#capability-matrix) for exact boundaries.
 
 CRUD uses a separate deny-by-default write-resource registry. It supports

@@ -35,6 +35,7 @@ Current boundaries remain documented in the [capability matrix](API.md#capabilit
 - live SQL Server metadata validation for types, nullability, defaults, identity, and computed columns
 - prepared DML, mandatory UPDATE/DELETE filters, affected-row and safe identity responses
 - classified duplicate/constraint errors and database-independent CRUD/security/regression coverage
+- SQL Resource Mode support for complex server-owned SQL Server SELECT/CTE queries without JSON Query function/expression limitations
 
 The shipped write registry is intentionally empty and must be configured per
 deployment. UPSERT uses one SQL Server MERGE/HOLDLOCK statement and verifies a

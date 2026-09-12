@@ -4,6 +4,7 @@ require_once __DIR__ . '/../../core/QueryEngine.php';
 require_once __DIR__ . '/../Resources/SqlResourceRegistry.php';
 require_once __DIR__ . '/Query/PaginationBuilder.php';
 require_once __DIR__ . '/../Requests/ApiRequestException.php';
+require_once __DIR__ . '/../Resources/SqlResourceStatement.php';
 
 class SqlRepository
 {
@@ -29,10 +30,6 @@ class SqlRepository
         $definition = $this->registry->resolve($request['resource']);
         $sql = trim($this->queryEngine->getQuery($definition['file']));
         $sql = rtrim($sql, "; \t\n\r\0\x0B");
-        if (!preg_match('/^SELECT\b/i', $sql)) {
-            throw new RuntimeException('Approved SQL resources must be read-only queries.');
-        }
-
         $allowedColumns = [];
         foreach ($definition['columns'] as $column) {
             $allowedColumns[strtolower($column)] = $column;
@@ -63,6 +60,18 @@ class SqlRepository
                 $request['filters'] ?? [],
                 $request['filterLogic'] ?? 'AND',
                 $allowedFilterColumns
+            );
+        }
+        $statement = SqlResourceStatement::analyze($sql);
+        $queryPrefix = $statement->prefix();
+        $sql = $statement->body();
+        $querySuffix = $statement->suffix();
+        if ($statement->hasAuthoredPagination()
+            && (!empty($request['filters']) || !empty($request['sort']) || isset($request['pagination']))) {
+            throw new ApiRequestException(
+                'Runtime query controls cannot be combined with authored SQL pagination.',
+                'INVALID_SQL_PAGINATION',
+                [['path' => 'pagination', 'message' => 'This resource owns its OFFSET/FETCH pagination.']]
             );
         }
         $sort = !empty($request['sort'])
@@ -117,9 +126,11 @@ class SqlRepository
             $params,
             $paginationRequest,
             $paginationOrderSql !== '' ? trim($paginationOrderSql) : null,
-            !($canPageAuthoredSqlDirectly && $topFitsRequestedPage)
+            !($canPageAuthoredSqlDirectly && $topFitsRequestedPage),
+            $queryPrefix,
+            $querySuffix
         );
-        $result = $this->queryEngine->executePrepared($paged['sql'], $params, [
+        $result = $this->queryEngine->executePrepared($queryPrefix . $paged['sql'], $params, [
             'action' => 'sql',
             'resource' => $request['resource'],
             'queryPhase' => 'data',

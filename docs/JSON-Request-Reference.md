@@ -34,6 +34,12 @@ also exist in the server registry. Its sort fields are unqualified output aliase
 filter fields come from the resource's `filterColumns` allowlist, which defaults
 to its output columns. Neither accepts arbitrary database fields.
 
+These restrictions describe client-composed JSON. A registered SQL Resource is
+backend-owned SQL and may use SQL Server functions, CTEs, joins, windows,
+subqueries, and set operations that are intentionally not exposed by the JSON
+Query function or expression allowlists. The client still supplies only the
+resource ID and documented runtime controls, never SQL text.
+
 ## CRUD writes
 
 CRUD `resource` IDs use the same restricted ID syntax as SQL resources, but are

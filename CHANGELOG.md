@@ -19,6 +19,9 @@ All notable backend changes are recorded here. The project follows semantic vers
 - A backup-first, cross-platform migration utility for converting plaintext `database.json` without exposing configuration or key material.
 - Windows one-time encryption setup using the bundled PHP/OpenSSL runtime, Windows User environment storage, backup-first complete-configuration migration, and connection validation.
 - Database-independent encryption coverage for complete-configuration round trips, field confidentiality, random nonces, malformed data, wrong keys, tampering, migration backups, backward-compatible resolution, and secret-safe logging.
+- Complex server-owned SQL Resource queries, including standard/recursive CTEs, subqueries, complex joins/APPLY, windows, SQL Server functions, JSON/XML expressions, and set operations, without expanding JSON Query Mode allowlists.
+- CTE-aware SQL Resource filtering/count/pagination generation and explicit protection against combining request controls with authored OFFSET/FETCH.
+- Database-independent SQL Resource capability and security regression coverage.
 - Database-independent `tests/run.php` entry point and broader logic coverage for every public filter operator, public joins, representative function families, all window functions, pagination counts, set-operation assembly, and response formatting.
 - Ubuntu/PHP 8.2 GitHub Actions workflow for backend syntax checks and all standalone tests without SQL Server, ODBC, credentials, or database configuration.
 - Definitive backend capability matrix and detailed public JSON field reference.

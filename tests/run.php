@@ -7,6 +7,7 @@ $tests = [
     __DIR__ . '/Phase1CapabilityTest.php',
     __DIR__ . '/Phase2CrudTest.php',
     __DIR__ . '/SqlControllerTest.php',
+    __DIR__ . '/SqlResourceCapabilityTest.php',
     __DIR__ . '/QueryExecutionIsolationTest.php',
     __DIR__ . '/LoggerTest.php',
     __DIR__ . '/DatabaseCredentialEncryptionTest.php',

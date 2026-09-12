@@ -33,7 +33,7 @@ Validation and normalization occur in `api/index.php` before controller dispatch
 | Services | Thin delegation to query or metadata repositories |
 | `QueryRepository` | Execution/orchestration facade for SELECT, set operations, and routines |
 | `SqlResourceRegistry` | Maps exact approved IDs to backend files, exposed output aliases, and default sorting; enforces path containment |
-| `SqlRepository` | Loads a registered SELECT, wraps it, safely applies supported runtime state, and reuses pagination/execution infrastructure |
+| `SqlRepository` | Loads a registered server-owned SELECT/CTE, preserves CTE scope around wrappers, safely applies runtime state, and reuses pagination/execution infrastructure |
 | `WriteResourceRegistry` | Maps exact approved write IDs to fixed schema/table and column/key allowlists; defaults to deny-all |
 | `WriteRepository` | Loads write metadata, validates payloads, chooses a write builder, executes prepared SQL, and formats operation results |
 | `ScopedMetadataRepository` | Adds request-local inferred CTE output metadata while delegating physical table/column checks to `MetadataRepository` |
@@ -52,7 +52,11 @@ client cannot supply SQL or a file path. Runtime sort and filter fields are chec
 against per-resource allowlists, identifiers are quoted by the repository, and
 values are passed to `QueryEngine::executePrepared`. Both paths converge on the
 same `QueryEngine`, database connection, exception handling, and `Response`
-envelope. Existing `QueryController` behavior is unchanged.
+envelope. Server-owned SQL is parsed by SQL Server and does not pass through the
+JSON Query function/expression allowlists. A small statement analyzer retains
+the single-read-query guard, splits a top-level WITH prefix from its main SELECT,
+and prevents wrappers from moving CTE declarations into invalid derived-table
+positions. Existing `QueryController` behavior is unchanged.
 
 CRUD is a third path rather than an extension of `SelectBuilder`. Each request
 resolves a `WriteResourceRegistry` entry before database metadata is loaded.

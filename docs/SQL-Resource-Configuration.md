@@ -17,7 +17,7 @@ Use a SQL resource when a report's projection and business logic should be fixed
 
 Use JSON Query Mode when the existing public JSON contract can express the query and the client needs to choose its validated fields, joins, grouping, or functions. SQL Resource Mode does not expose those structural choices: the SQL file owns them.
 
-SQL Resource Mode passes the registered statement to SQL Server rather than implementing individual SQL features. The current repository accepts only files whose trimmed contents begin with `SELECT`. In particular, a top-level `WITH` CTE file is not currently accepted; see [SQL Resource Files](SQL-Resource-Files.md#cte-files-are-not-currently-supported).
+SQL Resource Mode passes the registered statement to SQL Server rather than implementing or allowlisting individual functions and expressions. It accepts one server-owned read-only `SELECT`, optionally with leading comments or a top-level standard/recursive `WITH` clause. This is intentionally broader than client-composed JSON Query Mode.
 
 ## Runtime Flow
 
@@ -230,11 +230,11 @@ The implemented boundary provides these controls:
 - runtime filter values use ODBC prepared `?` parameters;
 - the client cannot submit SQL, file paths, credentials, or connection settings through this action.
 
-The SQL file itself is trusted backend code. The leading-`SELECT` check is a simple read-only guard, not a complete SQL parser. Review resource files like application code and use a least-privilege database account. There is currently no application authentication, per-resource authorization, rate limiting, resource cache, or response-column filtering.
+The SQL file itself is trusted backend code. Statement analysis rejects non-SELECT main statements, multiple statements, and top-level `SELECT ... INTO`, but is not a complete SQL parser. Review resource files like application code and use a least-privilege database account. There is currently no application authentication, per-resource authorization, rate limiting, resource cache, or response-column filtering.
 
 ## Adding a New SQL Resource
 
-1. Create a `.sql` file under `queries/`, conventionally `queries/reports/<resource-id>.sql`. Follow [SQL Resource Files](SQL-Resource-Files.md), including the leading-`SELECT` rule.
+1. Create a `.sql` file under `queries/`, conventionally `queries/reports/<resource-id>.sql`. Follow the statement and wrapping rules in [SQL Resource Files](SQL-Resource-Files.md).
 2. Add an exact resource ID key to `config/sql-resources.php` and map `file` with `QUERY_PATH`.
 3. Add every stable returned field/alias needed for sorting to `columns`. Ensure the SQL itself returns no sensitive fields.
 4. Add a non-empty, deterministic `defaultSort` using fields from `columns`.
@@ -255,7 +255,8 @@ The SQL file itself is trusted backend code. The leading-`SELECT` check is a sim
 | Sort direction or filter operator/value shape is invalid | HTTP 400, `INVALID_REQUEST` | Use the documented directions/operators and array shapes |
 | Integer-backed date is invalid | HTTP 400, `INVALID_SQL_RUNTIME_VALUE` | Send a real date as `YYYY-MM-DD` or `YYYYMMDD` |
 | Source marker is missing, duplicated, or used in an output-filter resource | HTTP 500, generic `QUERY_ERROR` | Use exactly one marker for `source`, none for `output` |
-| File begins with a comment, `WITH`, or another token instead of `SELECT` | HTTP 500, generic `QUERY_ERROR` | Make the first non-whitespace token `SELECT`; top-level CTE resources are not implemented |
+| Main statement is not SELECT, the file has multiple statements, or SELECT uses top-level INTO | HTTP 500, generic `QUERY_ERROR` | Keep one read-only SELECT; a leading comment or WITH/CTE is allowed |
+| Runtime controls are sent to a resource with authored OFFSET/FETCH | HTTP 400, `INVALID_SQL_PAGINATION` | Remove request filters/sort/pagination or remove authored pagination from the file |
 | SQL Server rejects the statement or an alias does not exist | HTTP 500, generic `QUERY_ERROR` | Inspect the dated log in `logs/`, then run the file against the configured schema |
 | Statement exceeds its configured execution limit | HTTP 504, `QUERY_ERROR` | Optimize the query or review `DB_QUERY_TIMEOUT_SECONDS` and deployment limits |
 

@@ -64,9 +64,11 @@ Backend registration and file-authoring details are documented separately in
 [SQL Resource Configuration](SQL-Resource-Configuration.md) and
 [SQL Resource Files](SQL-Resource-Files.md).
 
-The registered SQL owns static projections, joins, grouping, HAVING, and other
-business logic. Dynamic grouping and free-text search are not SQL action
-properties. Clients should send only the runtime properties documented above.
+The registered SQL owns static projections, joins, grouping, HAVING, CTEs,
+subqueries, set operations, windows, and SQL Server-specific functions. It is
+not constrained by JSON Query Mode's function/expression allowlists. Dynamic
+query structure and free-text SQL are not SQL action properties; clients send
+only the runtime properties documented above.
 
 ### CRUD write requests
 
@@ -226,7 +228,7 @@ generic HTTP 500 `QUERY_ERROR`; no SQL Server message is returned.
 
 ## Pagination and ordering
 
-`pagination` requires positive integer `page` and `pageSize`. SQL Server compatibility level 110+ uses `OFFSET/FETCH`; older compatibility levels use a `ROW_NUMBER()` wrapper. The backend normally runs a count query before the page query; the complete-first-page SQL-resource `TOP` optimization described above is the exception.
+`pagination` requires positive integer `page` and `pageSize`. SQL Server compatibility level 110+ uses `OFFSET/FETCH`; older compatibility levels use a `ROW_NUMBER()` wrapper. The backend normally runs a count query before the page query; the complete-first-page SQL-resource `TOP` optimization described above is the exception. SQL resources with authored OFFSET/FETCH run directly without runtime controls; combining authored and request pagination is rejected explicitly.
 
 Public sorting uses validated logical fields or a selected alias and `ASC`/`DESC`; numeric positions such as `"1"` are rejected. Window functions likewise require a logical sort field. This prevents invalid SQL Server output such as `ROW_NUMBER() OVER (ORDER BY 1)`. If top-level `sort` is omitted, the builder supplies an order based on the first usable projection (or table metadata when needed); grouped requests default to the first group field.
 
@@ -237,7 +239,7 @@ Public sorting uses validated logical fields or a selected alias and `ASC`/`DESC
 | Feature | Backend support | Public JSON representation | Validation | Notes |
 |---|---|---|---|---|
 | SELECT | Supported | `action: "select"`, `source`, `fields` | Table/field identifier shape, then live metadata | Existing JSON query action |
-| Controlled SQL resource | Supported | `action: "sql"`, `resource` | Explicit resource registry plus sort/filter field allowlists | No raw SQL or client paths |
+| Controlled SQL resource | Supported | `action: "sql"`, `resource` | Explicit resource registry plus sort/filter field allowlists | Complex server-owned SQL/CTEs allowed; no raw SQL or client paths |
 | INSERT | Supported | `action: "insert"`, `resource`, `data` | Write registry plus live column metadata | Single object; prepared values; safe identity output |
 | UPDATE | Supported | `action: "update"`, `resource`, `data`, non-empty `filters` | Writable/filterable allowlists plus live types | Full-table UPDATE rejected |
 | DELETE | Supported | `action: "delete"`, `resource`, non-empty `filters` | Filter allowlist plus live types | Full-table DELETE rejected |
