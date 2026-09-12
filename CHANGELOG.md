@@ -6,6 +6,14 @@ All notable backend changes are recorded here. The project follows semantic vers
 
 ### Added
 
+- Public single-object INSERT, UPDATE, DELETE, and UPSERT actions routed through
+  dedicated controller/service/repository and write-builder layers.
+- Deny-by-default write-resource registry with per-resource action, schema/table,
+  writable/filterable column, UPSERT key, and identity allowlists.
+- Live SQL Server write metadata validation, mandatory UPDATE/DELETE targeting,
+  prepared DML values, affected-row/identity responses, unique-key verification,
+  safe constraint error classification, and database-independent CRUD/security tests.
+
 - Cross-platform AES-256-GCM database password encryption with a versioned nonce/ciphertext/authentication-tag format and a Base64-encoded 32-byte key supplied through `GENERIC_SQL_API_ENCRYPTION_KEY`.
 - Database credential resolution that preserves plaintext password compatibility while decrypting encrypted passwords before the existing SQL Server ODBC connection path.
 - Windows one-time encryption setup using the bundled PHP/OpenSSL runtime, Windows User environment storage, in-place configuration migration, and connection validation without retaining a plaintext backup.

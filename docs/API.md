@@ -17,6 +17,7 @@ The body must be one JSON object. The required `action` is one of:
 
 - `select`
 - `sql`
+- `insert`, `update`, `delete`, `upsert`
 - `union`, `unionAll`
 - `procedure`, `function`, `tableFunction`
 - `metadata.tables`, `metadata.columns`, `metadata.views`, `metadata.procedures`, `metadata.schema`
@@ -67,6 +68,63 @@ The registered SQL owns static projections, joins, grouping, HAVING, and other
 business logic. Dynamic grouping and free-text search are not SQL action
 properties. Clients should send only the runtime properties documented above.
 
+### CRUD write requests
+
+Writes use an exact ID from `config/write-resources.php`; they never accept a
+table or schema name from the client. The shipped registry is empty so a new
+deployment denies every write until an administrator explicitly maps a resource
+to a table and its writable/filterable columns.
+
+```json
+{
+  "action": "insert",
+  "resource": "customers",
+  "data": { "customerCode": "C001", "name": "John", "email": null }
+}
+```
+
+```json
+{
+  "action": "update",
+  "resource": "customers",
+  "data": { "email": "new@example.com" },
+  "filters": [{ "field": "id", "operator": "=", "value": 10 }]
+}
+```
+
+```json
+{
+  "action": "delete",
+  "resource": "customers",
+  "filters": [{ "field": "id", "operator": "=", "value": 10 }]
+}
+```
+
+```json
+{
+  "action": "upsert",
+  "resource": "customers",
+  "data": { "customerCode": "C001", "name": "John" },
+  "keys": ["customerCode"]
+}
+```
+
+Each request changes one input object; bulk writes are not implemented. INSERT
+and UPSERT require every non-nullable, non-generated column that lacks a default.
+Identity, computed, timestamp, and rowversion columns cannot be supplied.
+UPDATE and DELETE require a non-empty, valid `filters` array and never fall back
+to a full-table statement. Write filters support comparisons, LIKE, IN, BETWEEN,
+and NULL operators, but not subqueries or EXISTS. Columns, types, nullability,
+lengths, defaults, and generated status are checked against SQL Server metadata.
+All data, key, and filter values are prepared parameters.
+
+UPSERT `keys` must exactly match the server-configured key set and each key value
+must be present and non-null. The implementation is one SQL Server `MERGE` with
+`HOLDLOCK`; a matching unfiltered UNIQUE/PRIMARY KEY index is verified from live
+metadata. It does not
+open a transaction, and SQL Server MERGE-specific operational caveats still
+apply. See [Write Resource Configuration](Write-Resource-Configuration.md).
+
 ## Success response
 
 All controllers use the same envelope:
@@ -91,8 +149,31 @@ All controllers use the same envelope:
 - Paginated SELECT and SQL-resource requests normally obtain `totalRows` with a separate count query. A complete first-page `TOP` resource can infer it from `rowsReturned`; without pagination it also defaults to `rowsReturned`.
 - `executionTime` is elapsed database execution time in milliseconds, rounded to two decimals, or `null` if the underlying result did not supply it.
 - `rowsReturned` counts rows collected across the executed result.
+- Write responses keep `rowsReturned: 0`, add `meta.affectedRows`, and put one
+  operation summary in `data`. INSERT and an inserting UPSERT also include
+  `generatedId` when the resource declares a verified identity column.
 - Query results do not include a separate column-schema/column-metadata property. The `metadata.columns` action returns column rows as ordinary `data`.
 - SELECT/UNION messages are `Data Loaded Successfully`; routine actions use their corresponding executed-successfully message; metadata actions use their loaded-successfully message.
+- Write messages are `Data Inserted Successfully`, `Data Updated Successfully`,
+  `Data Deleted Successfully`, and `Data Upserted Successfully`.
+
+A successful INSERT with a configured identity is represented as:
+
+```json
+{
+  "success": true,
+  "message": "Data Inserted Successfully",
+  "data": [{ "operation": "insert", "affectedRows": 1, "generatedId": 42 }],
+  "meta": {
+    "page": null,
+    "pageSize": null,
+    "totalRows": 0,
+    "rowsReturned": 0,
+    "executionTime": 1.27,
+    "affectedRows": 1
+  }
+}
+```
 
 ## Error responses
 
@@ -136,6 +217,13 @@ Unhandled builder, metadata, connection, or execution failures are HTTP 500:
 
 The response does not expose the underlying exception. The exception handler writes details to the dated file in `logs/`.
 
+Write validation additionally uses `INVALID_WRITE_RESOURCE`,
+`INVALID_WRITE_COLUMN`, `INVALID_WRITE_VALUE`, `MISSING_REQUIRED_FIELD`,
+`INVALID_UPSERT_KEY`, and `UNSAFE_WRITE`, all as HTTP 400. Recognized duplicate
+key and other constraint failures are safe HTTP 409 responses with
+`DUPLICATE_KEY` or `CONSTRAINT_VIOLATION`. Other database failures remain the
+generic HTTP 500 `QUERY_ERROR`; no SQL Server message is returned.
+
 ## Pagination and ordering
 
 `pagination` requires positive integer `page` and `pageSize`. SQL Server compatibility level 110+ uses `OFFSET/FETCH`; older compatibility levels use a `ROW_NUMBER()` wrapper. The backend normally runs a count query before the page query; the complete-first-page SQL-resource `TOP` optimization described above is the exception.
@@ -150,6 +238,10 @@ Public sorting uses validated logical fields or a selected alias and `ASC`/`DESC
 |---|---|---|---|---|
 | SELECT | Supported | `action: "select"`, `source`, `fields` | Table/field identifier shape, then live metadata | Existing JSON query action |
 | Controlled SQL resource | Supported | `action: "sql"`, `resource` | Explicit resource registry plus sort/filter field allowlists | No raw SQL or client paths |
+| INSERT | Supported | `action: "insert"`, `resource`, `data` | Write registry plus live column metadata | Single object; prepared values; safe identity output |
+| UPDATE | Supported | `action: "update"`, `resource`, `data`, non-empty `filters` | Writable/filterable allowlists plus live types | Full-table UPDATE rejected |
+| DELETE | Supported | `action: "delete"`, `resource`, non-empty `filters` | Filter allowlist plus live types | Full-table DELETE rejected |
+| UPSERT | Supported | `action: "upsert"`, `resource`, `data`, `keys` | Exact configured key set plus live types | SQL Server MERGE/HOLDLOCK; database unique constraint required |
 | DISTINCT | Supported | `distinct: true` | Boolean | Default `false` |
 | TOP | Supported | `limit: 10` | Positive integer | Normalizes to internal `top` |
 | Column/table aliases | Supported | field `alias`; `source.alias` | Identifier | Selected aliases may be used by top-level sort |
@@ -190,6 +282,7 @@ Public sorting uses validated logical fields or a selected alias and `ASC`/`DESC
 | Metadata | Supported | five `metadata.*` actions | Action allow-list; columns requires source table | Database-backed |
 | Column description metadata | Not supported in query envelope | None | N/A | Use `metadata.columns` separately |
 | Validation/error envelope | Supported | N/A | Unknown properties and invalid shapes rejected | 400 contract errors; generic 500 query errors |
+| Transactions | Not supported | None | N/A | Planned for Phase 3; CRUD actions execute independently |
 
 Known contract boundary: `TIMEFROMPARTS` is named in the function allow-list and exists in the internal builder, but its required `fractions` property is not accepted by the public field-property allow-list. It is therefore not a usable public feature and is not shown as a supported example.
 

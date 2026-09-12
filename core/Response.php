@@ -34,7 +34,10 @@ class Response
                 'rowsReturned' => $rowsReturned,
                 'executionTime' => is_array($data) && isset($data['executionTime'])
                     ? $data['executionTime']
-                    : null
+                    : null,
+                ...is_array($data) && array_key_exists('affectedRows', $data)
+                    ? ['affectedRows' => (int)$data['affectedRows']]
+                    : [],
             ]
         ];
     }

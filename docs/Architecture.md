@@ -2,7 +2,7 @@
 
 ## Runtime flow
 
-The two query request flows implemented today are:
+The three request flows implemented today are:
 
 ```text
 Client
@@ -11,6 +11,7 @@ Client
   -> QueryRequestNormalizer
   -> QueryController -> QueryService -> QueryRepository -> specialized builders
      OR SQLController -> SqlService -> SqlRepository -> approved SQL resource
+     OR WriteController -> WriteService -> WriteRepository -> write builders
   -> QueryEngine
   -> Database -> DriverFactory -> SqlServerDriver
   -> PHP ODBC -> SQL Server
@@ -23,14 +24,18 @@ Validation and normalization occur in `api/index.php` before controller dispatch
 | Layer | Current responsibility |
 |---|---|
 | `api/index.php` | CORS/preflight, JSON parsing, validation, normalization, routing, exception registration |
-| `QueryRequestValidator` | Dispatches validation for JSON-query actions and controlled SQL resources |
+| `QueryRequestValidator` | Dispatches validation for JSON-query, controlled SQL-resource, and CRUD actions |
 | `SqlRequestValidator` | Restricts SQL mode to a resource ID and supported filter/sort/pagination runtime shapes |
-| `QueryRequestNormalizer` | Converts public JSON terminology and routes `sql` to `SQLController` |
-| Controllers | Select/SQL-resource operation and shared response message; no SQL construction |
+| `WriteRequestValidator` | Enforces CRUD shapes, scalar values, write-filter operators, and mandatory UPDATE/DELETE targeting |
+| `WritePayloadValidator` | Resolves configured columns against live metadata and checks types, nullability, defaults, generated columns, and UPSERT keys |
+| `QueryRequestNormalizer` | Converts public JSON terminology and routes query, SQL-resource, and write actions |
+| Controllers | Query, SQL-resource, or write operation and shared response message; no SQL construction |
 | Services | Thin delegation to query or metadata repositories |
 | `QueryRepository` | Execution/orchestration facade for SELECT, set operations, and routines |
 | `SqlResourceRegistry` | Maps exact approved IDs to backend files, exposed output aliases, and default sorting; enforces path containment |
 | `SqlRepository` | Loads a registered SELECT, wraps it, safely applies supported runtime state, and reuses pagination/execution infrastructure |
+| `WriteResourceRegistry` | Maps exact approved write IDs to fixed schema/table and column/key allowlists; defaults to deny-all |
+| `WriteRepository` | Loads write metadata, validates payloads, chooses a write builder, executes prepared SQL, and formats operation results |
 | `ScopedMetadataRepository` | Adds request-local inferred CTE output metadata while delegating physical table/column checks to `MetadataRepository` |
 | Query builders | Validate database objects and construct SQL fragments/parameters |
 | `QueryEngine` | ODBC execution, result collection, timing, row counts, execution logs |
@@ -48,6 +53,27 @@ against per-resource allowlists, identifiers are quoted by the repository, and
 values are passed to `QueryEngine::executePrepared`. Both paths converge on the
 same `QueryEngine`, database connection, exception handling, and `Response`
 envelope. Existing `QueryController` behavior is unchanged.
+
+CRUD is a third path rather than an extension of `SelectBuilder`. Each request
+resolves a `WriteResourceRegistry` entry before database metadata is loaded.
+`WritePayloadValidator` canonicalizes only allowlisted columns and rejects values
+that do not match the live SQL Server column properties. `InsertBuilder`,
+`UpdateBuilder`, `DeleteBuilder`, `UpsertBuilder`, and `WriteFilterBuilder` then
+produce bracket-quoted server-owned identifiers and positional parameters.
+
+The DML `OUTPUT` is captured into a table variable and selected after the change.
+This provides an affected-row count, avoids relying on driver-specific
+`odbc_num_rows`, and remains usable when the target has enabled DML triggers.
+Only a configured, metadata-verified identity can be returned. UPDATE and DELETE
+cannot be built through the public path without at least one valid filter.
+
+UPSERT uses one `MERGE ... WITH (HOLDLOCK)` statement. A two-statement
+UPDATE-then-INSERT sequence was rejected because Phase 2 has no transaction in
+which to preserve its key-range lock. The configured keys must have a matching
+database unfiltered UNIQUE/PRIMARY KEY index, which is verified through live
+metadata. HOLDLOCK reduces the absent-row race,
+but does not remove SQL Server MERGE caveats or replace deployment-specific
+concurrency testing. Transactions remain a Phase 3 boundary.
 
 SQL resources may define `filterColumns` separately from returned `columns`.
 For example, a grouped report can return `Cust_Name` and aggregate aliases
@@ -81,7 +107,7 @@ Nested SELECT construction snapshots and restores the expression alias scope, so
 
 ## Database and metadata
 
-`DriverFactory` currently creates only `SqlServerDriver`. A `Database` construction immediately connects, which is why production repositories are connection-backed. `QueryRepository` passes its request-owned `QueryEngine` to `MetadataRepository`, so metadata and data use one connection in sequence instead of opening a second connection. Other requests construct different engines and connections. Statements are freed in `finally`, including after failures, and the engine closes its connection at the end of its lifetime. `MetadataRepository` queries `INFORMATION_SCHEMA` to validate tables and columns and to determine types used by integer-backed date-range handling.
+`DriverFactory` currently creates only `SqlServerDriver`. A `Database` construction immediately connects, which is why production repositories are connection-backed. Query and write repositories pass their request-owned `QueryEngine` to `MetadataRepository`, so metadata and data use one connection in sequence instead of opening a second connection. Other requests construct different engines and connections. Statements are freed in `finally`, including after failures, and the engine closes its connection at the end of its lifetime. `MetadataRepository` queries `INFORMATION_SCHEMA` for query validation and integer-backed date handling. CRUD additionally queries `sys.columns`, `sys.tables`, `sys.schemas`, and `sys.types` for length, precision/scale, nullability, identity, computed, generated/hidden, and default flags.
 
 Database password protection is a configuration-layer concern:
 
@@ -115,9 +141,10 @@ This timeout controls duration and failure behavior; it does not make an ineffic
 
 ## Test boundary
 
-Database-independent tests instantiate builders with fake `QueryEngine` and `MetadataRepository` subclasses whose constructors do not connect. They test public validation -> normalization -> SQL/parameter generation and response formatting, count/data sequencing, independent executor state, parameter isolation, timeout conversion, cleanup, and recovery after failure. A live SQL Server remains necessary for execution-plan and real ODBC timeout integration, but not for normal CI.
+Database-independent tests instantiate builders with fake `QueryEngine` and `MetadataRepository` subclasses whose constructors do not connect. They test public validation -> normalization -> SQL/parameter generation and response formatting, CRUD type/resource/filter/key safety, affected-row and identity mapping, count/data sequencing, independent executor state, parameter isolation, timeout conversion, cleanup, and recovery after failure. A live SQL Server remains necessary for real DML, constraints, triggers, MERGE concurrency, execution plans, and ODBC timeout integration, but not for normal CI.
 
 See [API](API.md), [JSON request reference](JSON-Request-Reference.md),
 [SQL resource configuration](SQL-Resource-Configuration.md),
-[SQL resource files](SQL-Resource-Files.md), and
+[SQL resource files](SQL-Resource-Files.md),
+[write resource configuration](Write-Resource-Configuration.md), and
 [Database configuration](Database-Configuration.md).

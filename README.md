@@ -1,6 +1,10 @@
 # Generic SQL API Framework
 
-Generic SQL API Framework is a backend-only PHP API that turns a validated JSON query description into SQL Server SQL, executes it through ODBC, and returns a stable JSON envelope. It is intended for clients that need reusable read/query endpoints without adding a controller for every report query. Clients never submit raw SQL.
+Generic SQL API Framework is a backend-only PHP API that turns validated JSON
+query or CRUD descriptions into SQL Server SQL, executes them through ODBC, and
+returns a stable JSON envelope. It provides reusable read/query endpoints and
+explicitly configured write resources without a controller per table or report.
+Clients never submit raw SQL.
 
 The existing PHP implementation is the source of truth. Microsoft SQL Server through ODBC is the only working provider. Driver stubs for MySQL, PostgreSQL, Oracle, and SQLite are not selectable by `DriverFactory` and are not supported providers.
 
@@ -24,7 +28,7 @@ Send JSON to `api/index.php` (normally with `POST` and `Content-Type: applicatio
 }
 ```
 
-The public actions are `select`, `sql`, `union`, `unionAll`, `procedure`, `function`, `tableFunction`, and the five metadata actions documented in [API.md](docs/API.md). Public property names such as `source`, `fields`, `field`, `filters`, and `pagination` are normalized to a private execution model. Internal names such as `table`, `columns`, `column`, `where`, `top`, `page`, and `pageSize` are not accepted as public JSON.
+The public actions are `select`, `sql`, `insert`, `update`, `delete`, `upsert`, `union`, `unionAll`, `procedure`, `function`, `tableFunction`, and the five metadata actions documented in [API.md](docs/API.md). Public property names such as `source`, `fields`, `field`, `resource`, `data`, `filters`, and `pagination` are normalized to a private execution model. Internal names such as `table`, `columns`, `column`, `where`, `top`, `page`, and `pageSize` are not accepted as public JSON.
 
 `sql` is a controlled report-resource action, not a raw-SQL endpoint. A client
 sends an allowlisted resource ID plus optional runtime filters, sorting, and
@@ -35,13 +39,19 @@ uses the existing SQL Server connection.
 
 Current query support includes SELECT, DISTINCT, SQL Server TOP through `limit`, aliases, CASE and arithmetic expressions, an allow-list of SQL functions, prepared WHERE values, INNER/LEFT/RIGHT equality joins, GROUP BY, aggregate HAVING, multi-field sorting, pagination, eight window functions, subqueries in selected filters, one CTE (including the recursive form), UNION/UNION ALL, routines, and database metadata reads. See the definitive [JSON request reference](docs/JSON-Request-Reference.md) and [capability matrix](docs/API.md#capability-matrix) for exact boundaries.
 
+CRUD uses a separate deny-by-default write-resource registry. It supports
+single-object INSERT, targeted UPDATE/DELETE, and SQL Server UPSERT with live
+metadata validation, prepared values, affected-row reporting, and optional safe
+identity output. A deployment must explicitly configure approved write targets.
+
 ## Architecture
 
 The actual HTTP flow is:
 
 ```text
 Client -> api/index.php -> QueryRequestValidator -> QueryRequestNormalizer
-       -> QueryController/QueryRepository or SQLController/SqlRepository
+       -> QueryController/QueryRepository, SQLController/SqlRepository,
+          or WriteController/WriteRepository
        -> QueryEngine -> Database/ODBC -> SQL Server
 ```
 
@@ -50,7 +60,8 @@ Results return through the same layers and `Response` creates the public envelop
 See [Architecture.md](docs/Architecture.md) for responsibilities and request/response flow.
 Backend developers adding controlled SQL reports should also read
 [SQL resource configuration](docs/SQL-Resource-Configuration.md) and
-[SQL resource files](docs/SQL-Resource-Files.md).
+[SQL resource files](docs/SQL-Resource-Files.md). CRUD deployments should read
+[write resource configuration](docs/Write-Resource-Configuration.md).
 
 ## Configure SQL Server
 
@@ -116,13 +127,14 @@ find api app config core database scripts tests -type f -name '*.php' -exec php 
 
 ## Responses
 
-Successful operations return `success`, `message`, `data`, and `meta`. Metadata includes `page`, `pageSize`, `totalRows`, `rowsReturned`, and `executionTime`; there is no query-result column-description metadata. Errors return `success: false`, an `error` object, and an empty `data` array. See [API.md](docs/API.md).
+Successful operations return `success`, `message`, `data`, and `meta`. Metadata includes `page`, `pageSize`, `totalRows`, `rowsReturned`, and `executionTime`; writes additionally include `affectedRows`. There is no query-result column-description metadata. Errors return `success: false`, an `error` object, and an empty `data` array. See [API.md](docs/API.md).
 
 ## Project status
 
 - v1.0.0 — Core API and advanced SQL: released
-- v1.1.0 — Windows runtime and deployment: current
-- v1.2.0 onward — CRUD, transactions, richer metadata, API authentication/authorization, API improvements, performance, and additional providers: planned
+- v1.1.0 — Windows runtime and deployment: released
+- v1.2.0 — CRUD operations: current
+- v1.3.0 onward — transactions, richer metadata, API authentication/authorization, API improvements, performance, and additional providers: planned
 
 The roadmap is backend-only. See [Roadmap.md](docs/Roadmap.md) and [CHANGELOG.md](CHANGELOG.md).
 
@@ -134,6 +146,7 @@ The roadmap is backend-only. See [Roadmap.md](docs/Roadmap.md) and [CHANGELOG.md
 - [JSON request reference](docs/JSON-Request-Reference.md)
 - [SQL resource configuration](docs/SQL-Resource-Configuration.md)
 - [SQL resource files](docs/SQL-Resource-Files.md)
+- [Write resource configuration](docs/Write-Resource-Configuration.md)
 - [Query examples](docs/Query-Examples.md)
 - [Database configuration](docs/Database-Configuration.md)
 - [Hosting](docs/Hosting.md)

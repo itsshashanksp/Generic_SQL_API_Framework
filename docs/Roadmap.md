@@ -11,13 +11,10 @@ This roadmap covers only the Generic SQL API backend. Frontend dashboards, grids
 - IN/EXISTS filter subqueries, standard/recursive CTE, UNION/UNION ALL
 - stored procedure, scalar function, table-valued function, and metadata actions
 - stable success/error envelope, execution timing, row count, query/error logging
-- Phase 1 completion coverage for every public function family, JOIN columns,
-  nested filter subqueries, CTE/recursive-CTE output scope and pagination,
-  UNION/UNION ALL compatibility, routines, metadata, and SQL Resource Mode
 
-Current boundaries remain documented in the [capability matrix](API.md#capability-matrix). In particular, FULL/CROSS joins, window partitioning, public INTERSECT/EXCEPT, general subqueries, and write operations are not released features.
+Current boundaries remain documented in the [capability matrix](API.md#capability-matrix). In particular, FULL/CROSS joins, window partitioning, public INTERSECT/EXCEPT, and general subqueries are not released features.
 
-## v1.1.0 — Windows Runtime & Deployment — Current
+## v1.1.0 — Windows Runtime & Deployment — Released
 
 - bundled `runtime/windows/php/`
 - `start-windows.bat` checks PHP, configuration, ODBC, OpenSSL, encrypted-credential readiness, database connectivity, API path, and ports
@@ -27,12 +24,22 @@ Current boundaries remain documented in the [capability matrix](API.md#capabilit
 - modular `QueryRepository` facade with specialized query builders
 - public validation/normalization plus API-contract and ORDER BY/window regression coverage
 - database-independent backend test runner and GitHub Actions syntax/logic workflow
+- Phase 1 completion coverage for every public function family, JOIN columns,
+  nested filter subqueries, CTE/recursive-CTE output scope and pagination,
+  UNION/UNION ALL compatibility, routines, metadata, and SQL Resource Mode
 
-## v1.2.0 — CRUD Operations — Planned
+## v1.2.0 — CRUD Operations — Current
 
-- INSERT, UPDATE, DELETE, and upsert design
-- write-specific validation and prepared execution
-- write response/error contracts and tests
+- INSERT, UPDATE, DELETE, and single-row UPSERT public actions
+- deny-by-default write-resource registry with action, table, column, filter, key, and identity allowlists
+- live SQL Server metadata validation for types, nullability, defaults, identity, and computed columns
+- prepared DML, mandatory UPDATE/DELETE filters, affected-row and safe identity responses
+- classified duplicate/constraint errors and database-independent CRUD/security/regression coverage
+
+The shipped write registry is intentionally empty and must be configured per
+deployment. UPSERT uses one SQL Server MERGE/HOLDLOCK statement and verifies a
+matching unfiltered unique index. Bulk writes and application-managed
+transactions are not part of this release.
 
 ## v1.3.0 — Transactions — Planned
 

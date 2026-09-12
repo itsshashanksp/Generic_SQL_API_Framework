@@ -14,6 +14,10 @@ Unknown top-level properties are rejected for every action.
 |---|---|---|
 | `select` | `source`, `fields` | `filters`, `joins`, `groupBy`, `having`, `sort`, `pagination`, `distinct`, `limit`, `filterLogic`, `with` |
 | `sql` | `resource` | `filters`, `sort`, `pagination`, `filterLogic` |
+| `insert` | `resource`, non-empty `data` object | none |
+| `update` | `resource`, non-empty `data` object, non-empty `filters` | `filterLogic` |
+| `delete` | `resource`, non-empty `filters` | `filterLogic` |
+| `upsert` | `resource`, non-empty `data` object, non-empty `keys` list | none |
 | `union`, `unionAll` | non-empty `queries` | none |
 | `procedure` | `source.procedure` | `parameters` |
 | `function`, `tableFunction` | `source.function` | `parameters` |
@@ -29,6 +33,45 @@ Its resource IDs use the stricter `^[A-Za-z0-9][A-Za-z0-9_-]*$` shape and must
 also exist in the server registry. Its sort fields are unqualified output aliases;
 filter fields come from the resource's `filterColumns` allowlist, which defaults
 to its output columns. Neither accepts arbitrary database fields.
+
+## CRUD writes
+
+CRUD `resource` IDs use the same restricted ID syntax as SQL resources, but are
+resolved from the separate `config/write-resources.php` registry. Clients cannot
+send `source`, table/schema names, SQL, expressions, file paths, metadata, or
+connection information. `data` is a JSON object keyed by unqualified column
+names; every value must be a string, number, boolean, or null. Arrays and nested
+objects are not write values.
+
+Each resource separately allowlists which CRUD `actions` are enabled. A valid
+resource ID is rejected when that resource does not enable the requested action.
+
+Write columns are case-insensitively matched to their configured canonical names
+and live SQL Server metadata. Integer, numeric, bit, string/length, ISO date/time,
+UUID, binary-string, nullability, required/default, identity, computed, and
+rowversion rules are validated before SQL execution. Unsupported database types
+are rejected instead of being guessed. Defaults are used by omitting their
+columns; clients cannot request a SQL DEFAULT expression.
+
+UPDATE and DELETE filters use this shape:
+
+| Name | Type | Required | Allowed/default |
+|---|---|---:|---|
+| `filters` | array | yes | Non-empty; an empty/missing list is `UNSAFE_WRITE` |
+| `filters[].field` | unqualified identifier | yes | Must be in the resource `filterColumns` |
+| `filters[].operator` | string | yes | `=`, `!=`, `<>`, `>`, `<`, `>=`, `<=`, `LIKE`, `NOT LIKE`, `IN`, `NOT IN`, `BETWEEN`, `NOT BETWEEN`, `IS NULL`, `IS NOT NULL` |
+| `filters[].value` | scalar/array | except NULL forms | Non-empty list for IN; exactly two values for BETWEEN |
+| `filterLogic` | string | no | `AND`; `OR` also accepted |
+
+Write filters do not accept `query`, EXISTS, NOT EXISTS, or dotted fields. A null
+comparison must use IS NULL/IS NOT NULL. For UPSERT, `keys` is a unique list of
+unqualified column names that must exactly equal the resource's configured key
+set; all key values must exist in `data` and be non-null. UPSERT does not accept
+filters or `filterLogic`.
+
+All four actions are single-object operations. There is no bulk request shape,
+transaction property, begin/commit/rollback action, arbitrary returned-column
+selection, or client override for identity insertion.
 
 ## SELECT fields
 

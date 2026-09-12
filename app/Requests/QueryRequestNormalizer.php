@@ -19,6 +19,24 @@ class QueryRequestNormalizer
         if ($action === 'select') {
             return ['controller' => 'Query', 'action' => 'select'] + $this->normalizeSelect($request);
         }
+        if (in_array($action, ['insert', 'update', 'delete', 'upsert'], true)) {
+            $normalized = [
+                'controller' => 'Write',
+                'action' => $action,
+                'resource' => $request['resource'],
+            ];
+            if (isset($request['data'])) $normalized['data'] = $request['data'];
+            if (isset($request['filters'])) {
+                $normalized['filters'] = array_map(fn (array $filter): array => [
+                    'field' => $filter['field'],
+                    'operator' => strtoupper($filter['operator']),
+                    ...array_key_exists('value', $filter) ? ['value' => $filter['value']] : [],
+                ], $request['filters']);
+            }
+            if (isset($request['filterLogic'])) $normalized['filterLogic'] = strtoupper($request['filterLogic']);
+            if (isset($request['keys'])) $normalized['keys'] = $request['keys'];
+            return $normalized;
+        }
         if ($action === 'union' || $action === 'unionAll') {
             return [
                 'controller' => 'Query',
